@@ -1,0 +1,6 @@
+{
+  "name": "NexusPlay",
+  "description": "Production-ready sports venue management & booking platform for turfs, arenas, courts, open games and player marketplace.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
