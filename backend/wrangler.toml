@@ -1,0 +1,29 @@
+name = "thidal-backend"
+main = "src/index.js"
+compatibility_date = "2024-11-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Runs every minute to auto-cancel & refund pools that missed their
+# player threshold within the deadline window.
+[triggers]
+crons = ["* * * * *"]
+
+# Logo uploads live in this R2 bucket. Create it once with:
+#   wrangler r2 bucket create thidal-logos
+[[r2_buckets]]
+binding = "LOGOS"
+bucket_name = "thidal-logos"
+
+# DATABASE_URL and JWT_SECRET are SECRETS, not vars — never commit them.
+# Set them with:
+#   wrangler secret put DATABASE_URL
+#   wrangler secret put JWT_SECRET      # any long random string
+#
+# For local dev, put them in a .dev.vars file (gitignored):
+#   DATABASE_URL=postgres://...
+#   JWT_SECRET=some-long-random-string
+#   DEV_MODE=true   # returns the OTP code in the API response so you can test without SMS
+
+[vars]
+DEV_MODE = "true"
+# ALLOWED_ORIGIN = "https://your-frontend.pages.dev"
