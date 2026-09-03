@@ -296,6 +296,9 @@ export function initDb() {
   try { db.exec("ALTER TABLE court_slots ADD COLUMN full_inquiry_client TEXT"); } catch(e) {}
   try { db.exec("ALTER TABLE court_slots ADD COLUMN full_inquiry_phone TEXT"); } catch(e) {}
   try { db.exec("ALTER TABLE court_slots ADD COLUMN full_inquiry_notes TEXT"); } catch(e) {}
+  try { db.exec("ALTER TABLE court_slots ADD COLUMN full_inquiry_amount INTEGER"); } catch(e) {}
+  try { db.exec("ALTER TABLE court_slots ADD COLUMN full_inquiry_status TEXT DEFAULT 'none'"); } catch(e) {}
+  try { db.exec("ALTER TABLE court_slots ADD COLUMN full_inquiry_requested_at DATETIME"); } catch(e) {}
   try { db.exec("ALTER TABLE bookings ADD COLUMN upi_utr TEXT"); } catch(e) {}
   try { db.exec("ALTER TABLE bookings ADD COLUMN upi_verified_at DATETIME"); } catch(e) {}
   try { db.exec("ALTER TABLE bookings ADD COLUMN upi_verified_by TEXT"); } catch(e) {}

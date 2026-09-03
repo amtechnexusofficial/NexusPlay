@@ -227,15 +227,79 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
     }
   }
 
+  // Owner Host Open Game Modal State
+  const [showOwnerHostModal, setShowOwnerHostModal] = useState(false);
+  const [ownerHostSlot, setOwnerHostSlot] = useState(null);
+  const [ownerHostTitle, setOwnerHostTitle] = useState('');
+  const [ownerHostSportId, setOwnerHostSportId] = useState('football');
+  const [ownerHostPlayers, setOwnerHostPlayers] = useState(10);
+  const [ownerHostCost, setOwnerHostCost] = useState(150);
+  const [ownerHostSkill, setOwnerHostSkill] = useState('All Levels');
+  const [ownerHostRules, setOwnerHostRules] = useState('Turf shoes only. Bibs and match ball provided by arena.');
+  const [isPublishingOwnerGame, setIsPublishingOwnerGame] = useState(false);
+
   // Accept Full-Time Inquiry on a Slot (e.g. 6/8 players)
   function handleOpenInquiryModal(slot) {
     setInquirySlot(slot);
-    setInquiryClientName('Bangalore Tech League / Corporate FC');
-    setInquiryClientPhone('+91 98800 12345');
-    setInquiryAmount(slot.price || 1600);
+    setInquiryClientName(slot.full_inquiry_client || 'Bangalore Tech League / Corporate FC');
+    setInquiryClientPhone(slot.full_inquiry_phone || '+91 98800 12345');
+    setInquiryAmount(slot.full_inquiry_amount || slot.price || 1600);
     setInquiryPaymentMode('cash');
-    setInquiryNotes('Private team reservation inquiry approved by owner');
+    setInquiryNotes(slot.full_inquiry_notes || 'Private team reservation inquiry approved by owner');
     setShowInquiryModal(true);
+  }
+
+  async function handleDeclineInquiry(slot) {
+    if (!window.confirm(`Decline full slot booking request for ${slot.full_inquiry_client || 'client'}? The slot will remain open for individual pickup players.`)) return;
+    try {
+      await api.declineSlotInquiry(slot.id);
+      alert('Full slot request declined.');
+      if (selectedVenue) loadLiveSlots(selectedVenue.id, calendarDate);
+    } catch (err) {
+      alert('Failed to decline inquiry: ' + err.message);
+    }
+  }
+
+  function handleOpenOwnerHostModal(slot) {
+    setOwnerHostSlot(slot);
+    setOwnerHostTitle(`Open Pickup Match - ${selectedVenue?.name || 'Arena'}`);
+    setOwnerHostSportId(slot.sport_id || 'football');
+    setOwnerHostPlayers(10);
+    setOwnerHostCost(Math.ceil((slot.price || 1200) / 10));
+    setOwnerHostSkill('All Levels');
+    setOwnerHostRules('Turf shoes only. Bibs and match ball provided by arena.');
+    setShowOwnerHostModal(true);
+  }
+
+  async function handleOwnerHostSubmit(e) {
+    e.preventDefault();
+    if (!ownerHostSlot || !selectedVenue) return;
+    try {
+      setIsPublishingOwnerGame(true);
+      await api.createGame({
+        venueId: selectedVenue.id,
+        courtId: ownerHostSlot.court_id,
+        courtSlotId: ownerHostSlot.id,
+        sportId: ownerHostSportId,
+        title: ownerHostTitle.trim() || `Community Open Match - ${selectedVenue.name}`,
+        organizerName: (selectedVenue.name || 'Arena') + ' Staff',
+        organizerPhone: bizPhone || '+91 98765 00000',
+        skillLevel: ownerHostSkill,
+        requiredPlayers: Number(ownerHostPlayers),
+        costPerPlayer: Number(ownerHostCost),
+        date: ownerHostSlot.date,
+        startTime: ownerHostSlot.start_time,
+        endTime: ownerHostSlot.end_time,
+        rules: ownerHostRules
+      });
+      setShowOwnerHostModal(false);
+      alert(`🎉 Open game session posted on ${ownerHostSlot.court_name} (${ownerHostSlot.start_time} - ${ownerHostSlot.end_time})! Players can now discover and join.`);
+      loadLiveSlots(selectedVenue.id, calendarDate);
+    } catch (err) {
+      alert('Failed to host open game: ' + err.message);
+    } finally {
+      setIsPublishingOwnerGame(false);
+    }
   }
 
   async function handleConfirmFullInquiry(e) {
@@ -712,6 +776,22 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
 
             <div className="mobile-btn-group" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <button
+                id="btn-owner-host-open-game"
+                onClick={() => {
+                  const firstOpen = displaySlots.find(s => s.status === 'open' && !s.game) || displaySlots[0];
+                  if (firstOpen) {
+                    handleOpenOwnerHostModal(firstOpen);
+                  } else {
+                    alert('No open slots found on this date. Please pick another date or clear booked slots.');
+                  }
+                }}
+                className="btn-primary"
+                style={{ background: '#059669', fontSize: 12.5, padding: '7px 14px', flex: '1 1 auto', display: 'flex', alignItems: 'center', gap: 6 }}
+              >
+                <Trophy size={14} /> Host Open Game
+              </button>
+
+              <button
                 onClick={() => setShowWalkInModal(true)}
                 className="btn-primary"
                 style={{ fontSize: 12.5, padding: '7px 14px', flex: '1 1 auto' }}
@@ -728,6 +808,58 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
               </button>
             </div>
           </div>
+
+          {/* Dedicated Alert Banner for Full Slot Booking Requests */}
+          {(() => {
+            const pendingInquirySlots = displaySlots.filter(s => s.full_inquiry_status === 'pending' || (s.game && s.game.full_inquiry_status === 'pending'));
+            if (pendingInquirySlots.length === 0) return null;
+            return (
+              <div style={{ background: '#fffbeb', border: '2px solid #f59e0b', borderRadius: 12, padding: '14px 16px', marginBottom: 20, color: '#78350f' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 800, fontSize: 14 }}>
+                    <span style={{ fontSize: 18 }}>🚨</span>
+                    <span>{pendingInquirySlots.length} Pending Full-Slot Booking Request(s)</span>
+                  </div>
+                  <span style={{ fontSize: 11.5, background: '#fef3c7', padding: '2px 8px', borderRadius: 6, fontWeight: 700, border: '1px solid #fde68a' }}>
+                    Action Required
+                  </span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {pendingInquirySlots.map(pSlot => (
+                    <div key={pSlot.id} style={{ background: '#ffffff', border: '1px solid #fde68a', borderRadius: 8, padding: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+                      <div>
+                        <div style={{ fontWeight: 800, fontSize: 13.5, color: '#0f172a' }}>
+                          {pSlot.court_name} · {pSlot.start_time} - {pSlot.end_time} ({pSlot.date})
+                        </div>
+                        <div style={{ fontSize: 12, color: '#475569', marginTop: 2 }}>
+                          Client: <strong>{pSlot.full_inquiry_client || pSlot.game?.full_inquiry_client || 'Squad Leader'}</strong> ({pSlot.full_inquiry_phone || pSlot.game?.full_inquiry_phone || ''}) · Total: <strong>₹{pSlot.full_inquiry_amount || pSlot.price}</strong>
+                        </div>
+                        <div style={{ fontSize: 11.5, color: '#15803d', marginTop: 3 }}>
+                          💬 Accepting triggers instant automated WhatsApp 100% refund notification to all {pSlot.game?.current_players || 0} registered pickup player(s).
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button
+                          className="btn-primary"
+                          onClick={() => handleOpenInquiryModal(pSlot)}
+                          style={{ background: '#059669', fontSize: 12, padding: '7px 14px' }}
+                        >
+                          ✓ Accept Full Booking
+                        </button>
+                        <button
+                          className="btn-secondary"
+                          onClick={() => handleDeclineInquiry(pSlot)}
+                          style={{ fontSize: 12, padding: '7px 12px', color: '#dc2626' }}
+                        >
+                          Decline
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Quick Slot Stats Pills (Responsive 2-col on mobile, 4-col on desktop) */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 20 }}>
@@ -925,8 +1057,34 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
 
                     {/* Card Actions: Full Time Inquiry & Slot Operations */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, paddingTop: 4 }}>
+                      {/* PENDING FULL SLOT BOOKING INQUIRY ALERT (IF REQUESTED BY PLAYER) */}
+                      {(slot.full_inquiry_status === 'pending' || slot.game?.full_inquiry_status === 'pending') && (
+                        <div style={{ background: '#fef3c7', border: '1.5px solid #f59e0b', borderRadius: 8, padding: 10, marginBottom: 4, color: '#78350f' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 800, fontSize: 12 }}>
+                            <span>🚨</span> Full Slot Booking Requested!
+                          </div>
+                          <div style={{ fontSize: 11.5, marginTop: 4, color: '#92400e', lineHeight: 1.4 }}>
+                            <strong>{slot.full_inquiry_client || slot.game?.full_inquiry_client || 'Team Organizer'}</strong> wants this full slot for <strong>₹{slot.full_inquiry_amount || slot.price}</strong>.
+                          </div>
+                          <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+                            <button
+                              onClick={() => handleOpenInquiryModal(slot)}
+                              style={{ flex: 1.5, background: '#059669', color: '#fff', border: 'none', borderRadius: 6, padding: '7px 8px', fontSize: 11.5, fontWeight: 700, cursor: 'pointer' }}
+                            >
+                              ✓ Accept & Refund
+                            </button>
+                            <button
+                              onClick={() => handleDeclineInquiry(slot)}
+                              style={{ flex: 0.8, background: '#fff', color: '#dc2626', border: '1px solid #fca5a5', borderRadius: 6, padding: '7px 8px', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+                            >
+                              Decline
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
                       {/* USER DIRECT REQUIREMENT: FULL TIME INQUIRY ACCEPTANCE */}
-                      {isPartiallyFilled && (
+                      {isPartiallyFilled && slot.full_inquiry_status !== 'pending' && !slot.game?.full_inquiry_status && (
                         <button
                           onClick={() => handleOpenInquiryModal(slot)}
                           style={{
@@ -951,17 +1109,39 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                       )}
 
                       {!isBooked && !isPartiallyFilled && !isBlocked && (
-                        <div style={{ display: 'flex', gap: 6 }}>
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                          <button
+                            onClick={() => handleOpenOwnerHostModal(slot)}
+                            style={{
+                              flex: '1 1 45%',
+                              background: '#059669',
+                              color: '#fff',
+                              border: 'none',
+                              borderRadius: 6,
+                              padding: '7px 8px',
+                              fontSize: 11,
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: 4
+                            }}
+                            title="Host open pickup match on this slot"
+                          >
+                            <Trophy size={12} /> Host Game
+                          </button>
+
                           <button
                             onClick={() => handleOpenInquiryModal(slot)}
                             style={{
-                              flex: 1,
+                              flex: '1 1 45%',
                               background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
                               color: '#fff',
                               border: 'none',
                               borderRadius: 6,
-                              padding: '7px 10px',
-                              fontSize: 11.5,
+                              padding: '7px 8px',
+                              fontSize: 11,
                               fontWeight: 700,
                               cursor: 'pointer',
                               display: 'flex',
@@ -982,7 +1162,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                               setShowWalkInModal(true);
                             }}
                             className="btn-secondary"
-                            style={{ flex: 1, fontSize: 11.5, padding: '7px 10px', justifyContent: 'center' }}
+                            style={{ flex: 1, fontSize: 11, padding: '7px 8px', justifyContent: 'center' }}
                           >
                             Walk-in
                           </button>
@@ -2296,6 +2476,124 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
             <button className="btn-secondary" style={{ width: '100%' }} onClick={() => setShowQrModal(false)}>
               Close QR
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: OWNER HOST OPEN GAME ON COURT SLOT */}
+      {showOwnerHostModal && ownerHostSlot && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 20 }}>
+          <div className="nexus-card animate-fade-in" style={{ maxWidth: 480, width: '100%', padding: 24, background: '#111726' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+              <div style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(16, 185, 129, 0.2)', color: '#34d399', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Trophy size={18} />
+              </div>
+              <h3 style={{ fontSize: 18, fontWeight: 800, color: '#f8fafc', margin: 0 }}>
+                Host Open Game on Slot
+              </h3>
+            </div>
+            <p style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginBottom: 14 }}>
+              {ownerHostSlot.court_name} · {ownerHostSlot.date} ({ownerHostSlot.start_time} - {ownerHostSlot.end_time})
+            </p>
+
+            <form onSubmit={handleOwnerHostSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>MATCH TITLE *</label>
+                <input
+                  type="text"
+                  required
+                  className="nexus-input"
+                  style={{ width: '100%' }}
+                  value={ownerHostTitle}
+                  onChange={e => setOwnerHostTitle(e.target.value)}
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>SPORT</label>
+                  <select
+                    value={ownerHostSportId}
+                    onChange={e => setOwnerHostSportId(e.target.value)}
+                    className="nexus-input"
+                    style={{ width: '100%' }}
+                  >
+                    <option value="football">Football</option>
+                    <option value="futsal">Futsal</option>
+                    <option value="cricket">Box Cricket</option>
+                    <option value="badminton">Badminton</option>
+                    <option value="padel">Padel</option>
+                    <option value="pickleball">Pickleball</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>SKILL LEVEL</label>
+                  <select
+                    value={ownerHostSkill}
+                    onChange={e => setOwnerHostSkill(e.target.value)}
+                    className="nexus-input"
+                    style={{ width: '100%' }}
+                  >
+                    <option value="All Levels">All Levels (Casual)</option>
+                    <option value="Beginner">Beginner Friendly</option>
+                    <option value="Intermediate">Intermediate</option>
+                    <option value="Advanced">Advanced / Competitive</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>REQUIRED PLAYERS</label>
+                  <input
+                    type="number"
+                    min={2}
+                    max={30}
+                    required
+                    className="nexus-input"
+                    style={{ width: '100%' }}
+                    value={ownerHostPlayers}
+                    onChange={e => {
+                      const count = Number(e.target.value) || 2;
+                      setOwnerHostPlayers(count);
+                      setOwnerHostCost(Math.ceil((ownerHostSlot.price || 1200) / count));
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>PRICE PER SPOT (₹)</label>
+                  <input
+                    type="number"
+                    min={20}
+                    required
+                    className="nexus-input"
+                    style={{ width: '100%' }}
+                    value={ownerHostCost}
+                    onChange={e => setOwnerHostCost(Number(e.target.value))}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>RULES & EQUIPMENT</label>
+                <input
+                  type="text"
+                  className="nexus-input"
+                  style={{ width: '100%' }}
+                  value={ownerHostRules}
+                  onChange={e => setOwnerHostRules(e.target.value)}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+                <button type="button" className="btn-secondary" style={{ flex: 1 }} onClick={() => setShowOwnerHostModal(false)}>
+                  Cancel
+                </button>
+                <button type="submit" disabled={isPublishingOwnerGame} className="btn-primary" style={{ flex: 1.5 }}>
+                  {isPublishingOwnerGame ? 'Publishing...' : 'Publish Open Game'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

@@ -93,6 +93,17 @@ export const api = {
     return body;
   },
 
+  async requestFullSlot(gameId, data) {
+    const res = await fetch(`${API_BASE}/games/${gameId}/request-full-slot`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error || 'Failed to submit full slot booking request');
+    return body;
+  },
+
   // Venue Owner SaaS
   async getOwnerContext() {
     const res = await fetch(`${API_BASE}/owner/context`);
@@ -204,6 +215,16 @@ export const api = {
     return body;
   },
 
+  async declineSlotInquiry(slotId) {
+    const res = await fetch(`${API_BASE}/owner/slots/${slotId}/decline-full-inquiry`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error || 'Failed to decline slot inquiry');
+    return body;
+  },
+
   async updateSlotPrice(slotId, price) {
     const res = await fetch(`${API_BASE}/owner/slots/${slotId}/price`, {
       method: 'PATCH',
@@ -295,6 +316,14 @@ export const api = {
       headers: token ? { Authorization: `Bearer ${token}` } : {}
     });
     if (!res.ok) throw new Error('Failed to load player dashboard');
+    return res.json();
+  },
+
+  async getPlayerNotifications(phone) {
+    const params = new URLSearchParams();
+    if (phone) params.append('phone', phone);
+    const res = await fetch(`${API_BASE}/player/notifications?${params.toString()}`);
+    if (!res.ok) return [];
     return res.json();
   }
 };

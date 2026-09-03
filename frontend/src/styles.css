@@ -423,9 +423,35 @@ body {
   grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
   gap: 20px;
 }
-@media (max-width: 480px) {
+@media (max-width: 640px) {
   .marketplace-grid {
     grid-template-columns: 1fr !important;
-    gap: 16px;
+    gap: 14px !important;
+  }
+
+  .marketplace-container {
+    padding: 10px 12px 96px !important;
+  }
+
+  .marketplace-hero-card {
+    padding: 14px 14px !important;
+    margin-bottom: 14px !important;
+    border-radius: 12px !important;
+  }
+
+  .marketplace-hero-title {
+    font-size: 20px !important;
+    line-height: 1.25 !important;
+  }
+
+  .venue-card-body {
+    padding: 14px !important;
+  }
+
+  .location-preset-row {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 6px !important;
   }
 }
+

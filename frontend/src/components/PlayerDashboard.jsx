@@ -19,16 +19,44 @@ import {
   LogOut,
   RefreshCw,
   ExternalLink,
-  ShieldCheck
+  ShieldCheck,
+  Plus,
+  Bell,
+  Check,
+  MessageSquare,
+  Building2
 } from 'lucide-react';
 import { api } from '../api';
 
-export function PlayerDashboard({ user, onBookVenue, onBrowseGames, onLogout }) {
-  const [activeTab, setActiveTab] = useState('bookings'); // 'bookings' | 'games' | 'profile'
+export function PlayerDashboard({ user, initialTab = 'bookings', onBookVenue, onBrowseGames, onLogout }) {
+  const [activeTab, setActiveTab] = useState(initialTab); // 'bookings' | 'games' | 'host_game' | 'whatsapp_alerts'
   const [dashboardData, setDashboardData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedReceipt, setSelectedReceipt] = useState(null);
+
+  // Host Open Game Wizard State
+  const [venues, setVenues] = useState([]);
+  const [selectedVenueId, setSelectedVenueId] = useState('');
+  const [hostDate, setHostDate] = useState(new Date().toISOString().slice(0, 10));
+  const [availableSlots, setAvailableSlots] = useState([]);
+  const [loadingSlots, setLoadingSlots] = useState(false);
+  const [selectedSlot, setSelectedSlot] = useState(null);
+
+  // Host Game Form Fields
+  const [hostTitle, setHostTitle] = useState('');
+  const [hostSportId, setHostSportId] = useState('football');
+  const [hostPlayers, setHostPlayers] = useState(10);
+  const [hostCostPerPlayer, setHostCostPerPlayer] = useState(150);
+  const [hostSkill, setHostSkill] = useState('All Levels');
+  const [hostRules, setHostRules] = useState('Turf shoes only. Bibs provided. Please arrive 10 min early.');
+  const [isPublishingGame, setIsPublishingGame] = useState(false);
+  const [hostSuccessMsg, setHostSuccessMsg] = useState('');
+  const [hostErrorMsg, setHostErrorMsg] = useState('');
+
+  // WhatsApp Notifications
+  const [notifications, setNotifications] = useState([]);
+  const [loadingNotifications, setLoadingNotifications] = useState(false);
 
   const fetchDashboard = async () => {
     setIsLoading(true);
@@ -45,11 +73,129 @@ export function PlayerDashboard({ user, onBookVenue, onBrowseGames, onLogout }) 
     }
   };
 
+  const fetchNotifications = async () => {
+    setLoadingNotifications(true);
+    try {
+      const notifs = await api.getPlayerNotifications(user?.phone || '9876500001');
+      setNotifications(notifs || []);
+    } catch (err) {
+      console.error('Error fetching notifications:', err);
+    } finally {
+      setLoadingNotifications(false);
+    }
+  };
+
+  const fetchMarketplaceVenues = async () => {
+    try {
+      const vList = await api.getMarketplaceVenues();
+      setVenues(vList || []);
+      if (vList && vList.length > 0 && !selectedVenueId) {
+        setSelectedVenueId(vList[0].id);
+      }
+    } catch (err) {
+      console.error('Error loading venues for game hosting:', err);
+    }
+  };
+
   useEffect(() => {
     fetchDashboard();
+    fetchNotifications();
+    fetchMarketplaceVenues();
   }, [user]);
 
+  // When initialTab changes from parent
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
+
+  // Load available live slots when venue or date changes in host wizard
+  useEffect(() => {
+    if (!selectedVenueId) return;
+    async function loadSlots() {
+      setLoadingSlots(true);
+      setSelectedSlot(null);
+      try {
+        const slots = await api.getVenueSlots(selectedVenueId, hostDate);
+        // Only show open slots (or unreserved)
+        const openOnes = (slots || []).filter(s => s.status === 'open' && !s.is_game);
+        setAvailableSlots(openOnes);
+        if (openOnes.length > 0) {
+          setSelectedSlot(openOnes[0]);
+          const calculatedPerPlayer = Math.ceil((openOnes[0].price || 1200) / hostPlayers);
+          setHostCostPerPlayer(calculatedPerPlayer);
+        }
+      } catch (err) {
+        console.error('Error fetching slots for hosting:', err);
+      } finally {
+        setLoadingSlots(false);
+      }
+    }
+    loadSlots();
+  }, [selectedVenueId, hostDate]);
+
+  // Update cost per player when slot or required players change
+  function handlePlayerCountChange(val) {
+    const count = Number(val) || 2;
+    setHostPlayers(count);
+    if (selectedSlot) {
+      const calculated = Math.ceil((selectedSlot.price || 1200) / count);
+      setHostCostPerPlayer(calculated);
+    }
+  }
+
+  function handleSelectSlot(slot) {
+    setSelectedSlot(slot);
+    const calculated = Math.ceil((slot.price || 1200) / hostPlayers);
+    setHostCostPerPlayer(calculated);
+  }
+
+  async function handleHostGameSubmit(e) {
+    e.preventDefault();
+    if (!selectedVenueId || !selectedSlot) {
+      setHostErrorMsg('Please select a registered turf and an available time slot.');
+      return;
+    }
+
+    setHostErrorMsg('');
+    setIsPublishingGame(true);
+
+    try {
+      const currentVenue = venues.find(v => v.id === selectedVenueId);
+      const res = await api.createGame({
+        venueId: selectedVenueId,
+        courtId: selectedSlot.court_id,
+        courtSlotId: selectedSlot.id,
+        sportId: selectedSlot.sport_id || hostSportId,
+        title: hostTitle.trim() || `Community Match at ${currentVenue?.name || 'Arena'}`,
+        organizerName: user?.name || profile.name || 'Team Captain',
+        organizerPhone: user?.phone || profile.phone || '9876500001',
+        skillLevel: hostSkill,
+        requiredPlayers: Number(hostPlayers),
+        costPerPlayer: Number(hostCostPerPlayer),
+        date: hostDate,
+        startTime: selectedSlot.start_time,
+        endTime: selectedSlot.end_time,
+        rules: hostRules.trim()
+      });
+
+      setHostSuccessMsg(`🎉 Open game session created on ${currentVenue?.name} (${selectedSlot.start_time} - ${selectedSlot.end_time})! Other players can now join spots or book the entire slot.`);
+      fetchDashboard();
+      fetchNotifications();
+      setTimeout(() => {
+        setHostSuccessMsg('');
+        setActiveTab('games');
+      }, 2500);
+    } catch (err) {
+      setHostErrorMsg(err.message || 'Failed to host open game.');
+    } finally {
+      setIsPublishingGame(false);
+    }
+  }
+
   const profile = dashboardData?.profile || {
+    name: user?.name || 'Nexus Player',
     phone: user?.phone || '9876500001',
     email: user?.email || 'player@nexusplay.com',
     totalSpent: 1200,
@@ -60,38 +206,39 @@ export function PlayerDashboard({ user, onBookVenue, onBrowseGames, onLogout }) 
 
   const bookings = dashboardData?.bookings || [];
   const games = dashboardData?.games || [];
+  const unreadRefundsCount = notifications.filter(n => n.type === 'full_inquiry_refund').length;
 
   return (
-    <div id="player-dashboard-container" style={{ maxWidth: '1100px', margin: '0 auto', padding: '24px 16px 80px' }}>
+    <div id="player-dashboard-container" style={{ maxWidth: '1100px', margin: '0 auto', padding: '16px 16px 80px' }}>
       
       {/* Top Profile Banner - Crisp White Modern Card */}
       <div 
         id="player-profile-card"
         className="nexus-card"
-        style={{ padding: '24px', marginBottom: '24px', background: '#ffffff', border: '1px solid #e2e8f0' }}
+        style={{ padding: '20px 24px', marginBottom: '20px', background: '#ffffff', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}
       >
         <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
             <div style={{
-              width: '56px',
-              height: '56px',
-              borderRadius: '14px',
+              width: '52px',
+              height: '52px',
+              borderRadius: '12px',
               background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
               color: '#ffffff',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: '22px',
+              fontSize: '20px',
               fontWeight: '800'
             }}>
               {user?.name ? user.name.charAt(0).toUpperCase() : 'P'}
             </div>
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                <h2 style={{ fontSize: '20px', fontWeight: '800', color: '#0f172a', margin: 0, letterSpacing: '-0.02em' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' }}>
+                <h2 style={{ fontSize: '18px', fontWeight: '800', color: '#0f172a', margin: 0, letterSpacing: '-0.02em' }}>
                   {user?.name || 'Nexus Player'}
                 </h2>
-                <span className="badge-emerald">
+                <span className="badge-emerald" style={{ fontSize: '11px' }}>
                   <ShieldCheck size={12} />
                   Verified Player
                 </span>
@@ -99,14 +246,14 @@ export function PlayerDashboard({ user, onBookVenue, onBrowseGames, onLogout }) 
                   {profile.loyaltyTier}
                 </span>
               </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '16px', fontSize: '12.5px', color: '#64748b' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '14px', fontSize: '12px', color: '#64748b' }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <Phone size={13} color="#059669" />
+                  <Phone size={12} color="#059669" />
                   +91 {user?.phone || profile.phone}
                 </span>
                 {user?.email && (
                   <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <Mail size={13} color="#059669" />
+                    <Mail size={12} color="#059669" />
                     {user.email}
                   </span>
                 )}
@@ -114,119 +261,63 @@ export function PlayerDashboard({ user, onBookVenue, onBrowseGames, onLogout }) 
             </div>
           </div>
 
-          {/* Quick Action Buttons */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {/* Quick Action Button to Host Game directly from header */}
+          <div style={{ display: 'flex', gap: '8px' }}>
             <button
-              id="player-book-court-btn"
-              onClick={onBookVenue}
+              id="btn-quick-host-game"
+              onClick={() => setActiveTab('host_game')}
               className="btn-primary"
-              style={{ fontSize: '13px', padding: '8px 16px' }}
+              style={{ fontSize: '12.5px', padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '6px' }}
             >
-              <Calendar size={15} />
-              <span>Book a Turf</span>
+              <Plus size={15} />
+              Host Open Game
             </button>
             <button
-              id="player-join-pickup-btn"
-              onClick={onBrowseGames}
-              className="btn-secondary"
-              style={{ fontSize: '13px', padding: '8px 16px' }}
-            >
-              <Users size={15} />
-              <span>Join Pickup</span>
-            </button>
-            <button
-              id="player-logout-btn"
               onClick={onLogout}
               style={{
                 background: '#f8fafc',
                 border: '1px solid #cbd5e1',
-                borderRadius: '8px',
-                padding: '8px 12px',
                 color: '#64748b',
-                fontSize: '12.5px',
+                padding: '8px 12px',
+                borderRadius: '8px',
+                fontSize: '12px',
                 fontWeight: '600',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '6px'
+                gap: '4px'
               }}
-              title="Logout"
             >
-              <LogOut size={14} />
-              <span>Sign Out</span>
+              <LogOut size={13} />
+              Sign Out
             </button>
-          </div>
-        </div>
-
-        {/* Stats Grid */}
-        <div style={{ 
-          display: 'grid', 
-          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', 
-          gap: '12px', 
-          marginTop: '20px', 
-          paddingTop: '20px', 
-          borderTop: '1px solid #f1f5f9' 
-        }}>
-          <div style={{ background: '#f8fafc', padding: '12px 16px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
-            <div style={{ fontSize: '11.5px', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              Court Reservations
-            </div>
-            <div style={{ fontSize: '20px', fontWeight: '800', color: '#0f172a', marginTop: '2px' }}>
-              {profile.totalBookings} Completed
-            </div>
-          </div>
-
-          <div style={{ background: '#f8fafc', padding: '12px 16px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
-            <div style={{ fontSize: '11.5px', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              Pickup Games Joined
-            </div>
-            <div style={{ fontSize: '20px', fontWeight: '800', color: '#059669', marginTop: '2px' }}>
-              {profile.gamesJoined} Matches
-            </div>
-          </div>
-
-          <div style={{ background: '#f8fafc', padding: '12px 16px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
-            <div style={{ fontSize: '11.5px', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              Direct UPI Spent
-            </div>
-            <div style={{ fontSize: '20px', fontWeight: '800', color: '#0f172a', marginTop: '2px' }}>
-              ₹{profile.totalSpent.toLocaleString('en-IN')}
-            </div>
-          </div>
-
-          <div style={{ background: '#f8fafc', padding: '12px 16px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
-            <div style={{ fontSize: '11.5px', fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              Preferred Sport
-            </div>
-            <div style={{ fontSize: '16px', fontWeight: '800', color: '#4f46e5', marginTop: '4px' }}>
-              Football & Badminton
-            </div>
           </div>
         </div>
       </div>
 
       {/* Tabs Navigation */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px' }}>
-        <div style={{ display: 'flex', gap: '8px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px', borderBottom: '1px solid #e2e8f0', paddingBottom: '10px', overflowX: 'auto' }}>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'nowrap' }}>
           <button
             id="tab-my-bookings"
             onClick={() => setActiveTab('bookings')}
             style={{
-              padding: '8px 16px',
+              padding: '8px 14px',
               borderRadius: '8px',
               border: 'none',
               background: activeTab === 'bookings' ? '#059669' : '#ffffff',
               color: activeTab === 'bookings' ? '#ffffff' : '#475569',
               fontWeight: '700',
-              fontSize: '13px',
+              fontSize: '12.5px',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
+              whiteSpace: 'nowrap',
               boxShadow: activeTab === 'bookings' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none'
             }}
           >
-            <Calendar size={15} />
+            <Calendar size={14} />
             <span>My Bookings ({bookings.length})</span>
           </button>
 
@@ -234,22 +325,87 @@ export function PlayerDashboard({ user, onBookVenue, onBrowseGames, onLogout }) 
             id="tab-my-games"
             onClick={() => setActiveTab('games')}
             style={{
-              padding: '8px 16px',
+              padding: '8px 14px',
               borderRadius: '8px',
               border: 'none',
               background: activeTab === 'games' ? '#059669' : '#ffffff',
               color: activeTab === 'games' ? '#ffffff' : '#475569',
               fontWeight: '700',
-              fontSize: '13px',
+              fontSize: '12.5px',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
+              whiteSpace: 'nowrap',
               boxShadow: activeTab === 'games' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none'
             }}
           >
-            <Users size={15} />
+            <Users size={14} />
             <span>Joined Pickups ({games.length})</span>
+          </button>
+
+          {/* Direct Requirement: Open Game Hosting inside Player Dashboard */}
+          <button
+            id="tab-host-game"
+            onClick={() => setActiveTab('host_game')}
+            style={{
+              padding: '8px 14px',
+              borderRadius: '8px',
+              border: activeTab === 'host_game' ? 'none' : '1px solid #bbf7d0',
+              background: activeTab === 'host_game' ? '#059669' : '#f0fdf4',
+              color: activeTab === 'host_game' ? '#ffffff' : '#059669',
+              fontWeight: '700',
+              fontSize: '12.5px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              whiteSpace: 'nowrap',
+              boxShadow: activeTab === 'host_game' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none'
+            }}
+          >
+            <Plus size={14} />
+            <span>Host Open Game</span>
+          </button>
+
+          {/* WhatsApp Alerts & Receipts Tab */}
+          <button
+            id="tab-whatsapp-alerts"
+            onClick={() => {
+              setActiveTab('whatsapp_alerts');
+              fetchNotifications();
+            }}
+            style={{
+              padding: '8px 14px',
+              borderRadius: '8px',
+              border: 'none',
+              background: activeTab === 'whatsapp_alerts' ? '#059669' : '#ffffff',
+              color: activeTab === 'whatsapp_alerts' ? '#ffffff' : '#475569',
+              fontWeight: '700',
+              fontSize: '12.5px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              whiteSpace: 'nowrap',
+              position: 'relative',
+              boxShadow: activeTab === 'whatsapp_alerts' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none'
+            }}
+          >
+            <MessageSquare size={14} />
+            <span>WhatsApp Alerts & Refunds</span>
+            {unreadRefundsCount > 0 && (
+              <span style={{
+                background: '#22c55e',
+                color: '#ffffff',
+                fontSize: '10px',
+                fontWeight: '800',
+                padding: '1px 6px',
+                borderRadius: '999px'
+              }}>
+                {unreadRefundsCount}
+              </span>
+            )}
           </button>
         </div>
 
@@ -265,7 +421,8 @@ export function PlayerDashboard({ user, onBookVenue, onBrowseGames, onLogout }) 
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
-            gap: '4px'
+            gap: '4px',
+            whiteSpace: 'nowrap'
           }}
         >
           <RefreshCw size={13} className={isLoading ? 'animate-spin' : ''} />
@@ -274,7 +431,7 @@ export function PlayerDashboard({ user, onBookVenue, onBrowseGames, onLogout }) 
       </div>
 
       {/* =================================================================== */}
-      {/* MY BOOKINGS TAB */}
+      {/* TAB 1: MY BOOKINGS */}
       {/* =================================================================== */}
       {activeTab === 'bookings' && (
         <div>
@@ -297,10 +454,9 @@ export function PlayerDashboard({ user, onBookVenue, onBrowseGames, onLogout }) 
               </button>
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {bookings.map((booking) => {
                 const isPaid = booking.payment_status === 'paid' || booking.payment_status === 'pending_verification';
-                const isCash = booking.payment_status === 'cash';
 
                 return (
                   <div
@@ -310,19 +466,19 @@ export function PlayerDashboard({ user, onBookVenue, onBrowseGames, onLogout }) 
                     style={{
                       background: '#ffffff',
                       border: '1px solid #e2e8f0',
-                      padding: '18px 20px',
+                      padding: '16px 20px',
                       borderRadius: '12px',
                       display: 'flex',
                       flexWrap: 'wrap',
                       justifyContent: 'space-between',
                       alignItems: 'center',
-                      gap: '16px'
+                      gap: '14px'
                     }}
                   >
                     <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
                       <div style={{
-                        width: '44px',
-                        height: '44px',
+                        width: '42px',
+                        height: '42px',
                         borderRadius: '10px',
                         background: '#f0fdf4',
                         border: '1px solid #bbf7d0',
@@ -332,7 +488,7 @@ export function PlayerDashboard({ user, onBookVenue, onBrowseGames, onLogout }) 
                         justifyContent: 'center',
                         flexShrink: 0
                       }}>
-                        <Trophy size={20} />
+                        <Trophy size={18} />
                       </div>
                       <div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
@@ -355,12 +511,6 @@ export function PlayerDashboard({ user, onBookVenue, onBrowseGames, onLogout }) 
                             <Clock size={13} color="#059669" />
                             {booking.start_time} - {booking.end_time}
                           </span>
-                          {booking.venue_address && (
-                            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <MapPin size={13} color="#059669" />
-                              {booking.venue_address.split(',')[0]}
-                            </span>
-                          )}
                         </div>
                       </div>
                     </div>
@@ -370,38 +520,19 @@ export function PlayerDashboard({ user, onBookVenue, onBrowseGames, onLogout }) 
                         <div style={{ fontSize: '16px', fontWeight: '800', color: '#0f172a' }}>
                           ₹{booking.total_amount}
                         </div>
-                        <div style={{ marginTop: '2px' }}>
-                          {booking.payment_status === 'paid' && (
-                            <span className="badge-emerald" style={{ fontSize: '10.5px' }}>
-                              <CheckCircle2 size={11} />
-                              Confirmed & Paid
-                            </span>
-                          )}
-                          {booking.payment_status === 'pending_verification' && (
-                            <span className="badge-amber" style={{ fontSize: '10.5px' }}>
-                              <Clock size={11} />
-                              Awaiting UTR Verification
-                            </span>
-                          )}
-                          {isCash && (
-                            <span className="badge-slate" style={{ fontSize: '10.5px' }}>
-                              Pay Cash at Reception
-                            </span>
-                          )}
+                        <div style={{ fontSize: '11px', color: isPaid ? '#059669' : '#d97706', fontWeight: '700' }}>
+                          {isPaid ? '✓ Paid & Confirmed' : 'Pending Verification'}
                         </div>
                       </div>
 
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        <button
-                          id={`view-receipt-btn-${booking.id}`}
-                          onClick={() => setSelectedReceipt(booking)}
-                          className="btn-secondary"
-                          style={{ fontSize: '12px', padding: '6px 12px' }}
-                        >
-                          <Receipt size={14} />
-                          <span>Receipt</span>
-                        </button>
-                      </div>
+                      <button
+                        onClick={() => setSelectedReceipt(booking)}
+                        className="btn-secondary"
+                        style={{ fontSize: '12px', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                      >
+                        <Receipt size={13} />
+                        Voucher
+                      </button>
                     </div>
                   </div>
                 );
@@ -412,50 +543,51 @@ export function PlayerDashboard({ user, onBookVenue, onBrowseGames, onLogout }) 
       )}
 
       {/* =================================================================== */}
-      {/* MY GAMES TAB */}
+      {/* TAB 2: JOINED PICKUPS & OPEN GAMES */}
       {/* =================================================================== */}
       {activeTab === 'games' && (
         <div>
-          {isLoading ? (
-            <div style={{ textAlign: 'center', padding: '40px', color: '#64748b', background: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-              <RefreshCw size={24} className="animate-spin" style={{ margin: '0 auto 8px', color: '#059669' }} />
-              <div>Fetching community match rosters...</div>
-            </div>
-          ) : games.length === 0 ? (
+          {games.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '48px 24px', background: '#ffffff', borderRadius: '14px', border: '1px solid #e2e8f0' }}>
               <Users size={36} color="#94a3b8" style={{ margin: '0 auto 12px' }} />
               <h3 style={{ fontSize: '16px', fontWeight: '800', color: '#0f172a', marginBottom: '6px' }}>
-                No Pickup Games Joined Yet
+                No Active Pickup Matches
               </h3>
-              <p style={{ fontSize: '13px', color: '#64748b', maxWidth: '420px', margin: '0 auto 16px' }}>
-                Join open football, badminton, or cricket matches organized by fellow athletes in your area. Split turf costs effortlessly.
+              <p style={{ fontSize: '13px', color: '#64748b', maxWidth: '400px', margin: '0 auto 16px' }}>
+                Looking for players tonight? Join an open community match or host a new session on your favorite registered turf right here.
               </p>
-              <button onClick={onBrowseGames} className="btn-primary">
-                Browse Live Pickup Games
-              </button>
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+                <button onClick={() => setActiveTab('host_game')} className="btn-primary">
+                  <Plus size={15} /> Host Open Game
+                </button>
+                <button onClick={onBrowseGames} className="btn-secondary">
+                  Browse Open Hub
+                </button>
+              </div>
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {games.map((game) => (
                 <div
                   key={game.id}
+                  id={`game-item-${game.id}`}
                   className="nexus-card"
                   style={{
                     background: '#ffffff',
                     border: '1px solid #e2e8f0',
-                    padding: '18px 20px',
+                    padding: '16px 20px',
                     borderRadius: '12px',
                     display: 'flex',
                     flexWrap: 'wrap',
                     justifyContent: 'space-between',
                     alignItems: 'center',
-                    gap: '16px'
+                    gap: '14px'
                   }}
                 >
                   <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
                     <div style={{
-                      width: '44px',
-                      height: '44px',
+                      width: '42px',
+                      height: '42px',
                       borderRadius: '10px',
                       background: '#eef2ff',
                       border: '1px solid #c7d2fe',
@@ -465,7 +597,7 @@ export function PlayerDashboard({ user, onBookVenue, onBrowseGames, onLogout }) 
                       justifyContent: 'center',
                       flexShrink: 0
                     }}>
-                      <Users size={20} />
+                      <Users size={18} />
                     </div>
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
@@ -473,7 +605,7 @@ export function PlayerDashboard({ user, onBookVenue, onBrowseGames, onLogout }) 
                           {game.title}
                         </span>
                         <span className="badge-emerald" style={{ fontSize: '11px' }}>
-                          Joined Slot
+                          Joined Spot
                         </span>
                       </div>
                       <div style={{ fontSize: '13px', fontWeight: '600', color: '#334155', marginBottom: '4px' }}>
@@ -502,7 +634,7 @@ export function PlayerDashboard({ user, onBookVenue, onBrowseGames, onLogout }) 
                         ₹{game.cost_per_player || game.share_amount}
                       </div>
                       <div style={{ fontSize: '11px', color: '#059669', fontWeight: '700' }}>
-                        Paid via UPI
+                        Confirmed Spot
                       </div>
                     </div>
 
@@ -522,6 +654,371 @@ export function PlayerDashboard({ user, onBookVenue, onBrowseGames, onLogout }) 
       )}
 
       {/* =================================================================== */}
+      {/* TAB 3: HOST OPEN GAME (GUIDED WIZARD WITH REGISTERED TURFS & SLOTS) */}
+      {/* =================================================================== */}
+      {activeTab === 'host_game' && (
+        <div className="nexus-card" style={{ background: '#ffffff', border: '1px solid #e2e8f0', padding: '24px', borderRadius: '14px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+            <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#d1fae5', color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Plus size={18} />
+            </div>
+            <h2 className="font-display" style={{ fontSize: '20px', fontWeight: '800', color: '#0f172a', margin: 0 }}>
+              Host an Open Game Session
+            </h2>
+          </div>
+          <p style={{ color: '#64748b', fontSize: '13.5px', marginBottom: '20px' }}>
+            Select any registered sports arena on our site, pick an available slot, and establish an open pickup match. Other players can join spots, or another private team can reserve the full slot.
+          </p>
+
+          {hostSuccessMsg && (
+            <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#15803d', padding: '14px', borderRadius: '10px', fontSize: '13px', fontWeight: '600', marginBottom: '18px' }}>
+              {hostSuccessMsg}
+            </div>
+          )}
+
+          {hostErrorMsg && (
+            <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', padding: '12px', borderRadius: '10px', fontSize: '13px', marginBottom: '18px' }}>
+              {hostErrorMsg}
+            </div>
+          )}
+
+          <form onSubmit={handleHostGameSubmit}>
+            {/* STEP 1: Select Registered Turf */}
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '8px' }}>
+                Step 1: Choose a Registered Turf Arena *
+              </label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
+                {venues.map((venue) => {
+                  const isSelected = selectedVenueId === venue.id;
+                  return (
+                    <div
+                      key={venue.id}
+                      onClick={() => setSelectedVenueId(venue.id)}
+                      style={{
+                        padding: '12px 14px',
+                        borderRadius: '10px',
+                        cursor: 'pointer',
+                        background: isSelected ? '#f0fdf4' : '#ffffff',
+                        border: isSelected ? '2px solid #059669' : '1px solid #cbd5e1',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      <img
+                        src={venue.photos?.[0] || 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=150&q=80'}
+                        alt={venue.name}
+                        style={{ width: '48px', height: '48px', borderRadius: '8px', objectFit: 'cover' }}
+                      />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: '13.5px', fontWeight: '700', color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {venue.name}
+                        </div>
+                        <div style={{ fontSize: '11.5px', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <MapPin size={11} color="#059669" />
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{venue.address}</span>
+                        </div>
+                        <div style={{ fontSize: '11px', color: '#059669', fontWeight: '600', marginTop: '2px' }}>
+                          ★ {venue.rating || 4.8} · {venue.courts?.length || 2} Courts Available
+                        </div>
+                      </div>
+                      {isSelected && (
+                        <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: '#059669', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <Check size={12} />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* STEP 2: Date & Available Slot Selection */}
+            <div style={{ marginBottom: '20px', background: '#f8fafc', padding: '16px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '12px' }}>
+                <label style={{ fontSize: '12px', fontWeight: '700', color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.04em', margin: 0 }}>
+                  Step 2: Pick Date & Available Slot on Selected Turf *
+                </label>
+                <input
+                  type="date"
+                  value={hostDate}
+                  min={new Date().toISOString().slice(0, 10)}
+                  onChange={e => setHostDate(e.target.value)}
+                  className="nexus-input"
+                  style={{ padding: '6px 12px', fontSize: '12.5px', width: 'auto' }}
+                />
+              </div>
+
+              {loadingSlots ? (
+                <div style={{ textAlign: 'center', padding: '24px', color: '#64748b', fontSize: '13px' }}>
+                  <RefreshCw size={18} className="animate-spin" style={{ margin: '0 auto 6px', color: '#059669' }} />
+                  Checking real-time turf slot availability...
+                </div>
+              ) : availableSlots.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '24px', background: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0', color: '#64748b', fontSize: '13px' }}>
+                  No open slots found on this date. Please pick another date or select another registered arena above.
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: '10px' }}>
+                  {availableSlots.map((slot) => {
+                    const isSlotSelected = selectedSlot?.id === slot.id;
+                    return (
+                      <div
+                        key={slot.id}
+                        onClick={() => handleSelectSlot(slot)}
+                        style={{
+                          padding: '10px 12px',
+                          borderRadius: '8px',
+                          cursor: 'pointer',
+                          background: isSlotSelected ? '#059669' : '#ffffff',
+                          color: isSlotSelected ? '#ffffff' : '#0f172a',
+                          border: isSlotSelected ? '1px solid #059669' : '1px solid #cbd5e1',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '3px',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        <div style={{ fontSize: '11px', opacity: isSlotSelected ? 0.9 : 0.7, fontWeight: '600' }}>
+                          {slot.court_name || 'Court'}
+                        </div>
+                        <div style={{ fontSize: '13.5px', fontWeight: '800' }}>
+                          {slot.start_time} - {slot.end_time}
+                        </div>
+                        <div style={{ fontSize: '11.5px', fontWeight: '700', color: isSlotSelected ? '#d1fae5' : '#059669' }}>
+                          Turf Rate: ₹{slot.price}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* STEP 3: Game Configuration */}
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '12px' }}>
+                Step 3: Match Details & Player Split
+              </label>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '11.5px', fontWeight: '600', color: '#64748b', marginBottom: '4px' }}>
+                    MATCH TITLE *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. 5v5 Friday Night Futsal"
+                    className="nexus-input"
+                    style={{ width: '100%' }}
+                    value={hostTitle}
+                    onChange={e => setHostTitle(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '11.5px', fontWeight: '600', color: '#64748b', marginBottom: '4px' }}>
+                    SKILL LEVEL
+                  </label>
+                  <select
+                    value={hostSkill}
+                    onChange={e => setHostSkill(e.target.value)}
+                    className="nexus-input"
+                    style={{ width: '100%' }}
+                  >
+                    <option value="All Levels">All Levels (Casual)</option>
+                    <option value="Beginner">Beginner Friendly</option>
+                    <option value="Intermediate">Intermediate</option>
+                    <option value="Advanced">Advanced / Competitive</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '11.5px', fontWeight: '600', color: '#64748b', marginBottom: '4px' }}>
+                    PLAYERS NEEDED (ROSTER SIZE) *
+                  </label>
+                  <input
+                    type="number"
+                    min={2}
+                    max={24}
+                    required
+                    className="nexus-input"
+                    style={{ width: '100%' }}
+                    value={hostPlayers}
+                    onChange={e => handlePlayerCountChange(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '11.5px', fontWeight: '600', color: '#64748b', marginBottom: '4px' }}>
+                    PRICE PER PLAYER SHARE (₹) *
+                  </label>
+                  <input
+                    type="number"
+                    min={20}
+                    required
+                    className="nexus-input"
+                    style={{ width: '100%' }}
+                    value={hostCostPerPlayer}
+                    onChange={e => setHostCostPerPlayer(Number(e.target.value))}
+                  />
+                  <div style={{ fontSize: '11px', color: '#64748b', marginTop: '3px' }}>
+                    Auto-split based on arena slot rate (₹{selectedSlot?.price || 1200})
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '11.5px', fontWeight: '600', color: '#64748b', marginBottom: '4px' }}>
+                  MATCH RULES & GEAR NOTES
+                </label>
+                <input
+                  type="text"
+                  className="nexus-input"
+                  style={{ width: '100%' }}
+                  value={hostRules}
+                  onChange={e => setHostRules(e.target.value)}
+                  placeholder="e.g. Turf boots recommended. Bibs provided by organizer."
+                />
+              </div>
+            </div>
+
+            {/* Submit Button */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => setActiveTab('games')}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="btn-primary"
+                disabled={isPublishingGame || !selectedSlot}
+                style={{ padding: '10px 24px', fontSize: '13.5px' }}
+              >
+                {isPublishingGame ? 'Publishing Game...' : 'Publish Open Game Session'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* =================================================================== */}
+      {/* TAB 4: WHATSAPP ALERTS & 100% REFUND RECEIPTS */}
+      {/* =================================================================== */}
+      {activeTab === 'whatsapp_alerts' && (
+        <div>
+          <div style={{ marginBottom: '16px' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: '800', color: '#0f172a', margin: '0 0 4px' }}>
+              WhatsApp Notification Hub
+            </h3>
+            <p style={{ fontSize: '13px', color: '#64748b', margin: 0 }}>
+              Official real-time match dispatches, booking receipts, and automatic 100% WhatsApp refund alerts when a full slot reservation is accepted by a turf owner.
+            </p>
+          </div>
+
+          {loadingNotifications ? (
+            <div style={{ textAlign: 'center', padding: '40px', background: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', color: '#64748b' }}>
+              <RefreshCw size={20} className="animate-spin" style={{ margin: '0 auto 8px', color: '#059669' }} />
+              Loading WhatsApp message receipts...
+            </div>
+          ) : notifications.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '48px 24px', background: '#ffffff', borderRadius: '14px', border: '1px solid #e2e8f0' }}>
+              <MessageSquare size={36} color="#94a3b8" style={{ margin: '0 auto 12px' }} />
+              <h4 style={{ fontSize: '15px', fontWeight: '800', color: '#0f172a', marginBottom: '6px' }}>
+                No WhatsApp Alerts Yet
+              </h4>
+              <p style={{ fontSize: '13px', color: '#64748b', maxWidth: '420px', margin: '0 auto' }}>
+                If you join an open pickup game and an exclusive team reserves the full slot, you will receive an automatic 100% UPI refund notification message here and on your registered WhatsApp.
+              </p>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {notifications.map((notif) => {
+                const isRefund = notif.type === 'full_inquiry_refund';
+
+                return (
+                  <div
+                    key={notif.id}
+                    id={`notif-${notif.id}`}
+                    style={{
+                      background: '#ffffff',
+                      border: isRefund ? '1px solid #86efac' : '1px solid #e2e8f0',
+                      borderRadius: '12px',
+                      overflow: 'hidden',
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.04)'
+                    }}
+                  >
+                    {/* Simulated WhatsApp Header */}
+                    <div style={{
+                      background: '#075e54',
+                      padding: '10px 16px',
+                      color: '#ffffff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      fontSize: '12px',
+                      fontWeight: '700'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: '#25d366', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <MessageSquare size={12} color="#ffffff" />
+                        </div>
+                        <span>NexusPlay Official WhatsApp Business · Verified Account</span>
+                      </div>
+                      <span style={{ fontSize: '11px', opacity: 0.85 }}>
+                        {new Date(notif.created_at).toLocaleDateString()} {new Date(notif.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+
+                    {/* WhatsApp Chat Bubble Body */}
+                    <div style={{ padding: '16px 20px', background: '#efeae2' }}>
+                      <div style={{
+                        background: '#ffffff',
+                        borderRadius: '10px',
+                        padding: '14px 16px',
+                        maxWidth: '560px',
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
+                        borderLeft: isRefund ? '4px solid #16a34a' : '4px solid #059669'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+                          <span style={{
+                            background: isRefund ? '#dcfce7' : '#f0fdf4',
+                            color: isRefund ? '#166534' : '#059669',
+                            fontSize: '11px',
+                            fontWeight: '800',
+                            padding: '2px 8px',
+                            borderRadius: '4px',
+                            textTransform: 'uppercase'
+                          }}>
+                            {isRefund ? '100% UPI REFUND CONFIRMED' : 'MATCH NOTICE'}
+                          </span>
+                        </div>
+
+                        <div style={{ fontSize: '13.5px', color: '#0f172a', lineHeight: '1.5', whiteSpace: 'pre-line' }}>
+                          {notif.message}
+                        </div>
+
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px', paddingTop: '8px', borderTop: '1px solid #f1f5f9', fontSize: '11px', color: '#64748b' }}>
+                          <span>Delivered to +91 {notif.recipient_phone}</span>
+                          <span style={{ color: '#3b82f6', fontWeight: '700' }}>✓✓ Read</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* =================================================================== */}
       {/* DIGITAL RECEIPT MODAL */}
       {/* =================================================================== */}
       {selectedReceipt && (
@@ -533,10 +1030,10 @@ export function PlayerDashboard({ user, onBookVenue, onBrowseGames, onLogout }) 
           >
             <div style={{ background: '#059669', padding: '20px 24px', color: '#ffffff', textAlign: 'center' }}>
               <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'rgba(255,255,255,0.2)', margin: '0 auto 8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <CheckCircle2 size={24} color="#ffffff" />
+                <Receipt size={20} />
               </div>
               <h3 style={{ fontSize: '18px', fontWeight: '800', margin: 0 }}>
-                NexusPlay Court Pass
+                Booking Receipt & Pass
               </h3>
               <p style={{ fontSize: '12px', opacity: 0.9, margin: '2px 0 0' }}>
                 Official Arena Entry Voucher

@@ -735,7 +735,8 @@ app.get('/api/games', (req, res) => {
 app.post('/api/games/create', (req, res) => {
   const {
     venueId, courtId, sportId, title, organizerName, organizerPhone,
-    skillLevel = 'All Levels', requiredPlayers, costPerPlayer, date, startTime, endTime, rules
+    skillLevel = 'All Levels', requiredPlayers, costPerPlayer, date, startTime, endTime, rules,
+    courtSlotId
   } = req.body;
 
   if (!venueId || !courtId || !requiredPlayers || !costPerPlayer || !date || !startTime) {
@@ -744,22 +745,31 @@ app.post('/api/games/create', (req, res) => {
 
   const gameTx = db.transaction(() => {
     const venue = db.prepare('SELECT * FROM venues WHERE id = ?').get(venueId);
+    if (!venue) throw new Error('Selected venue does not exist');
     const gameId = `gm_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
 
     // Try finding matching court slot
-    const slot = db.prepare('SELECT * FROM court_slots WHERE court_id = ? AND date = ? AND start_time = ?').get(courtId, date, startTime);
-    if (slot && slot.status === 'open') {
-      db.prepare(`UPDATE court_slots SET status = 'booked' WHERE id = ?`).run(slot.id);
+    let slot = null;
+    if (courtSlotId) {
+      slot = db.prepare('SELECT * FROM court_slots WHERE id = ?').get(courtSlotId);
+    }
+    if (!slot) {
+      slot = db.prepare('SELECT * FROM court_slots WHERE court_id = ? AND date = ? AND start_time = ?').get(courtId, date, startTime);
+    }
+
+    // Link slot to open game
+    if (slot) {
+      db.prepare(`UPDATE court_slots SET game_id = ?, status = 'open' WHERE id = ?`).run(gameId, slot.id);
     }
 
     db.prepare(`
       INSERT INTO games (
-        id, organization_id, venue_id, court_id, sport_id, organizer_name, organizer_phone,
+        id, organization_id, venue_id, court_id, sport_id, court_slot_id, organizer_name, organizer_phone,
         title, skill_level, required_players, current_players, cost_per_player,
         date, start_time, end_time, status, rules
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
-      gameId, venue.organization_id, venueId, courtId, sportId, organizerName, organizerPhone,
+      gameId, venue.organization_id, venueId, courtId, sportId, slot ? slot.id : null, organizerName, organizerPhone,
       title, skillLevel, requiredPlayers, 1, costPerPlayer, date, startTime, endTime, 'open', rules || ''
     );
 
@@ -769,12 +779,12 @@ app.post('/api/games/create', (req, res) => {
       VALUES (?, ?, ?, ?, ?, ?)
     `).run(`gpart_${Date.now()}_1`, gameId, organizerName, organizerPhone, 'paid', costPerPlayer);
 
-    return { gameId };
+    return { gameId, slotId: slot ? slot.id : null };
   });
 
   try {
     const result = gameTx();
-    res.json({ success: true, gameId: result.gameId });
+    res.json({ success: true, gameId: result.gameId, slotId: result.slotId });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -833,6 +843,80 @@ app.post('/api/games/:gameId/join', (req, res) => {
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
+});
+
+// Request Full Slot Booking on an Open Game (Player/Team wanting exclusive pitch)
+app.post('/api/games/:gameId/request-full-slot', (req, res) => {
+  const { gameId } = req.params;
+  const { clientName, clientPhone, amount, notes, paymentMode = 'upi' } = req.body;
+
+  if (!clientName || !clientPhone) {
+    return res.status(400).json({ error: 'Client name and phone number are required.' });
+  }
+
+  const game = db.prepare('SELECT * FROM games WHERE id = ?').get(gameId);
+  if (!game) return res.status(404).json({ error: 'Open game not found' });
+
+  // Locate associated court slot
+  let slot = null;
+  if (game.court_slot_id) {
+    slot = db.prepare('SELECT * FROM court_slots WHERE id = ?').get(game.court_slot_id);
+  }
+  if (!slot) {
+    slot = db.prepare('SELECT * FROM court_slots WHERE court_id = ? AND date = ? AND start_time = ?').get(game.court_id, game.date, game.start_time);
+  }
+  if (!slot) {
+    return res.status(404).json({ error: 'Associated court slot not found' });
+  }
+
+  const venue = db.prepare('SELECT * FROM venues WHERE id = ?').get(game.venue_id);
+  const court = db.prepare('SELECT * FROM courts WHERE id = ?').get(game.court_id);
+  const participants = db.prepare('SELECT * FROM game_participants WHERE game_id = ?').all(gameId);
+  const offerAmount = Number(amount) || slot.price || 1200;
+  const requestedAt = new Date().toISOString();
+
+  db.prepare(`
+    UPDATE court_slots
+    SET full_inquiry_client = ?,
+        full_inquiry_phone = ?,
+        full_inquiry_notes = ?,
+        full_inquiry_amount = ?,
+        full_inquiry_status = 'pending',
+        full_inquiry_requested_at = ?
+    WHERE id = ?
+  `).run(clientName, clientPhone, notes || '', offerAmount, requestedAt, slot.id);
+
+  // Send real-time notification alert to turf owner
+  createNotification(
+    venue.organization_id,
+    venue.phone || '9876500000',
+    `🚨 Full Slot Booking Request!`,
+    `Client ${clientName} (+91 ${clientPhone}) requested full booking for ${game.date} (${game.start_time} - ${game.end_time}) on ${court.name}. Offer: ₹${offerAmount}. Currently ${participants.length} player(s) are registered. Review in Owner Hub to accept and auto-refund players via WhatsApp.`,
+    'full_slot_request'
+  );
+
+  res.json({
+    success: true,
+    message: 'Full slot booking request submitted to arena manager! You will receive confirmation and WhatsApp notification upon owner review.',
+    slotId: slot.id,
+    gameId,
+    offerAmount
+  });
+});
+
+// Fetch Notifications for Player (WhatsApp refund receipts & booking updates)
+app.get('/api/player/notifications', (req, res) => {
+  const { phone } = req.query;
+  if (!phone) return res.json([]);
+  const cleanPhone = phone.replace(/[^0-9]/g, '').slice(-10);
+  const notifs = db.prepare(`
+    SELECT * FROM notifications 
+    WHERE REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '+91', '') LIKE ? 
+       OR phone LIKE ?
+    ORDER BY created_at DESC 
+    LIMIT 25
+  `).all(`%${cleanPhone}%`, `%${cleanPhone}%`);
+  res.json(notifs);
 });
 
 // -----------------------------------------------------------------------------
@@ -1267,34 +1351,41 @@ app.post('/api/owner/slots/:slotId/convert-full-inquiry', (req, res) => {
       db.prepare(`
         UPDATE games 
         SET status = 'converted_to_full_booking',
-            rules = rules || ' [Converted to exclusive full-turf booking on owner acceptance]'
+            rules = COALESCE(rules, '') || ' [Converted to exclusive full-turf booking on owner acceptance]'
         WHERE id = ?
       `).run(game.id);
 
-      // Notify all previously registered individual players
+      // Notify all previously registered individual players with WhatsApp refund alert
       participants.forEach(p => {
+        db.prepare("UPDATE game_participants SET payment_status = 'refunded' WHERE id = ?").run(p.id);
+        const refId = `REF-UPI-${Date.now().toString().slice(-6)}`;
         createNotification(
           venue.organization_id,
           p.phone,
-          'Turf Booking Update',
-          `Hello ${p.name}, your open game slot at ${venue.name} on ${slot.date} (${slot.start_time}) was booked in full by a private team inquiry. Your ₹${p.share_amount || 250} registration fee has been credited back to your account.`,
-          'game_converted'
+          'WhatsApp: 100% Refund Processed · NexusPlay',
+          `Hi ${p.name}! Your open pickup game at ${venue.name} on ${slot.date} (${slot.start_time} - ${slot.end_time}) on ${court.name} was booked in full by an exclusive private team. Your registration fee of ₹${p.share_amount || 250} has been 100% refunded to your original UPI account (Ref: #${refId}). Contact ${venue.name} at ${venue.phone || '+91 98765 43210'} for any queries.`,
+          'whatsapp_refund'
         );
       });
     }
 
     // Register or find customer for this full time inquiry
-    let customer = db.prepare('SELECT * FROM customers WHERE phone = ?').get(clientPhone);
+    let customer = db.prepare('SELECT * FROM customers WHERE organization_id = ? AND phone = ?').get(venue.organization_id, clientPhone);
+    const bookingAmount = Number(amount) || slot.price || 1600;
     if (!customer) {
       const customerId = `cust_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
       db.prepare(`
-        INSERT INTO customers (id, organization_id, phone, name, source)
-        VALUES (?, ?, ?, ?, 'full_time_inquiry')
-      `).run(customerId, venue.organization_id, clientPhone, clientName);
+        INSERT INTO customers (id, organization_id, phone, name, email, total_spend, booking_count, last_booking_date)
+        VALUES (?, ?, ?, ?, '', ?, 1, ?)
+      `).run(customerId, venue.organization_id, clientPhone, clientName, bookingAmount, new Date().toISOString());
       customer = { id: customerId, name: clientName, phone: clientPhone };
+    } else {
+      db.prepare(`
+        UPDATE customers 
+        SET total_spend = total_spend + ?, booking_count = booking_count + 1, last_booking_date = ?, name = COALESCE(?, name)
+        WHERE id = ?
+      `).run(bookingAmount, new Date().toISOString(), clientName, customer.id);
     }
-
-    const bookingAmount = Number(amount) || slot.price || 1600;
     const bookingId = `bk_inquiry_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
 
     // Create confirmed booking
@@ -1320,6 +1411,7 @@ app.post('/api/owner/slots/:slotId/convert-full-inquiry', (req, res) => {
           full_inquiry_client = ?,
           full_inquiry_phone = ?,
           full_inquiry_notes = ?,
+          full_inquiry_status = 'accepted',
           price = ?
       WHERE id = ?
     `).run(bookingId, clientName, clientPhone, notes, bookingAmount, slot.id);
@@ -1337,7 +1429,8 @@ app.post('/api/owner/slots/:slotId/convert-full-inquiry', (req, res) => {
       bookingId,
       registeredPlayersCount,
       slotDate: slot.date,
-      slotTime: `${slot.start_time} - ${slot.end_time}`
+      slotTime: `${slot.start_time} - ${slot.end_time}`,
+      clientName
     };
   });
 
@@ -1345,12 +1438,42 @@ app.post('/api/owner/slots/:slotId/convert-full-inquiry', (req, res) => {
     const result = convertTx();
     res.json({
       success: true,
-      message: `Full-time inquiry accepted! Slot booked for ${clientName}. ${result.registeredPlayersCount > 0 ? `${result.registeredPlayersCount} individual players were credited and notified.` : ''}`,
+      message: `Full-time inquiry accepted! Pitch booked exclusively for ${result.clientName}. ${result.registeredPlayersCount > 0 ? `WhatsApp 100% refund notifications dispatched to ${result.registeredPlayersCount} registered player(s).` : ''}`,
       ...result
     });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
+});
+
+// Decline Full-Time Inquiry on a Slot (Owner decides to keep open game active)
+app.post('/api/owner/slots/:slotId/decline-full-inquiry', (req, res) => {
+  const { slotId } = req.params;
+  const slot = db.prepare('SELECT * FROM court_slots WHERE id = ?').get(slotId);
+  if (!slot) return res.status(404).json({ error: 'Slot not found' });
+
+  const venue = db.prepare('SELECT * FROM venues WHERE id = ?').get(slot.venue_id);
+
+  db.prepare(`
+    UPDATE court_slots
+    SET full_inquiry_status = 'declined'
+    WHERE id = ?
+  `).run(slotId);
+
+  if (slot.full_inquiry_phone) {
+    createNotification(
+      venue.organization_id,
+      slot.full_inquiry_phone,
+      'WhatsApp: Full Booking Update · NexusPlay',
+      `Hello ${slot.full_inquiry_client || 'Customer'}, your full slot booking request for ${slot.date} (${slot.start_time} - ${slot.end_time}) was declined by ${venue.name} as the community pickup game remains active. Please explore other available slots on NexusPlay.`,
+      'notice'
+    );
+  }
+
+  res.json({
+    success: true,
+    message: 'Full slot booking request declined. Community pickup session remains active.'
+  });
 });
 
 // Quick Slot Price Adjustment by Owner

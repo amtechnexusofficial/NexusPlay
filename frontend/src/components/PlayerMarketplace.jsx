@@ -151,35 +151,33 @@ export default function PlayerMarketplace({ onSelectVenue }) {
   });
 
   return (
-    <div className="animate-fade-in" style={{ maxWidth: 1200, margin: '0 auto', padding: '16px 20px 80px' }}>
+    <div className="animate-fade-in marketplace-container" style={{ maxWidth: 1200, margin: '0 auto' }}>
       
       {/* Search & Location Hero Header */}
       <div
         id="marketplace-hero"
-        className="nexus-card"
+        className="nexus-card marketplace-hero-card"
         style={{
-          padding: '28px 28px',
-          marginBottom: 24,
           background: '#ffffff',
           border: '1px solid #e2e8f0',
           boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)'
         }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 16, marginBottom: 20 }}>
-          <div>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#059669', fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
-              <Sparkles size={14} /> LIVE TURF DISCOVERY & LOCAL SLOTS
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 14, marginBottom: 16 }}>
+          <div style={{ flex: '1 1 280px' }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#059669', fontSize: 11.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>
+              <Sparkles size={13} /> LIVE TURF DISCOVERY & LOCAL SLOTS
             </div>
-            <h1 className="font-display" style={{ fontSize: 30, fontWeight: 800, color: '#0f172a', lineHeight: 1.2, margin: 0 }}>
+            <h1 className="font-display marketplace-hero-title" style={{ fontSize: 26, fontWeight: 800, color: '#0f172a', lineHeight: 1.25, margin: 0 }}>
               Find Sports Arenas Near You
             </h1>
-            <p style={{ color: '#64748b', fontSize: 14, marginTop: 4, marginBottom: 0 }}>
+            <p style={{ color: '#64748b', fontSize: 13, marginTop: 4, marginBottom: 0 }}>
               Allow location to calculate real-time distance, view live slot availability, registered player counts, and prices set by owners.
             </p>
           </div>
 
           {/* Location Request Button & Quick Presets */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-start' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-start', flex: '0 0 auto' }}>
             <button
               id="btn-request-location"
               onClick={handleRequestLocation}
@@ -189,67 +187,69 @@ export default function PlayerMarketplace({ onSelectVenue }) {
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: 8,
-                padding: '9px 18px',
-                fontSize: 13,
-                fontWeight: 700
+                padding: '9px 16px',
+                fontSize: 12.5,
+                fontWeight: 700,
+                width: 'auto'
               }}
             >
-              <Navigation size={15} style={{ transform: locatingUser ? 'rotate(45deg)' : 'none', transition: 'transform 0.3s' }} />
-              {locatingUser ? 'Finding Your Location...' : locationPermissionGranted ? '📍 Location Active (Auto-Sorted)' : 'Use My Current Location'}
+              <Navigation size={14} style={{ transform: locatingUser ? 'rotate(45deg)' : 'none', transition: 'transform 0.3s' }} />
+              {locatingUser ? 'Locating...' : locationPermissionGranted ? '📍 Location Active' : 'Use My Current Location'}
             </button>
-            <div style={{ fontSize: 11.5, color: locationPermissionGranted ? '#059669' : '#64748b' }}>
+            <div style={{ fontSize: 11, color: locationPermissionGranted ? '#059669' : '#64748b' }}>
               {locationStatusText}
             </div>
           </div>
         </div>
 
         {/* Location Presets if browser geolocation unavailable */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', paddingTop: 14, borderTop: '1px solid #e2e8f0', fontSize: 12 }}>
-          <span style={{ color: '#64748b', fontWeight: 600 }}>Quick Bangalore Locations:</span>
-          <button
-            onClick={() => handlePresetLocation('koramangala')}
-            style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#334155', padding: '4px 12px', borderRadius: 6, fontSize: 12, cursor: 'pointer', fontWeight: 600 }}
-          >
-            Koramangala
-          </button>
-          <button
-            onClick={() => handlePresetLocation('indiranagar')}
-            style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#334155', padding: '4px 12px', borderRadius: 6, fontSize: 12, cursor: 'pointer', fontWeight: 600 }}
-          >
-            Indiranagar
-          </button>
-          <button
-            onClick={() => handlePresetLocation('hsr')}
-            style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#334155', padding: '4px 12px', borderRadius: 6, fontSize: 12, cursor: 'pointer', fontWeight: 600 }}
-          >
-            HSR Layout
-          </button>
-          {locationPermissionGranted && (
+        <div className="location-preset-row" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', paddingTop: 12, borderTop: '1px solid #e2e8f0', fontSize: 12 }}>
+          <span style={{ color: '#64748b', fontWeight: 600, fontSize: 11.5 }}>Bangalore Presets:</span>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             <button
-              onClick={() => handlePresetLocation('reset')}
-              style={{ background: 'transparent', border: 'none', color: '#64748b', textDecoration: 'underline', fontSize: 11.5, cursor: 'pointer', marginLeft: 'auto' }}
+              onClick={() => handlePresetLocation('koramangala')}
+              style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#334155', padding: '4px 10px', borderRadius: 6, fontSize: 11.5, cursor: 'pointer', fontWeight: 600 }}
             >
-              Reset Location Filter
+              Koramangala
             </button>
-          )}
+            <button
+              onClick={() => handlePresetLocation('indiranagar')}
+              style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#334155', padding: '4px 10px', borderRadius: 6, fontSize: 11.5, cursor: 'pointer', fontWeight: 600 }}
+            >
+              Indiranagar
+            </button>
+            <button
+              onClick={() => handlePresetLocation('hsr')}
+              style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#334155', padding: '4px 10px', borderRadius: 6, fontSize: 11.5, cursor: 'pointer', fontWeight: 600 }}
+            >
+              HSR Layout
+            </button>
+            {locationPermissionGranted && (
+              <button
+                onClick={() => handlePresetLocation('reset')}
+                style={{ background: 'transparent', border: 'none', color: '#64748b', textDecoration: 'underline', fontSize: 11, cursor: 'pointer' }}
+              >
+                Reset GPS
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Search Bar & Sort Dropdown */}
-        <div className="mobile-stack" style={{ display: 'flex', gap: 12, marginTop: 18 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#ffffff', padding: '8px 14px', borderRadius: 8, border: '1px solid #cbd5e1', flex: 1 }}>
-            <Search size={16} style={{ color: '#94a3b8' }} />
+        <div className="mobile-stack" style={{ display: 'flex', gap: 10, marginTop: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#ffffff', padding: '8px 12px', borderRadius: 8, border: '1px solid #cbd5e1', flex: 1, minHeight: 42 }}>
+            <Search size={15} style={{ color: '#94a3b8' }} />
             <input
               id="marketplace-search-input"
               type="text"
-              placeholder="Search by arena name, location (e.g. Koramangala, Indiranagar, HSR)..."
+              placeholder="Search by arena name or area (Koramangala, Indiranagar)..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              style={{ background: 'transparent', border: 'none', color: '#0f172a', outline: 'none', width: '100%', fontSize: 13.5 }}
+              style={{ background: 'transparent', border: 'none', color: '#0f172a', outline: 'none', width: '100%', fontSize: 13 }}
             />
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <ArrowUpDown size={15} style={{ color: '#64748b' }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: '0 0 auto' }}>
             <select
               id="marketplace-sort-select"
               value={sortBy}
@@ -325,7 +325,9 @@ export default function PlayerMarketplace({ onSelectVenue }) {
                 display: 'flex',
                 flexDirection: 'column',
                 cursor: 'pointer',
-                border: '1px solid var(--border-card)'
+                background: '#ffffff',
+                border: '1px solid #e2e8f0',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
               }}
               onClick={() => onSelectVenue(venue.slug || venue.id)}
             >
