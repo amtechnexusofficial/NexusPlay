@@ -1,20 +1,34 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import PlayerMarketplace from './components/PlayerMarketplace.jsx';
 import PublicBookingView from './components/PublicBookingView.jsx';
 import OpenGamesHub from './components/OpenGamesHub.jsx';
 import OwnerSaaSView from './components/OwnerSaaSView.jsx';
+import { PlayerDashboard } from './components/PlayerDashboard.jsx';
+import { AuthModal } from './components/AuthModal.jsx';
 import {
-  Trophy, Compass, LayoutDashboard, Sparkles, MapPin,
-  Share2, ShieldCheck, User
+  Trophy, 
+  Compass, 
+  LayoutDashboard, 
+  Sparkles, 
+  MapPin,
+  Share2, 
+  ShieldCheck, 
+  User, 
+  Building2, 
+  CalendarCheck,
+  LogOut,
+  ChevronDown
 } from 'lucide-react';
+import { api } from './api.js';
 
 export default function App() {
-  // Navigation tabs: 'marketplace', 'opengames', 'owner', 'venue-page'
+  // Navigation views: 'marketplace', 'opengames', 'venue-page', 'player-dashboard', 'owner'
   const [activeView, setActiveView] = useState(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('venue') || params.get('v')) return 'venue-page';
     if (params.get('view') === 'owner') return 'owner';
     if (params.get('view') === 'opengames') return 'opengames';
+    if (params.get('view') === 'dashboard') return 'player-dashboard';
     return 'marketplace';
   });
 
@@ -23,7 +37,33 @@ export default function App() {
     return params.get('venue') || params.get('v') || 'nexus-central-koramangala';
   });
 
-  // Keep URL updated for bookmarking and unique links
+  // User Auth Session State
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      const saved = localStorage.getItem('nexus_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch (e) {
+      return null;
+    }
+  });
+
+  // Auth Modal State
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authModalRole, setAuthModalRole] = useState('player'); // 'player' | 'owner'
+
+  // Sync session on mount
+  useEffect(() => {
+    const token = localStorage.getItem('nexus_token');
+    if (token) {
+      api.getAuthMe(token).then((res) => {
+        if (res && res.user) {
+          setCurrentUser(res.user);
+          localStorage.setItem('nexus_user', JSON.stringify(res.user));
+        }
+      }).catch(() => {});
+    }
+  }, []);
+
   function navigateTo(view, venueSlug = activeVenueSlug) {
     setActiveView(view);
     if (view === 'venue-page') {
@@ -33,6 +73,8 @@ export default function App() {
       window.history.pushState({}, '', '/?view=owner');
     } else if (view === 'opengames') {
       window.history.pushState({}, '', '/?view=opengames');
+    } else if (view === 'player-dashboard') {
+      window.history.pushState({}, '', '/?view=dashboard');
     } else {
       window.history.pushState({}, '', '/');
     }
@@ -42,17 +84,50 @@ export default function App() {
     navigateTo('venue-page', slugOrId);
   }
 
+  function handleAuthSuccess(user, role, venue) {
+    setCurrentUser(user);
+    if (role === 'owner') {
+      navigateTo('owner');
+    } else {
+      navigateTo('player-dashboard');
+    }
+  }
+
+  function handleLogout() {
+    localStorage.removeItem('nexus_token');
+    localStorage.removeItem('nexus_user');
+    localStorage.removeItem('nexus_owner_venue');
+    setCurrentUser(null);
+    navigateTo('marketplace');
+  }
+
+  function openPlayerAuth() {
+    setAuthModalRole('player');
+    setAuthModalOpen(true);
+  }
+
+  function openOwnerAuth() {
+    // If already logged in as owner, navigate directly
+    if (currentUser?.role === 'owner') {
+      navigateTo('owner');
+    } else {
+      setAuthModalRole('owner');
+      setAuthModalOpen(true);
+    }
+  }
+
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg-dark)' }}>
-      {/* Global Brand Header */}
+      {/* Global Brand Header - Modern Clean White Layout */}
       <header
+        id="nexus-global-header"
         style={{
-          background: 'rgba(10, 15, 29, 0.94)',
-          borderBottom: '1px solid var(--border-card)',
+          background: '#ffffff',
+          borderBottom: '1px solid #e2e8f0',
           position: 'sticky',
           top: 0,
           zIndex: 50,
-          backdropFilter: 'blur(12px)'
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)'
         }}
       >
         <div
@@ -68,6 +143,7 @@ export default function App() {
         >
           {/* Logo & Tagline */}
           <div
+            id="nexus-brand-logo"
             style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}
             onClick={() => navigateTo('marketplace')}
           >
@@ -76,36 +152,41 @@ export default function App() {
                 width: 38,
                 height: 38,
                 borderRadius: 10,
-                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#022c22',
+                color: '#ffffff',
                 fontWeight: 900,
                 fontSize: 18,
-                boxShadow: '0 0 16px rgba(16, 185, 129, 0.35)'
+                boxShadow: '0 2px 8px rgba(5, 150, 105, 0.25)'
               }}
             >
               NP
             </div>
             <div>
-              <div className="font-display" style={{ fontSize: 19, fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', lineHeight: 1.1 }}>
-                NEXUS<span style={{ color: '#10b981' }}>PLAY</span>
+              <div className="font-display" style={{ fontSize: 19, fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: 1.1 }}>
+                NEXUS<span style={{ color: '#059669' }}>PLAY</span>
               </div>
-              <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              <div style={{ fontSize: 10, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                 Sports Operating System & Arena Network
               </div>
             </div>
           </div>
 
           {/* Desktop Navigation Switcher */}
-          <nav className="desktop-nav" style={{ background: '#070b14', padding: 4, borderRadius: 10, border: '1px solid var(--border-card)', gap: 3 }}>
+          <nav 
+            id="desktop-main-navigation"
+            className="desktop-nav" 
+            style={{ background: '#f8fafc', padding: 4, borderRadius: 10, border: '1px solid #e2e8f0', gap: 3 }}
+          >
             <button
+              id="nav-turfs-btn"
               onClick={() => navigateTo('marketplace')}
               style={{
-                background: activeView === 'marketplace' ? '#141e34' : 'transparent',
-                color: activeView === 'marketplace' ? '#34d399' : 'var(--text-secondary)',
-                border: activeView === 'marketplace' ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid transparent',
+                background: activeView === 'marketplace' ? '#ffffff' : 'transparent',
+                color: activeView === 'marketplace' ? '#059669' : '#475569',
+                border: activeView === 'marketplace' ? '1px solid #cbd5e1' : '1px solid transparent',
                 borderRadius: 7,
                 padding: '7px 15px',
                 fontSize: 12.5,
@@ -114,6 +195,7 @@ export default function App() {
                 display: 'flex',
                 alignItems: 'center',
                 gap: 6,
+                boxShadow: activeView === 'marketplace' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none',
                 transition: 'all 0.15s ease'
               }}
             >
@@ -121,11 +203,12 @@ export default function App() {
             </button>
 
             <button
+              id="nav-pickup-btn"
               onClick={() => navigateTo('opengames')}
               style={{
-                background: activeView === 'opengames' ? '#141e34' : 'transparent',
-                color: activeView === 'opengames' ? '#fbbf24' : 'var(--text-secondary)',
-                border: activeView === 'opengames' ? '1px solid rgba(245, 158, 11, 0.3)' : '1px solid transparent',
+                background: activeView === 'opengames' ? '#ffffff' : 'transparent',
+                color: activeView === 'opengames' ? '#d97706' : '#475569',
+                border: activeView === 'opengames' ? '1px solid #cbd5e1' : '1px solid transparent',
                 borderRadius: 7,
                 padding: '7px 15px',
                 fontSize: 12.5,
@@ -134,6 +217,7 @@ export default function App() {
                 display: 'flex',
                 alignItems: 'center',
                 gap: 6,
+                boxShadow: activeView === 'opengames' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none',
                 transition: 'all 0.15s ease'
               }}
             >
@@ -141,11 +225,12 @@ export default function App() {
             </button>
 
             <button
+              id="nav-direct-link-btn"
               onClick={() => navigateTo('venue-page')}
               style={{
-                background: activeView === 'venue-page' ? '#141e34' : 'transparent',
-                color: activeView === 'venue-page' ? '#34d399' : 'var(--text-secondary)',
-                border: activeView === 'venue-page' ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid transparent',
+                background: activeView === 'venue-page' ? '#ffffff' : 'transparent',
+                color: activeView === 'venue-page' ? '#059669' : '#475569',
+                border: activeView === 'venue-page' ? '1px solid #cbd5e1' : '1px solid transparent',
                 borderRadius: 7,
                 padding: '7px 15px',
                 fontSize: 12.5,
@@ -154,39 +239,239 @@ export default function App() {
                 display: 'flex',
                 alignItems: 'center',
                 gap: 6,
+                boxShadow: activeView === 'venue-page' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none',
                 transition: 'all 0.15s ease'
               }}
             >
-              <Share2 size={14} /> Unique Turf URL
+              <Share2 size={14} /> Turf Direct Link
             </button>
 
-            <button
-              onClick={() => navigateTo('owner')}
-              style={{
-                background: activeView === 'owner' ? '#10b981' : 'transparent',
-                color: activeView === 'owner' ? '#022c22' : 'var(--text-secondary)',
-                border: '1px solid transparent',
-                borderRadius: 7,
-                padding: '7px 15px',
-                fontSize: 12.5,
-                fontWeight: 700,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                boxShadow: activeView === 'owner' ? '0 0 12px rgba(16, 185, 129, 0.4)' : 'none',
-                transition: 'all 0.15s ease'
-              }}
-            >
-              <LayoutDashboard size={14} /> Owner Dashboard
-            </button>
+            {/* If player is logged in, show My Dashboard in nav */}
+            {currentUser && currentUser.role === 'player' && (
+              <button
+                id="nav-player-dashboard-btn"
+                onClick={() => navigateTo('player-dashboard')}
+                style={{
+                  background: activeView === 'player-dashboard' ? '#ffffff' : 'transparent',
+                  color: activeView === 'player-dashboard' ? '#059669' : '#475569',
+                  border: activeView === 'player-dashboard' ? '1px solid #cbd5e1' : '1px solid transparent',
+                  borderRadius: 7,
+                  padding: '7px 15px',
+                  fontSize: 12.5,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  boxShadow: activeView === 'player-dashboard' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                <CalendarCheck size={14} /> My Dashboard
+              </button>
+            )}
+
+            {/* If owner is logged in, show Owner Hub in nav */}
+            {currentUser && currentUser.role === 'owner' && (
+              <button
+                id="nav-owner-hub-btn"
+                onClick={() => navigateTo('owner')}
+                style={{
+                  background: activeView === 'owner' ? '#ffffff' : 'transparent',
+                  color: activeView === 'owner' ? '#059669' : '#475569',
+                  border: activeView === 'owner' ? '1px solid #cbd5e1' : '1px solid transparent',
+                  borderRadius: 7,
+                  padding: '7px 15px',
+                  fontSize: 12.5,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  boxShadow: activeView === 'owner' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                <Building2 size={14} /> Owner Hub
+              </button>
+            )}
           </nav>
 
-          {/* Direct Settlement Badge */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span className="badge-emerald" style={{ fontSize: 11, padding: '4px 10px' }}>
-              <ShieldCheck size={13} /> Direct Settlement
-            </span>
+          {/* Right Action Controls: Separate Player & Owner Access */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {/* Logged in as Player */}
+            {currentUser && currentUser.role === 'player' && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <button
+                  id="header-player-profile-btn"
+                  onClick={() => navigateTo('player-dashboard')}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    background: '#f8fafc',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: 999,
+                    padding: '5px 12px 5px 6px',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease'
+                  }}
+                  title="Open Player Dashboard"
+                >
+                  <div style={{
+                    width: 26,
+                    height: 26,
+                    borderRadius: '50%',
+                    background: '#059669',
+                    color: '#ffffff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 12,
+                    fontWeight: 800
+                  }}>
+                    {currentUser.name ? currentUser.name.charAt(0).toUpperCase() : 'P'}
+                  </div>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>
+                    {currentUser.name.split(' ')[0]}
+                  </span>
+                  <span className="badge-emerald" style={{ padding: '1px 6px', fontSize: 10 }}>
+                    Player
+                  </span>
+                </button>
+
+                <button
+                  id="header-logout-player-btn"
+                  onClick={handleLogout}
+                  title="Sign Out"
+                  style={{
+                    background: '#ffffff',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: 8,
+                    padding: '7px 9px',
+                    cursor: 'pointer',
+                    color: '#64748b',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <LogOut size={14} />
+                </button>
+              </div>
+            )}
+
+            {/* Logged in as Owner */}
+            {currentUser && currentUser.role === 'owner' && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <button
+                  id="header-owner-profile-btn"
+                  onClick={() => navigateTo('owner')}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    background: activeView === 'owner' ? '#ecfdf5' : '#f8fafc',
+                    border: activeView === 'owner' ? '1px solid #a7f3d0' : '1px solid #cbd5e1',
+                    borderRadius: 999,
+                    padding: '5px 12px 5px 6px',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease'
+                  }}
+                  title="Open Arena Hub"
+                >
+                  <div style={{
+                    width: 26,
+                    height: 26,
+                    borderRadius: '50%',
+                    background: '#4f46e5',
+                    color: '#ffffff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 12,
+                    fontWeight: 800
+                  }}>
+                    <Building2 size={13} />
+                  </div>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>
+                    {currentUser.name || 'Arena Owner'}
+                  </span>
+                  <span className="badge-indigo" style={{ padding: '1px 6px', fontSize: 10 }}>
+                    Owner
+                  </span>
+                </button>
+
+                <button
+                  id="header-owner-hub-btn"
+                  onClick={() => navigateTo('owner')}
+                  className="btn-primary"
+                  style={{ fontSize: 12.5, padding: '7px 12px', minHeight: 34 }}
+                >
+                  <Building2 size={13} />
+                  <span>Arena Hub</span>
+                </button>
+
+                <button
+                  id="header-logout-owner-btn"
+                  onClick={handleLogout}
+                  title="Sign Out"
+                  style={{
+                    background: '#ffffff',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: 8,
+                    padding: '7px 9px',
+                    cursor: 'pointer',
+                    color: '#64748b',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <LogOut size={14} />
+                </button>
+              </div>
+            )}
+
+            {/* Not logged in: Show both Player and Owner entry points */}
+            {!currentUser && (
+              <>
+                <button
+                  id="header-player-signin-btn"
+                  onClick={openPlayerAuth}
+                  className="btn-secondary"
+                  style={{ fontSize: 12.5, padding: '7px 14px' }}
+                >
+                  <User size={14} color="#059669" />
+                  <span>Player Sign In</span>
+                </button>
+
+                <button
+                  id="header-owner-portal-btn"
+                  onClick={openOwnerAuth}
+                  style={{
+                    background: activeView === 'owner' ? '#059669' : '#ffffff',
+                    color: activeView === 'owner' ? '#ffffff' : '#0f172a',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: 8,
+                    padding: '7px 14px',
+                    fontSize: 12.5,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    boxShadow: activeView === 'owner' ? '0 2px 8px rgba(5,150,105,0.25)' : 'none',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <Building2 size={14} color={activeView === 'owner' ? '#ffffff' : '#059669'} />
+                  <span>Owner Portal</span>
+                </button>
+              </>
+            )}
           </div>
         </div>
       </header>
@@ -194,17 +479,35 @@ export default function App() {
       {/* Main Screen Views */}
       <main style={{ flex: 1, padding: '20px 0 80px' }}>
         {activeView === 'marketplace' && (
-          <PlayerMarketplace onSelectVenue={handleSelectVenue} />
+          <PlayerMarketplace 
+            onSelectVenue={handleSelectVenue} 
+            currentUser={currentUser}
+            onOpenAuth={openPlayerAuth}
+          />
         )}
 
         {activeView === 'opengames' && (
-          <OpenGamesHub onNavigateToVenue={handleSelectVenue} />
+          <OpenGamesHub 
+            onNavigateToVenue={handleSelectVenue}
+            currentUser={currentUser}
+            onOpenAuth={openPlayerAuth}
+          />
         )}
 
         {activeView === 'venue-page' && (
           <PublicBookingView
             slug={activeVenueSlug}
             onBack={() => navigateTo('marketplace')}
+            currentUser={currentUser}
+          />
+        )}
+
+        {activeView === 'player-dashboard' && (
+          <PlayerDashboard
+            user={currentUser}
+            onBookVenue={() => navigateTo('marketplace')}
+            onBrowseGames={() => navigateTo('opengames')}
+            onLogout={handleLogout}
           />
         )}
 
@@ -218,8 +521,9 @@ export default function App() {
       </main>
 
       {/* Native Mobile Bottom Navigation Bar */}
-      <nav className="mobile-bottom-bar">
+      <nav id="mobile-bottom-navigation" className="mobile-bottom-bar">
         <button
+          id="mobile-nav-turfs"
           className={`mobile-bottom-btn ${activeView === 'marketplace' ? 'active' : ''}`}
           onClick={() => navigateTo('marketplace')}
         >
@@ -228,6 +532,7 @@ export default function App() {
         </button>
 
         <button
+          id="mobile-nav-pickup"
           className={`mobile-bottom-btn ${activeView === 'opengames' ? 'active' : ''}`}
           onClick={() => navigateTo('opengames')}
         >
@@ -236,25 +541,48 @@ export default function App() {
         </button>
 
         <button
-          className={`mobile-bottom-btn ${activeView === 'venue-page' ? 'active' : ''}`}
-          onClick={() => navigateTo('venue-page')}
+          id="mobile-nav-dashboard"
+          className={`mobile-bottom-btn ${activeView === 'player-dashboard' ? 'active' : ''}`}
+          onClick={() => {
+            if (currentUser && currentUser.role === 'player') {
+              navigateTo('player-dashboard');
+            } else {
+              openPlayerAuth();
+            }
+          }}
         >
-          <Share2 size={20} />
-          <span>Turf Link</span>
+          <CalendarCheck size={20} />
+          <span>{currentUser ? 'My Bookings' : 'Player Login'}</span>
         </button>
 
         <button
+          id="mobile-nav-owner"
           className={`mobile-bottom-btn ${activeView === 'owner' ? 'active' : ''}`}
-          onClick={() => navigateTo('owner')}
+          onClick={openOwnerAuth}
         >
-          <LayoutDashboard size={20} />
+          <Building2 size={20} />
           <span>Owner Hub</span>
         </button>
       </nav>
 
+      {/* Authentication Modal with Dedicated Player & Owner Screens */}
+      <AuthModal
+        isOpen={authModalOpen}
+        initialRole={authModalRole}
+        onClose={() => setAuthModalOpen(false)}
+        onAuthSuccess={handleAuthSuccess}
+      />
+
       {/* Footer */}
-      <footer style={{ background: '#070b14', borderTop: '1px solid var(--border-card)', padding: '20px 20px', textAlign: 'center', fontSize: 12.5, color: 'var(--text-muted)' }}>
-        NexusPlay Sports Operating System · Location-based discovery, live slot management, and direct owner bank settlement
+      <footer style={{ background: '#ffffff', borderTop: '1px solid #e2e8f0', padding: '24px 20px', textAlign: 'center', fontSize: 13, color: '#64748b' }}>
+        <div style={{ maxWidth: 800, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div style={{ fontWeight: 700, color: '#0f172a' }}>
+            NexusPlay Sports Operating System & Venue Network
+          </div>
+          <div>
+            Direct 0% fee owner bank settlements via UPI QR · Real-time slot locking engine · Seamless player pickup matches
+          </div>
+        </div>
       </footer>
     </div>
   );

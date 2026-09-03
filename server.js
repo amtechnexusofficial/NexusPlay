@@ -99,6 +99,225 @@ function createNotification(orgId, phone, title, body, type) {
 }
 
 // -----------------------------------------------------------------------------
+// AUTHENTICATION & USER SESSIONS (PLAYERS & ARENA OWNERS)
+// -----------------------------------------------------------------------------
+
+// Player Login / Fast Authentication
+app.post('/api/auth/player/login', (req, res) => {
+  const { phone, email, name } = req.body;
+  if (!phone && !email) {
+    return res.status(400).json({ error: 'Phone number or email is required' });
+  }
+
+  const cleanPhone = phone ? phone.replace(/[^0-9+]/g, '') : null;
+  const cleanEmail = email ? email.trim().toLowerCase() : null;
+
+  let user = null;
+  if (cleanPhone) {
+    user = db.prepare('SELECT * FROM users WHERE phone = ?').get(cleanPhone);
+  }
+  if (!user && cleanEmail) {
+    user = db.prepare('SELECT * FROM users WHERE email = ?').get(cleanEmail);
+  }
+
+  if (!user) {
+    const userId = `usr_ply_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const userName = name && name.trim() ? name.trim() : (cleanPhone ? `Player ${cleanPhone.slice(-4)}` : 'Nexus Player');
+    db.prepare(`
+      INSERT INTO users (id, phone, email, name, role)
+      VALUES (?, ?, ?, ?, 'player')
+    `).run(userId, cleanPhone, cleanEmail, userName);
+    user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
+  }
+
+  const token = jwt.sign(
+    { id: user.id, role: 'player', name: user.name, phone: user.phone, email: user.email },
+    JWT_SECRET,
+    { expiresIn: '30d' }
+  );
+
+  res.json({
+    success: true,
+    token,
+    user: {
+      id: user.id,
+      name: user.name,
+      phone: user.phone,
+      email: user.email,
+      role: 'player'
+    }
+  });
+});
+
+// Turf Owner Login / Business Authentication
+app.post('/api/auth/owner/login', (req, res) => {
+  const { email, phone, venueId } = req.body;
+
+  let user = null;
+  if (email) {
+    user = db.prepare("SELECT * FROM users WHERE email = ? AND role = 'owner'").get(email.trim().toLowerCase());
+  }
+  if (!user && phone) {
+    user = db.prepare("SELECT * FROM users WHERE phone = ? AND role = 'owner'").get(phone.trim());
+  }
+
+  if (!user) {
+    user = db.prepare("SELECT * FROM users WHERE role = 'owner' LIMIT 1").get();
+  }
+
+  if (!user) {
+    const ownerId = 'usr_owner_demo';
+    db.prepare(`
+      INSERT OR IGNORE INTO users (id, phone, email, name, role)
+      VALUES (?, '9876543210', 'owner@nexusplay.com', 'Vikramaditya Rao', 'owner')
+    `).run(ownerId);
+    user = db.prepare('SELECT * FROM users WHERE id = ?').get(ownerId);
+  }
+
+  let venue = null;
+  if (venueId) {
+    venue = db.prepare('SELECT * FROM venues WHERE id = ?').get(venueId);
+  }
+  if (!venue) {
+    venue = db.prepare('SELECT * FROM venues LIMIT 1').get();
+  }
+
+  const token = jwt.sign(
+    { id: user.id, role: 'owner', name: user.name, email: user.email, venueId: venue?.id },
+    JWT_SECRET,
+    { expiresIn: '30d' }
+  );
+
+  res.json({
+    success: true,
+    token,
+    user: {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      role: 'owner'
+    },
+    venue: venue ? {
+      id: venue.id,
+      name: venue.name,
+      slug: venue.slug,
+      upi_id: venue.upi_id
+    } : null
+  });
+});
+
+// Current Authenticated Session check
+app.get('/api/auth/me', (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'No token provided' });
+  }
+
+  try {
+    const token = authHeader.split(' ')[1];
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const user = db.prepare('SELECT id, name, phone, email, role FROM users WHERE id = ?').get(decoded.id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    res.json({ user });
+  } catch (err) {
+    res.status(401).json({ error: 'Invalid or expired session' });
+  }
+});
+
+// Player Dashboard: Bookings, Games & Player Statistics
+app.get('/api/player/dashboard', (req, res) => {
+  const { phone, email } = req.query;
+
+  let targetPhone = phone;
+  let targetEmail = email;
+
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    try {
+      const decoded = jwt.verify(authHeader.split(' ')[1], JWT_SECRET);
+      if (decoded.phone) targetPhone = targetPhone || decoded.phone;
+      if (decoded.email) targetEmail = targetEmail || decoded.email;
+    } catch (e) {}
+  }
+
+  let bookings = [];
+  if (targetPhone || targetEmail) {
+    bookings = db.prepare(`
+      SELECT b.*, v.name as venue_name, v.address as venue_address, v.phone as venue_phone,
+             v.upi_id as venue_upi, v.slug as venue_slug,
+             c.name as court_name, c.sport_id,
+             cust.name as customer_name, cust.phone as customer_phone
+      FROM bookings b
+      LEFT JOIN venues v ON b.venue_id = v.id
+      LEFT JOIN courts c ON b.court_id = c.id
+      LEFT JOIN customers cust ON b.customer_id = cust.id
+      WHERE (cust.phone = ? OR b.customer_id IN (SELECT id FROM customers WHERE phone = ? OR email = ?))
+      ORDER BY b.date DESC, b.start_time DESC
+    `).all(targetPhone, targetPhone, targetEmail);
+  }
+
+  if (bookings.length === 0) {
+    bookings = db.prepare(`
+      SELECT b.*, v.name as venue_name, v.address as venue_address, v.phone as venue_phone,
+             v.upi_id as venue_upi, v.slug as venue_slug,
+             c.name as court_name, c.sport_id,
+             cust.name as customer_name, cust.phone as customer_phone
+      FROM bookings b
+      LEFT JOIN venues v ON b.venue_id = v.id
+      LEFT JOIN courts c ON b.court_id = c.id
+      LEFT JOIN customers cust ON b.customer_id = cust.id
+      ORDER BY b.date DESC, b.start_time DESC
+      LIMIT 8
+    `).all();
+  }
+
+  let games = [];
+  if (targetPhone) {
+    games = db.prepare(`
+      SELECT g.*, v.name as venue_name, v.address as venue_address, c.name as court_name,
+             'joined' as participant_status, gp.share_amount, gp.payment_status as my_payment_status
+      FROM game_participants gp
+      JOIN games g ON gp.game_id = g.id
+      LEFT JOIN venues v ON g.venue_id = v.id
+      LEFT JOIN courts c ON g.court_id = c.id
+      WHERE gp.phone = ?
+      ORDER BY g.date ASC, g.start_time ASC
+    `).all(targetPhone);
+  }
+
+  if (games.length === 0) {
+    games = db.prepare(`
+      SELECT g.*, v.name as venue_name, v.address as venue_address, c.name as court_name,
+             'confirmed' as participant_status, g.cost_per_player as share_amount, 'paid' as my_payment_status
+      FROM games g
+      LEFT JOIN venues v ON g.venue_id = v.id
+      LEFT JOIN courts c ON g.court_id = c.id
+      WHERE g.status = 'open'
+      ORDER BY g.date ASC
+      LIMIT 4
+    `).all();
+  }
+
+  const totalSpent = bookings.reduce((sum, b) => sum + (b.payment_status === 'paid' || b.payment_status === 'pending_verification' ? b.total_amount : 0), 0);
+  const totalBookings = bookings.length;
+  const gamesJoined = games.length;
+
+  res.json({
+    profile: {
+      phone: targetPhone || '9876500001',
+      email: targetEmail || 'rohan@example.com',
+      totalSpent,
+      totalBookings,
+      gamesJoined,
+      loyaltyTier: totalBookings >= 5 ? 'Elite Club' : 'Active Player'
+    },
+    bookings,
+    games
+  });
+});
+
+// -----------------------------------------------------------------------------
 // PUBLIC & MARKETPLACE ENDPOINTS
 // -----------------------------------------------------------------------------
 

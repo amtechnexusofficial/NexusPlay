@@ -155,23 +155,25 @@ export default function PlayerMarketplace({ onSelectVenue }) {
       
       {/* Search & Location Hero Header */}
       <div
+        id="marketplace-hero"
         className="nexus-card"
         style={{
           padding: '28px 28px',
           marginBottom: 24,
-          background: 'linear-gradient(180deg, #111827 0%, #0d131f 100%)',
-          border: '1px solid var(--border-card)'
+          background: '#ffffff',
+          border: '1px solid #e2e8f0',
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)'
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 16, marginBottom: 20 }}>
           <div>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#34d399', fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#059669', fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
               <Sparkles size={14} /> LIVE TURF DISCOVERY & LOCAL SLOTS
             </div>
-            <h1 className="font-display" style={{ fontSize: 30, fontWeight: 800, color: '#f8fafc', lineHeight: 1.2, margin: 0 }}>
+            <h1 className="font-display" style={{ fontSize: 30, fontWeight: 800, color: '#0f172a', lineHeight: 1.2, margin: 0 }}>
               Find Sports Arenas Near You
             </h1>
-            <p style={{ color: 'var(--text-secondary)', fontSize: 14, marginTop: 4, marginBottom: 0 }}>
+            <p style={{ color: '#64748b', fontSize: 14, marginTop: 4, marginBottom: 0 }}>
               Allow location to calculate real-time distance, view live slot availability, registered player counts, and prices set by owners.
             </p>
           </div>
@@ -179,6 +181,7 @@ export default function PlayerMarketplace({ onSelectVenue }) {
           {/* Location Request Button & Quick Presets */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-start' }}>
             <button
+              id="btn-request-location"
               onClick={handleRequestLocation}
               disabled={locatingUser}
               className={locationPermissionGranted ? "btn-secondary" : "btn-primary"}
@@ -194,37 +197,37 @@ export default function PlayerMarketplace({ onSelectVenue }) {
               <Navigation size={15} style={{ transform: locatingUser ? 'rotate(45deg)' : 'none', transition: 'transform 0.3s' }} />
               {locatingUser ? 'Finding Your Location...' : locationPermissionGranted ? '📍 Location Active (Auto-Sorted)' : 'Use My Current Location'}
             </button>
-            <div style={{ fontSize: 11.5, color: locationPermissionGranted ? '#34d399' : 'var(--text-muted)' }}>
+            <div style={{ fontSize: 11.5, color: locationPermissionGranted ? '#059669' : '#64748b' }}>
               {locationStatusText}
             </div>
           </div>
         </div>
 
         {/* Location Presets if browser geolocation unavailable */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', paddingTop: 14, borderTop: '1px solid var(--border-card)', fontSize: 12 }}>
-          <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>Quick Bangalore Locations:</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', paddingTop: 14, borderTop: '1px solid #e2e8f0', fontSize: 12 }}>
+          <span style={{ color: '#64748b', fontWeight: 600 }}>Quick Bangalore Locations:</span>
           <button
             onClick={() => handlePresetLocation('koramangala')}
-            style={{ background: '#1e293b', border: '1px solid var(--border-card)', color: '#cbd5e1', padding: '3px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer' }}
+            style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#334155', padding: '4px 12px', borderRadius: 6, fontSize: 12, cursor: 'pointer', fontWeight: 600 }}
           >
             Koramangala
           </button>
           <button
             onClick={() => handlePresetLocation('indiranagar')}
-            style={{ background: '#1e293b', border: '1px solid var(--border-card)', color: '#cbd5e1', padding: '3px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer' }}
+            style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#334155', padding: '4px 12px', borderRadius: 6, fontSize: 12, cursor: 'pointer', fontWeight: 600 }}
           >
             Indiranagar
           </button>
           <button
             onClick={() => handlePresetLocation('hsr')}
-            style={{ background: '#1e293b', border: '1px solid var(--border-card)', color: '#cbd5e1', padding: '3px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer' }}
+            style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#334155', padding: '4px 12px', borderRadius: 6, fontSize: 12, cursor: 'pointer', fontWeight: 600 }}
           >
             HSR Layout
           </button>
           {locationPermissionGranted && (
             <button
               onClick={() => handlePresetLocation('reset')}
-              style={{ background: 'transparent', border: 'none', color: '#94a3b8', textDecoration: 'underline', fontSize: 11.5, cursor: 'pointer', marginLeft: 'auto' }}
+              style={{ background: 'transparent', border: 'none', color: '#64748b', textDecoration: 'underline', fontSize: 11.5, cursor: 'pointer', marginLeft: 'auto' }}
             >
               Reset Location Filter
             </button>
@@ -233,24 +236,26 @@ export default function PlayerMarketplace({ onSelectVenue }) {
 
         {/* Search Bar & Sort Dropdown */}
         <div className="mobile-stack" style={{ display: 'flex', gap: 12, marginTop: 18 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#0b111e', padding: '8px 14px', borderRadius: 8, border: '1px solid var(--border-card)', flex: 1 }}>
-            <Search size={16} style={{ color: 'var(--text-muted)' }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#ffffff', padding: '8px 14px', borderRadius: 8, border: '1px solid #cbd5e1', flex: 1 }}>
+            <Search size={16} style={{ color: '#94a3b8' }} />
             <input
+              id="marketplace-search-input"
               type="text"
               placeholder="Search by arena name, location (e.g. Koramangala, Indiranagar, HSR)..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              style={{ background: 'transparent', border: 'none', color: '#fff', outline: 'none', width: '100%', fontSize: 13.5 }}
+              style={{ background: 'transparent', border: 'none', color: '#0f172a', outline: 'none', width: '100%', fontSize: 13.5 }}
             />
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <ArrowUpDown size={15} style={{ color: 'var(--text-muted)' }} />
+            <ArrowUpDown size={15} style={{ color: '#64748b' }} />
             <select
+              id="marketplace-sort-select"
               value={sortBy}
               onChange={e => setSortBy(e.target.value)}
               className="nexus-input"
-              style={{ padding: '8px 12px', fontSize: 13, width: '100%' }}
+              style={{ padding: '8px 12px', fontSize: 13, width: '100%', background: '#ffffff', color: '#0f172a', borderColor: '#cbd5e1' }}
             >
               <option value="distance">Sort: Nearest to Me</option>
               <option value="slots_desc">Sort: Most Live Slots Today</option>
@@ -266,15 +271,16 @@ export default function PlayerMarketplace({ onSelectVenue }) {
         <button
           onClick={() => setSelectedSport('all')}
           style={{
-            background: selectedSport === 'all' ? '#10b981' : '#131b2e',
-            color: selectedSport === 'all' ? '#022c22' : '#e2e8f0',
-            border: `1px solid ${selectedSport === 'all' ? '#10b981' : 'var(--border-card)'}`,
+            background: selectedSport === 'all' ? '#059669' : '#ffffff',
+            color: selectedSport === 'all' ? '#ffffff' : '#334155',
+            border: `1px solid ${selectedSport === 'all' ? '#059669' : '#cbd5e1'}`,
             padding: '7px 16px',
             borderRadius: 8,
             fontWeight: 700,
             fontSize: 12.5,
             cursor: 'pointer',
-            whiteSpace: 'nowrap'
+            whiteSpace: 'nowrap',
+            boxShadow: '0 1px 2px rgba(0,0,0,0.04)'
           }}
         >
           All Sports ({venues.length})
@@ -284,9 +290,9 @@ export default function PlayerMarketplace({ onSelectVenue }) {
             key={s.id}
             onClick={() => setSelectedSport(s.id)}
             style={{
-              background: selectedSport === s.id ? '#10b981' : '#131b2e',
-              color: selectedSport === s.id ? '#022c22' : '#e2e8f0',
-              border: `1px solid ${selectedSport === s.id ? '#10b981' : 'var(--border-card)'}`,
+              background: selectedSport === s.id ? '#059669' : '#ffffff',
+              color: selectedSport === s.id ? '#ffffff' : '#334155',
+              border: `1px solid ${selectedSport === s.id ? '#059669' : '#cbd5e1'}`,
               padding: '7px 14px',
               borderRadius: 8,
               fontWeight: 700,
@@ -295,7 +301,8 @@ export default function PlayerMarketplace({ onSelectVenue }) {
               display: 'flex',
               alignItems: 'center',
               gap: 6,
-              whiteSpace: 'nowrap'
+              whiteSpace: 'nowrap',
+              boxShadow: '0 1px 2px rgba(0,0,0,0.04)'
             }}
           >
             <span>{s.icon}</span> {s.name}
@@ -402,9 +409,9 @@ export default function PlayerMarketplace({ onSelectVenue }) {
               </div>
 
               {/* Content Details */}
-              <div style={{ padding: '18px 20px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+              <div style={{ padding: '18px 20px', flex: 1, display: 'flex', flexDirection: 'column', background: '#ffffff' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
-                  <h3 style={{ fontSize: 17.5, fontWeight: 800, color: '#f8fafc', lineHeight: 1.3, margin: 0 }}>
+                  <h3 style={{ fontSize: 17.5, fontWeight: 800, color: '#0f172a', lineHeight: 1.3, margin: 0 }}>
                     {venue.name}
                   </h3>
                   {/* Share / Copy Unique Link button */}
@@ -412,9 +419,9 @@ export default function PlayerMarketplace({ onSelectVenue }) {
                     onClick={(e) => handleCopyUniqueLink(e, venue)}
                     title="Copy Unique Turf Booking URL"
                     style={{
-                      background: isCopied ? '#10b981' : '#1e293b',
-                      color: isCopied ? '#022c22' : '#cbd5e1',
-                      border: '1px solid var(--border-card)',
+                      background: isCopied ? '#059669' : '#f1f5f9',
+                      color: isCopied ? '#ffffff' : '#334155',
+                      border: '1px solid #cbd5e1',
                       borderRadius: 6,
                       padding: '5px 8px',
                       fontSize: 11,
@@ -431,16 +438,16 @@ export default function PlayerMarketplace({ onSelectVenue }) {
                   </button>
                 </div>
 
-                <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 5, marginTop: 6, marginBottom: 12 }}>
-                  <MapPin size={13} style={{ color: 'var(--accent-neon)', flexShrink: 0 }} />
+                <div style={{ fontSize: 12.5, color: '#64748b', display: 'flex', alignItems: 'center', gap: 5, marginTop: 6, marginBottom: 12 }}>
+                  <MapPin size={13} style={{ color: '#059669', flexShrink: 0 }} />
                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{venue.address}</span>
                 </div>
 
                 {/* LIVE SLOTS PREVIEW & INDIVIDUAL PLAYER REGISTRATIONS */}
-                <div style={{ background: '#0b111e', borderRadius: 8, padding: '10px 12px', border: '1px solid var(--border-card)', marginBottom: 14 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
+                <div style={{ background: '#f8fafc', borderRadius: 8, padding: '10px 12px', border: '1px solid #e2e8f0', marginBottom: 14 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
                     <span>Live Slots Today & Pricing</span>
-                    <span style={{ color: '#34d399' }}>Owner-Set Rates</span>
+                    <span style={{ color: '#059669' }}>Owner-Set Rates</span>
                   </div>
 
                   {venue.live_slots && venue.live_slots.length > 0 ? (
@@ -454,16 +461,16 @@ export default function PlayerMarketplace({ onSelectVenue }) {
                               display: 'flex',
                               justifyContent: 'space-between',
                               alignItems: 'center',
-                              background: isPartialGame ? 'rgba(245, 158, 11, 0.08)' : '#131b2e',
-                              border: isPartialGame ? '1px solid rgba(245, 158, 11, 0.25)' : '1px solid var(--border-card)',
+                              background: isPartialGame ? '#fffbeb' : '#ffffff',
+                              border: isPartialGame ? '1px solid #fde68a' : '1px solid #e2e8f0',
                               padding: '6px 10px',
                               borderRadius: 6,
                               fontSize: 12
                             }}
                           >
                             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                              <Clock size={12} style={{ color: isPartialGame ? '#f59e0b' : '#10b981' }} />
-                              <span style={{ fontWeight: 600, color: '#f8fafc' }}>
+                              <Clock size={12} style={{ color: isPartialGame ? '#d97706' : '#059669' }} />
+                              <span style={{ fontWeight: 600, color: '#0f172a' }}>
                                 {slot.start_time} - {slot.end_time}
                               </span>
                               {isPartialGame ? (
@@ -471,15 +478,15 @@ export default function PlayerMarketplace({ onSelectVenue }) {
                                   <Users size={10} /> {slot.registered_players}/{slot.capacity} players
                                 </span>
                               ) : (
-                                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                                <span style={{ fontSize: 11, color: '#64748b' }}>
                                   {slot.court_name}
                                 </span>
                               )}
                             </div>
 
-                            <div style={{ fontWeight: 700, color: isPartialGame ? '#fbbf24' : '#34d399' }}>
+                            <div style={{ fontWeight: 700, color: isPartialGame ? '#b45309' : '#059669' }}>
                               ₹{slot.price}
-                              <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 400 }}>
+                              <span style={{ fontSize: 10, color: '#64748b', fontWeight: 400 }}>
                                 {isPartialGame ? '/player' : '/slot'}
                               </span>
                             </div>
@@ -488,7 +495,7 @@ export default function PlayerMarketplace({ onSelectVenue }) {
                       })}
                     </div>
                   ) : (
-                    <div style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'center', padding: '6px 0' }}>
+                    <div style={{ fontSize: 12, color: '#64748b', textAlign: 'center', padding: '6px 0' }}>
                       All morning slots booked · Evening slots opening soon
                     </div>
                   )}
@@ -500,32 +507,33 @@ export default function PlayerMarketplace({ onSelectVenue }) {
                     <span
                       key={i}
                       style={{
-                        background: '#1e293b',
+                        background: '#f1f5f9',
                         borderRadius: 4,
                         padding: '2px 7px',
                         fontSize: 11,
-                        color: 'var(--text-secondary)'
+                        color: '#475569',
+                        border: '1px solid #e2e8f0'
                       }}
                     >
                       {am}
                     </span>
                   ))}
                   {venue.amenities?.length > 3 && (
-                    <span style={{ fontSize: 11, color: 'var(--text-muted)', alignSelf: 'center' }}>
+                    <span style={{ fontSize: 11, color: '#64748b', alignSelf: 'center' }}>
                       +{venue.amenities.length - 3} more
                     </span>
                   )}
                 </div>
 
                 {/* Footer: Owner Price & Booking Action */}
-                <div style={{ marginTop: 'auto', paddingTop: 12, borderTop: '1px solid var(--border-card)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ marginTop: 'auto', paddingTop: 12, borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
-                    <div style={{ fontSize: 10.5, color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
+                    <div style={{ fontSize: 10.5, color: '#64748b', textTransform: 'uppercase', fontWeight: 600 }}>
                       Starting From
                     </div>
-                    <div style={{ fontSize: 16, fontWeight: 800, color: '#f8fafc' }}>
+                    <div style={{ fontSize: 16, fontWeight: 800, color: '#0f172a' }}>
                       ₹{venue.min_price || 800}
-                      <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 400 }}>/hr</span>
+                      <span style={{ fontSize: 11, color: '#64748b', fontWeight: 400 }}>/hr</span>
                     </div>
                   </div>
 

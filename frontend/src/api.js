@@ -255,5 +255,46 @@ export const api = {
     const res = await fetch(`${API_BASE}/config/info`);
     if (!res.ok) return null;
     return res.json();
+  },
+
+  // Authentication & Sessions
+  async loginPlayer(credentials) {
+    const res = await fetch(`${API_BASE}/auth/player/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(credentials)
+    });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error || 'Player login failed');
+    return body;
+  },
+
+  async loginOwner(credentials) {
+    const res = await fetch(`${API_BASE}/auth/owner/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(credentials)
+    });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error || 'Owner login failed');
+    return body;
+  },
+
+  async getAuthMe(token) {
+    const res = await fetch(`${API_BASE}/auth/me`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {}
+    });
+    if (!res.ok) return null;
+    return res.json();
+  },
+
+  async getPlayerDashboard(phone, token) {
+    const params = new URLSearchParams();
+    if (phone) params.append('phone', phone);
+    const res = await fetch(`${API_BASE}/player/dashboard?${params.toString()}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {}
+    });
+    if (!res.ok) throw new Error('Failed to load player dashboard');
+    return res.json();
   }
 };

@@ -7,7 +7,7 @@ import {
   ExternalLink, RefreshCw
 } from 'lucide-react';
 
-export default function PublicBookingView({ slug = 'nexus-central-koramangala', onBack }) {
+export default function PublicBookingView({ slug = 'nexus-central-koramangala', onBack, currentUser }) {
   const [venue, setVenue] = useState(null);
   const [selectedSport, setSelectedSport] = useState(null);
   const [selectedCourt, setSelectedCourt] = useState(null);
@@ -22,14 +22,23 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
   const [lockCountdown, setLockCountdown] = useState(0);
   const [checkoutStep, setCheckoutStep] = useState('slots'); // 'slots', 'payment', 'confirmed'
 
-  // Customer Form & Direct UPI
-  const [customerName, setCustomerName] = useState('');
-  const [customerPhone, setCustomerPhone] = useState('');
-  const [customerEmail, setCustomerEmail] = useState('');
+  // Customer Form & Direct UPI - Pre-filled if user is authenticated
+  const [customerName, setCustomerName] = useState(() => currentUser?.name || '');
+  const [customerPhone, setCustomerPhone] = useState(() => currentUser?.phone || '');
+  const [customerEmail, setCustomerEmail] = useState(() => currentUser?.email || '');
   const [paymentProvider, setPaymentProvider] = useState('upi'); // 'upi', 'cash'
   const [upiUtr, setUpiUtr] = useState('');
   const [copiedUpi, setCopiedUpi] = useState(false);
   const [splitCount, setSplitCount] = useState(1);
+
+  // Sync if currentUser changes
+  useEffect(() => {
+    if (currentUser) {
+      if (currentUser.name) setCustomerName(currentUser.name);
+      if (currentUser.phone) setCustomerPhone(currentUser.phone);
+      if (currentUser.email) setCustomerEmail(currentUser.email);
+    }
+  }, [currentUser]);
 
   // Confirmation result
   const [confirmedBooking, setConfirmedBooking] = useState(null);
@@ -243,25 +252,25 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
         <div style={{ padding: 24 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 16 }}>
             <div>
-              <h1 className="font-display" style={{ fontSize: 32, fontWeight: 800, color: '#fff', marginBottom: 6 }}>
+              <h1 className="font-display" style={{ fontSize: 32, fontWeight: 800, color: '#0f172a', marginBottom: 6 }}>
                 {venue.name}
               </h1>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-secondary)', fontSize: 14 }}>
-                <MapPin size={16} style={{ color: 'var(--accent-neon)', flexShrink: 0 }} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#64748b', fontSize: 14 }}>
+                <MapPin size={16} style={{ color: '#059669', flexShrink: 0 }} />
                 <span>{venue.address}</span>
               </div>
             </div>
             <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              <div style={{ fontSize: 12, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 Operational Hours
               </div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--accent-neon)' }}>
+              <div style={{ fontSize: 16, fontWeight: 700, color: '#059669' }}>
                 {venue.open_time} - {venue.close_time}
               </div>
             </div>
           </div>
 
-          <p style={{ color: 'var(--text-secondary)', marginTop: 14, fontSize: 14.5, lineHeight: 1.6, maxWidth: 840 }}>
+          <p style={{ color: '#475569', marginTop: 14, fontSize: 14.5, lineHeight: 1.6, maxWidth: 840 }}>
             {venue.description}
           </p>
 
@@ -271,12 +280,13 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
               <span
                 key={idx}
                 style={{
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  background: '#f1f5f9',
+                  border: '1px solid #e2e8f0',
                   borderRadius: 999,
                   padding: '5px 12px',
                   fontSize: 12.5,
-                  color: 'var(--text-secondary)'
+                  color: '#334155',
+                  fontWeight: 600
                 }}
               >
                 ✓ {amenity}
@@ -288,70 +298,70 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
 
       {/* MAIN BOOKING INTERFACE */}
       {checkoutStep === 'confirmed' && confirmedBooking ? (
-        <div className="nexus-card animate-fade-in" style={{ padding: 36, textAlign: 'center' }}>
-          <div style={{ display: 'inline-flex', padding: 16, borderRadius: '50%', background: confirmedBooking.paymentStatus === 'pending_verification' ? 'rgba(234, 179, 8, 0.15)' : 'rgba(16, 185, 129, 0.15)', color: confirmedBooking.paymentStatus === 'pending_verification' ? '#eab308' : 'var(--accent-neon)', marginBottom: 16 }}>
+        <div className="nexus-card animate-fade-in" style={{ padding: 36, textAlign: 'center', background: '#ffffff', border: '1px solid #e2e8f0' }}>
+          <div style={{ display: 'inline-flex', padding: 16, borderRadius: '50%', background: confirmedBooking.paymentStatus === 'pending_verification' ? '#fef3c7' : '#d1fae5', color: confirmedBooking.paymentStatus === 'pending_verification' ? '#d97706' : '#059669', marginBottom: 16 }}>
             {confirmedBooking.paymentStatus === 'pending_verification' ? <Clock size={48} /> : <CheckCircle size={48} />}
           </div>
-          <h2 className="font-display" style={{ fontSize: 28, fontWeight: 800, color: '#fff' }}>
+          <h2 className="font-display" style={{ fontSize: 28, fontWeight: 800, color: '#0f172a' }}>
             {confirmedBooking.paymentStatus === 'pending_verification' ? 'Booking Reserved — Pending UPI Credit Verification' : 'Booking Confirmed!'}
           </h2>
-          <p style={{ color: 'var(--text-secondary)', marginTop: 8, fontSize: 14 }}>
-            Booking Ref: <strong style={{ color: '#fff' }}>{confirmedBooking.booking?.id}</strong>
+          <p style={{ color: '#64748b', marginTop: 8, fontSize: 14 }}>
+            Booking Ref: <strong style={{ color: '#0f172a' }}>{confirmedBooking.booking?.id}</strong>
           </p>
 
           {confirmedBooking.paymentStatus === 'pending_verification' && (
-            <div style={{ maxWidth: 520, margin: '16px auto', background: 'rgba(234, 179, 8, 0.08)', border: '1px solid rgba(234, 179, 8, 0.25)', borderRadius: 12, padding: 16, textAlign: 'left' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#eab308', fontWeight: 700, fontSize: 14, marginBottom: 4 }}>
+            <div style={{ maxWidth: 520, margin: '16px auto', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 12, padding: 16, textAlign: 'left' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#b45309', fontWeight: 700, fontSize: 14, marginBottom: 4 }}>
                 <ShieldCheck size={18} /> Slot 100% Reserved & Held
               </div>
-              <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: 0, lineHeight: 1.5 }}>
+              <p style={{ fontSize: 13, color: '#475569', margin: 0, lineHeight: 1.5 }}>
                 Your 12-digit UTR <strong>{confirmedBooking.utr || confirmedBooking.booking?.upi_utr}</strong> has been submitted directly to {venue.name}. The owner will verify the ₹{confirmedBooking.booking?.total_amount} credit in their bank account. You will receive an SMS confirmation once credited.
               </p>
             </div>
           )}
 
-          <div style={{ background: '#12141a', border: '1px solid var(--border-card)', borderRadius: 14, padding: 20, maxWidth: 520, margin: '20px auto', textAlign: 'left' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: 10, borderBottom: '1px solid var(--border-card)' }}>
-              <span style={{ color: 'var(--text-muted)' }}>Venue:</span>
-              <strong style={{ color: '#fff' }}>{venue.name}</strong>
+          <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 14, padding: 20, maxWidth: 520, margin: '20px auto', textAlign: 'left' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: 10, borderBottom: '1px solid #e2e8f0' }}>
+              <span style={{ color: '#64748b' }}>Venue:</span>
+              <strong style={{ color: '#0f172a' }}>{venue.name}</strong>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--border-card)' }}>
-              <span style={{ color: 'var(--text-muted)' }}>Court:</span>
-              <strong style={{ color: '#fff' }}>{selectedCourt?.name}</strong>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #e2e8f0' }}>
+              <span style={{ color: '#64748b' }}>Court:</span>
+              <strong style={{ color: '#0f172a' }}>{selectedCourt?.name}</strong>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--border-card)' }}>
-              <span style={{ color: 'var(--text-muted)' }}>Date & Time:</span>
-              <strong style={{ color: 'var(--accent-neon)' }}>{confirmedBooking.booking?.date} | {confirmedBooking.booking?.start_time} - {confirmedBooking.booking?.end_time}</strong>
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #e2e8f0' }}>
+              <span style={{ color: '#64748b' }}>Date & Time:</span>
+              <strong style={{ color: '#059669' }}>{confirmedBooking.booking?.date} | {confirmedBooking.booking?.start_time} - {confirmedBooking.booking?.end_time}</strong>
             </div>
             {confirmedBooking.utr && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--border-card)' }}>
-                <span style={{ color: 'var(--text-muted)' }}>UPI Reference (UTR):</span>
-                <strong style={{ color: '#fff', letterSpacing: '0.05em' }}>{confirmedBooking.utr}</strong>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid #e2e8f0' }}>
+                <span style={{ color: '#64748b' }}>UPI Reference (UTR):</span>
+                <strong style={{ color: '#0f172a', letterSpacing: '0.05em' }}>{confirmedBooking.utr}</strong>
               </div>
             )}
             <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 10 }}>
-              <span style={{ color: 'var(--text-muted)' }}>Total Amount:</span>
-              <strong style={{ color: '#fff', fontSize: 18 }}>₹{confirmedBooking.booking?.total_amount}</strong>
+              <span style={{ color: '#64748b' }}>Total Amount:</span>
+              <strong style={{ color: '#0f172a', fontSize: 18 }}>₹{confirmedBooking.booking?.total_amount}</strong>
             </div>
           </div>
 
           {confirmedBooking.shareLinks?.length > 1 && (
-            <div style={{ maxWidth: 520, margin: '0 auto 24px', textAlign: 'left', background: 'rgba(249, 115, 22, 0.08)', border: '1px solid rgba(249, 115, 22, 0.2)', padding: 18, borderRadius: 12 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#fb923c', fontWeight: 700, fontSize: 14, marginBottom: 8 }}>
+            <div style={{ maxWidth: 520, margin: '0 auto 24px', textAlign: 'left', background: '#fff7ed', border: '1px solid #fed7aa', padding: 18, borderRadius: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#c2410c', fontWeight: 700, fontSize: 14, marginBottom: 8 }}>
                 <Split size={18} /> Split Payment Links Generated ({confirmedBooking.shareLinks.length} players)
               </div>
-              <p style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginBottom: 12 }}>
+              <p style={{ fontSize: 12.5, color: '#475569', marginBottom: 12 }}>
                 Share these individual payment links with your teammates. Each pays ₹{confirmedBooking.shareLinks[0]?.shareAmount}:
               </p>
               {confirmedBooking.shareLinks.map((link, i) => (
-                <div key={link.participantId} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#12141a', padding: '8px 12px', borderRadius: 8, marginBottom: 6, fontSize: 12.5 }}>
-                  <span>{link.name} ({link.status === 'paid' ? 'Paid by you' : 'Pending'})</span>
+                <div key={link.participantId} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#ffffff', border: '1px solid #fed7aa', padding: '8px 12px', borderRadius: 8, marginBottom: 6, fontSize: 12.5 }}>
+                  <span style={{ color: '#0f172a' }}>{link.name} ({link.status === 'paid' ? 'Paid by you' : 'Pending'})</span>
                   <button
                     onClick={() => {
                       navigator.clipboard.writeText(`${window.location.origin}/pay/${link.token}`);
                       alert(`Shareable payment link for ${link.name} copied!`);
                     }}
-                    style={{ background: 'none', border: 'none', color: 'var(--accent-neon)', cursor: 'pointer', fontWeight: 600 }}
+                    style={{ background: 'none', border: 'none', color: '#059669', cursor: 'pointer', fontWeight: 600 }}
                   >
                     Copy Link
                   </button>
@@ -418,20 +428,21 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
                       key={crt.id}
                       onClick={() => { setSelectedCourt(crt); setSelectedSlot(null); }}
                       style={{
-                        background: selectedCourt?.id === crt.id ? 'rgba(16, 185, 129, 0.08)' : 'var(--bg-card)',
-                        border: `1.5px solid ${selectedCourt?.id === crt.id ? 'var(--accent-neon)' : 'var(--border-card)'}`,
+                        background: selectedCourt?.id === crt.id ? '#ecfdf5' : '#ffffff',
+                        border: `1.5px solid ${selectedCourt?.id === crt.id ? '#059669' : '#e2e8f0'}`,
                         borderRadius: 12,
                         padding: '14px 16px',
-                        cursor: 'pointer'
+                        cursor: 'pointer',
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
                       }}
                     >
-                      <div style={{ fontWeight: 700, fontSize: 14, color: '#fff', marginBottom: 4 }}>
+                      <div style={{ fontWeight: 700, fontSize: 14, color: '#0f172a', marginBottom: 4 }}>
                         {crt.name}
                       </div>
-                      <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                      <div style={{ fontSize: 12, color: '#64748b' }}>
                         Capacity: {crt.capacity} players · {crt.slot_duration_minutes}m slots
                       </div>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent-neon)', marginTop: 8 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: '#059669', marginTop: 8 }}>
                         From ₹{crt.base_price}/hr
                       </div>
                     </div>
@@ -442,7 +453,7 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
 
             {/* 3. Date Picker Horizontal Strip */}
             <div style={{ marginBottom: 24 }}>
-              <label style={{ display: 'block', fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: 10 }}>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', marginBottom: 10 }}>
                 3. Choose Date
               </label>
               <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 6 }}>
@@ -461,13 +472,14 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
                       onClick={() => { setSelectedDate(dStr); setSelectedSlot(null); }}
                       style={{
                         minWidth: 78,
-                        background: isSelected ? 'var(--accent-neon)' : 'var(--bg-card)',
-                        color: isSelected ? '#042f1f' : '#fff',
-                        border: `1px solid ${isSelected ? 'var(--accent-neon)' : 'var(--border-card)'}`,
+                        background: isSelected ? '#059669' : '#ffffff',
+                        color: isSelected ? '#ffffff' : '#0f172a',
+                        border: `1px solid ${isSelected ? '#059669' : '#cbd5e1'}`,
                         borderRadius: 12,
                         padding: '12px 8px',
                         textAlign: 'center',
-                        cursor: 'pointer'
+                        cursor: 'pointer',
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
                       }}
                     >
                       <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', opacity: 0.8 }}>
@@ -522,39 +534,40 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
                         onClick={() => { setSelectedSlot(slot); setErrorMsg(''); }}
                         style={{
                           background: isSelected
-                            ? 'var(--accent-neon)'
+                            ? '#059669'
                             : isOpen
-                            ? 'var(--bg-card)'
+                            ? '#ffffff'
                             : isHeld
-                            ? 'rgba(249, 115, 22, 0.12)'
-                            : 'rgba(255, 255, 255, 0.03)',
+                            ? '#fffbeb'
+                            : '#f8fafc',
                           color: isSelected
-                            ? '#042f1f'
+                            ? '#ffffff'
                             : isOpen
-                            ? '#fff'
+                            ? '#0f172a'
                             : isHeld
-                            ? '#fb923c'
-                            : '#475569',
+                            ? '#d97706'
+                            : '#94a3b8',
                           border: `1.5px solid ${
                             isSelected
-                              ? 'var(--accent-neon)'
+                              ? '#059669'
                               : isOpen
-                              ? 'var(--border-card)'
+                              ? '#cbd5e1'
                               : isHeld
-                              ? 'rgba(249, 115, 22, 0.3)'
-                              : 'transparent'
+                              ? '#fde68a'
+                              : '#e2e8f0'
                           }`,
                           borderRadius: 10,
                           padding: '10px 8px',
                           textAlign: 'center',
                           cursor: isOpen ? 'pointer' : 'not-allowed',
-                          position: 'relative'
+                          position: 'relative',
+                          boxShadow: isOpen ? '0 1px 2px rgba(0,0,0,0.03)' : 'none'
                         }}
                       >
                         <div style={{ fontSize: 13, fontWeight: 700 }}>
                           {slot.start_time} - {slot.end_time}
                         </div>
-                        <div style={{ fontSize: 12, fontWeight: 700, marginTop: 4 }}>
+                        <div style={{ fontSize: 12, fontWeight: 700, marginTop: 4, color: isSelected ? '#ffffff' : isOpen ? '#059669' : undefined }}>
                           {isOpen ? `₹${slot.price}` : isHeld ? 'Temporarily Held' : 'Booked'}
                         </div>
                       </button>
@@ -567,25 +580,25 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
 
           {/* Right Column: Checkout Summary & Temporary Lock Widget */}
           <div>
-            <div className="nexus-card" style={{ padding: 22, position: 'sticky', top: 20 }}>
-              <h3 className="font-display" style={{ fontSize: 20, fontWeight: 700, color: '#fff', marginBottom: 16 }}>
+            <div className="nexus-card" style={{ padding: 22, position: 'sticky', top: 20, background: '#ffffff', border: '1px solid #e2e8f0' }}>
+              <h3 className="font-display" style={{ fontSize: 20, fontWeight: 700, color: '#0f172a', marginBottom: 16 }}>
                 Booking Summary
               </h3>
 
               {selectedSlot ? (
                 <div>
-                  <div style={{ background: '#12141a', borderRadius: 10, padding: 14, marginBottom: 16, border: '1px solid var(--border-card)' }}>
-                    <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>{venue.name}</div>
-                    <div style={{ fontSize: 15, fontWeight: 700, color: '#fff', marginTop: 2 }}>{selectedCourt?.name}</div>
-                    <div style={{ fontSize: 13, color: 'var(--accent-neon)', marginTop: 4, fontWeight: 600 }}>
+                  <div style={{ background: '#f8fafc', borderRadius: 10, padding: 14, marginBottom: 16, border: '1px solid #e2e8f0' }}>
+                    <div style={{ fontSize: 13, color: '#64748b' }}>{venue.name}</div>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', marginTop: 2 }}>{selectedCourt?.name}</div>
+                    <div style={{ fontSize: 13, color: '#059669', marginTop: 4, fontWeight: 600 }}>
                       {selectedDate} · {selectedSlot.start_time} to {selectedSlot.end_time}
                     </div>
                   </div>
 
                   {/* Concurrency Timer if active lock exists */}
                   {activeHold && lockCountdown > 0 && (
-                    <div style={{ background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: 10, padding: 12, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <Lock size={20} style={{ color: 'var(--accent-neon)' }} />
+                    <div style={{ background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: 10, padding: 12, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <Lock size={20} style={{ color: '#059669' }} />
                       <div>
                         <div style={{ fontSize: 12, color: 'var(--accent-neon)', fontWeight: 700 }}>SLOT LOCKED FOR YOU</div>
                         <div style={{ fontSize: 13, color: '#fff' }}>
@@ -640,9 +653,9 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
                       <button
                         onClick={() => setPaymentProvider('upi')}
                         style={{
-                          background: paymentProvider === 'upi' ? 'rgba(16, 185, 129, 0.12)' : '#12141a',
-                          border: `1.5px solid ${paymentProvider === 'upi' ? 'var(--accent-neon)' : 'var(--border-card)'}`,
-                          color: '#fff',
+                          background: paymentProvider === 'upi' ? '#ecfdf5' : '#ffffff',
+                          border: `1.5px solid ${paymentProvider === 'upi' ? '#059669' : '#cbd5e1'}`,
+                          color: paymentProvider === 'upi' ? '#065f46' : '#0f172a',
                           borderRadius: 8,
                           padding: '10px 8px',
                           fontSize: 12,
@@ -651,17 +664,18 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          gap: 6
+                          gap: 6,
+                          boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
                         }}
                       >
-                        <QrCode size={14} style={{ color: 'var(--accent-neon)' }} /> Owner UPI QR
+                        <QrCode size={14} style={{ color: '#059669' }} /> Owner UPI QR
                       </button>
                       <button
                         onClick={() => setPaymentProvider('cash')}
                         style={{
-                          background: paymentProvider === 'cash' ? 'rgba(16, 185, 129, 0.12)' : '#12141a',
-                          border: `1.5px solid ${paymentProvider === 'cash' ? 'var(--accent-neon)' : 'var(--border-card)'}`,
-                          color: '#fff',
+                          background: paymentProvider === 'cash' ? '#ecfdf5' : '#ffffff',
+                          border: `1.5px solid ${paymentProvider === 'cash' ? '#059669' : '#cbd5e1'}`,
+                          color: paymentProvider === 'cash' ? '#065f46' : '#0f172a',
                           borderRadius: 8,
                           padding: '10px 8px',
                           fontSize: 12,
@@ -670,24 +684,25 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          gap: 6
+                          gap: 6,
+                          boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
                         }}
                       >
-                        <Banknote size={14} style={{ color: '#fb923c' }} /> Pay at Turf
+                        <Banknote size={14} style={{ color: '#d97706' }} /> Pay at Turf
                       </button>
                     </div>
                   </div>
 
                   {/* Split Bill Feature */}
-                  <div style={{ background: '#12141a', padding: 12, borderRadius: 8, border: '1px solid var(--border-card)', marginBottom: 18 }}>
+                  <div style={{ background: '#f8fafc', padding: 12, borderRadius: 8, border: '1px solid #e2e8f0', marginBottom: 18 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 5 }}>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: '#475569', display: 'flex', alignItems: 'center', gap: 5 }}>
                         <Split size={14} /> Split with players
                       </span>
                       <select
                         value={splitCount}
                         onChange={e => setSplitCount(Number(e.target.value))}
-                        style={{ background: '#1a1d25', color: '#fff', border: '1px solid var(--border-card)', borderRadius: 6, padding: '3px 8px', fontSize: 12 }}
+                        style={{ background: '#ffffff', color: '#0f172a', border: '1px solid #cbd5e1', borderRadius: 6, padding: '3px 8px', fontSize: 12 }}
                       >
                         <option value={1}>1 Player (Full)</option>
                         <option value={2}>2 Players (₹{Math.round(selectedSlot.price / 2)} each)</option>
@@ -699,16 +714,16 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
                   </div>
 
                   {/* Price Breakdown */}
-                  <div style={{ borderTop: '1px solid var(--border-card)', paddingTop: 14, marginBottom: 18 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--text-secondary)', marginBottom: 6 }}>
+                  <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: 14, marginBottom: 18 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#64748b', marginBottom: 6 }}>
                       <span>Slot Fee</span>
-                      <span>₹{selectedSlot.price}</span>
+                      <span style={{ fontWeight: 600, color: '#0f172a' }}>₹{selectedSlot.price}</span>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--text-secondary)', marginBottom: 8 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#64748b', marginBottom: 8 }}>
                       <span>Platform Fee</span>
-                      <span style={{ color: 'var(--accent-neon)' }}>₹0 (Direct UPI to Venue)</span>
+                      <span style={{ color: '#059669', fontWeight: 600 }}>₹0 (Direct UPI to Venue)</span>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 18, fontWeight: 800, color: '#fff' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 18, fontWeight: 800, color: '#0f172a' }}>
                       <span>Total Due</span>
                       <span>₹{selectedSlot.price}</span>
                     </div>
@@ -718,7 +733,7 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
                   {!activeHold ? (
                     <button
                       className="btn-primary"
-                      style={{ width: '100%' }}
+                      style={{ width: '100%', padding: '12px' }}
                       disabled={isHolding}
                       onClick={handleLockSlot}
                     >
@@ -727,34 +742,34 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                       {paymentProvider === 'upi' ? (
-                        <div style={{ background: '#12141a', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: 12, padding: 16 }}>
+                        <div style={{ background: '#f8fafc', border: '1px solid #a7f3d0', borderRadius: 12, padding: 16 }}>
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                            <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.05em', color: 'var(--accent-neon)', textTransform: 'uppercase' }}>
+                            <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.05em', color: '#059669', textTransform: 'uppercase' }}>
                               STEP 1: SCAN & PAY TO VENUE
                             </span>
-                            <span style={{ fontSize: 13, fontWeight: 800, color: '#fff' }}>
+                            <span style={{ fontSize: 14, fontWeight: 800, color: '#0f172a' }}>
                               ₹{selectedSlot.price}
                             </span>
                           </div>
 
                           {/* Dynamic QR Code Container */}
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 14 }}>
-                            <div style={{ background: '#fff', padding: 10, borderRadius: 12, boxShadow: '0 4px 14px rgba(0,0,0,0.5)', marginBottom: 8 }}>
+                            <div style={{ background: '#ffffff', padding: 10, borderRadius: 12, border: '1px solid #e2e8f0', boxShadow: '0 4px 14px rgba(0,0,0,0.06)', marginBottom: 8 }}>
                               <img
                                 src={activeHold.paymentOrder?.qrCodeUrl || `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(activeHold.paymentOrder?.upiUri || `upi://pay?pa=${venue.upi_id || 'koramangala.sports@okaxis'}&pn=${encodeURIComponent(venue.name)}&am=${selectedSlot.price}&cu=INR`)}`}
                                 alt="Venue Owner UPI QR Code"
                                 style={{ width: 170, height: 170, display: 'block' }}
                               />
                             </div>
-                            <div style={{ fontSize: 11.5, color: 'var(--text-muted)', textAlign: 'center' }}>
+                            <div style={{ fontSize: 11.5, color: '#64748b', textAlign: 'center' }}>
                               Scan using GPay, PhonePe, Paytm or BHIM
                             </div>
                           </div>
 
                           {/* Payee Info & Copy UPI ID */}
-                          <div style={{ background: '#181b22', padding: 10, borderRadius: 8, marginBottom: 12, fontSize: 12 }}>
-                            <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>Payee Name</div>
-                            <div style={{ color: '#fff', fontWeight: 600, marginBottom: 6 }}>
+                          <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', padding: 10, borderRadius: 8, marginBottom: 12, fontSize: 12 }}>
+                            <div style={{ color: '#64748b', fontSize: 11 }}>Payee Name</div>
+                            <div style={{ color: '#0f172a', fontWeight: 600, marginBottom: 6 }}>
                               {activeHold.paymentOrder?.venueName || venue.upi_name || venue.name}
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -772,10 +787,10 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
                                   setTimeout(() => setCopiedUpi(false), 2000);
                                 }}
                                 style={{
-                                  background: copiedUpi ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255, 255, 255, 0.1)',
-                                  border: 'none',
+                                  background: copiedUpi ? '#ecfdf5' : '#f1f5f9',
+                                  border: '1px solid #cbd5e1',
                                   borderRadius: 6,
-                                  color: copiedUpi ? 'var(--accent-neon)' : '#fff',
+                                  color: copiedUpi ? '#059669' : '#334155',
                                   padding: '4px 8px',
                                   fontSize: 11,
                                   cursor: 'pointer',
@@ -799,9 +814,9 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
                                 alignItems: 'center',
                                 justifyContent: 'center',
                                 gap: 6,
-                                background: 'rgba(59, 130, 246, 0.15)',
-                                border: '1px solid rgba(59, 130, 246, 0.3)',
-                                color: '#93c5fd',
+                                background: '#eff6ff',
+                                border: '1px solid #bfdbfe',
+                                color: '#1d4ed8',
                                 textDecoration: 'none',
                                 padding: '8px 12px',
                                 borderRadius: 8,
@@ -815,8 +830,8 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
                           )}
 
                           {/* Step 2: UTR Reference Input */}
-                          <div style={{ borderTop: '1px dashed var(--border-card)', paddingTop: 12 }}>
-                            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--accent-neon)', marginBottom: 4, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                          <div style={{ borderTop: '1px dashed #e2e8f0', paddingTop: 12 }}>
+                            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#059669', marginBottom: 4, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
                               STEP 2: ENTER 12-DIGIT UPI REFERENCE / UTR *
                             </label>
                             <input
@@ -827,17 +842,17 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
                               value={upiUtr}
                               onChange={e => setUpiUtr(e.target.value.replace(/[^0-9a-zA-Z]/g, ''))}
                             />
-                            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                            <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
                               Found in your UPI receipt (GPay / PhonePe / Paytm / BHIM)
                             </div>
                           </div>
                         </div>
                       ) : (
-                        <div style={{ background: '#12141a', border: '1px solid var(--border-card)', borderRadius: 10, padding: 14 }}>
-                          <div style={{ fontSize: 13, color: '#fff', fontWeight: 600, marginBottom: 4 }}>
+                        <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: 14 }}>
+                          <div style={{ fontSize: 13, color: '#0f172a', fontWeight: 600, marginBottom: 4 }}>
                             Pay at Reception Desk
                           </div>
-                          <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                          <div style={{ fontSize: 12, color: '#64748b' }}>
                             Please arrive 10 minutes prior to kickoff to complete payment of ₹{selectedSlot.price} at the turf counter.
                           </div>
                         </div>
@@ -845,7 +860,7 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
 
                       <button
                         className="btn-primary"
-                        style={{ width: '100%', background: '#10b981' }}
+                        style={{ width: '100%', background: '#059669', padding: '12px' }}
                         disabled={isHolding}
                         onClick={handleFinalizeBooking}
                       >

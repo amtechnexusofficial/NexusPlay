@@ -377,8 +377,9 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
           style={{
             padding: '16px 20px',
             marginBottom: 20,
-            background: '#0d1422',
-            border: '1px solid rgba(16, 185, 129, 0.25)',
+            background: '#ffffff',
+            border: '1px solid #e2e8f0',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
@@ -386,7 +387,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            <div style={{ width: 44, height: 44, borderRadius: 10, background: '#1e293b', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#10b981', flexShrink: 0 }}>
+            <div style={{ width: 44, height: 44, borderRadius: 10, background: '#ecfdf5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#059669', flexShrink: 0 }}>
               <Building size={22} />
             </div>
             <div>
@@ -398,7 +399,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                   <select
                     value={selectedVenue.id}
                     onChange={e => handleVenueChange(e.target.value)}
-                    style={{ background: '#1e293b', border: '1px solid var(--border-card)', color: '#f8fafc', padding: '3px 8px', borderRadius: 6, fontSize: 12, outline: 'none' }}
+                    style={{ background: '#ffffff', border: '1px solid #cbd5e1', color: '#0f172a', padding: '3px 8px', borderRadius: 6, fontSize: 12, outline: 'none' }}
                   >
                     {venues.map(v => (
                       <option key={v.id} value={v.id}>{v.name}</option>
@@ -406,20 +407,20 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                   </select>
                 )}
               </div>
-              <h2 className="font-display" style={{ fontSize: 20, fontWeight: 800, color: '#fff', margin: '3px 0 0 0' }}>
+              <h2 className="font-display" style={{ fontSize: 20, fontWeight: 800, color: '#0f172a', margin: '3px 0 0 0' }}>
                 {selectedVenue.name}
               </h2>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                {selectedVenue.address} · UPI: <strong style={{ color: '#cbd5e1' }}>{selectedVenue.upi_id}</strong>
+              <div style={{ fontSize: 12, color: '#64748b' }}>
+                {selectedVenue.address} · UPI: <strong style={{ color: '#0f172a' }}>{selectedVenue.upi_id}</strong>
               </div>
             </div>
           </div>
 
           {/* Unique Turf Booking Link Controls */}
           <div className="mobile-btn-group" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <div style={{ background: '#090d16', padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border-card)', display: 'flex', alignItems: 'center', gap: 6, flex: '1 1 auto', minWidth: 160 }}>
-              <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>Link:</span>
-              <span style={{ fontSize: 12, fontFamily: 'monospace', color: '#93c5fd', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <div style={{ background: '#f8fafc', padding: '6px 10px', borderRadius: 8, border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: 6, flex: '1 1 auto', minWidth: 160 }}>
+              <span style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>Link:</span>
+              <span style={{ fontSize: 12, fontFamily: 'monospace', color: '#2563eb', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 /?venue={selectedVenue.slug}
               </span>
             </div>
@@ -454,13 +455,13 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
       )}
 
       {/* NAVIGATION TABS (TOUCH-FRIENDLY HORIZONTAL SCROLL) */}
-      <div className="scroll-pills" style={{ borderBottom: '1px solid var(--border-card)', paddingBottom: 10, marginBottom: 20 }}>
+      <div className="scroll-pills" style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: 10, marginBottom: 20 }}>
         <button
           onClick={() => setActiveTab('live_slots')}
           style={{
-            background: activeTab === 'live_slots' ? '#10b981' : '#0d1422',
-            color: activeTab === 'live_slots' ? '#022c22' : '#cbd5e1',
-            border: activeTab === 'live_slots' ? '1px solid #10b981' : '1px solid var(--border-card)',
+            background: activeTab === 'live_slots' ? '#059669' : '#ffffff',
+            color: activeTab === 'live_slots' ? '#ffffff' : '#334155',
+            border: activeTab === 'live_slots' ? '1px solid #059669' : '1px solid #cbd5e1',
             borderRadius: 8,
             padding: '8px 16px',
             fontWeight: 700,
@@ -470,7 +471,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
             alignItems: 'center',
             gap: 7,
             whiteSpace: 'nowrap',
-            boxShadow: activeTab === 'live_slots' ? '0 0 12px rgba(16, 185, 129, 0.3)' : 'none'
+            boxShadow: '0 1px 2px rgba(0,0,0,0.04)'
           }}
         >
           <Calendar size={15} /> Live Slots & Calendar
@@ -479,9 +480,9 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
         <button
           onClick={() => setActiveTab('business_setup')}
           style={{
-            background: activeTab === 'business_setup' ? '#10b981' : '#0d1422',
-            color: activeTab === 'business_setup' ? '#022c22' : '#cbd5e1',
-            border: activeTab === 'business_setup' ? '1px solid #10b981' : '1px solid var(--border-card)',
+            background: activeTab === 'business_setup' ? '#059669' : '#ffffff',
+            color: activeTab === 'business_setup' ? '#ffffff' : '#334155',
+            border: activeTab === 'business_setup' ? '1px solid #059669' : '1px solid #cbd5e1',
             borderRadius: 8,
             padding: '8px 16px',
             fontWeight: 700,
@@ -491,7 +492,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
             alignItems: 'center',
             gap: 7,
             whiteSpace: 'nowrap',
-            boxShadow: activeTab === 'business_setup' ? '0 0 12px rgba(16, 185, 129, 0.3)' : 'none'
+            boxShadow: '0 1px 2px rgba(0,0,0,0.04)'
           }}
         >
           <Building size={15} /> Business Setup
@@ -500,9 +501,9 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
         <button
           onClick={() => setActiveTab('dashboard')}
           style={{
-            background: activeTab === 'dashboard' ? '#10b981' : '#0d1422',
-            color: activeTab === 'dashboard' ? '#022c22' : '#cbd5e1',
-            border: activeTab === 'dashboard' ? '1px solid #10b981' : '1px solid var(--border-card)',
+            background: activeTab === 'dashboard' ? '#059669' : '#ffffff',
+            color: activeTab === 'dashboard' ? '#ffffff' : '#334155',
+            border: activeTab === 'dashboard' ? '1px solid #059669' : '1px solid #cbd5e1',
             borderRadius: 8,
             padding: '8px 16px',
             fontWeight: 700,
@@ -512,7 +513,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
             alignItems: 'center',
             gap: 7,
             whiteSpace: 'nowrap',
-            boxShadow: activeTab === 'dashboard' ? '0 0 12px rgba(16, 185, 129, 0.3)' : 'none'
+            boxShadow: '0 1px 2px rgba(0,0,0,0.04)'
           }}
         >
           <LayoutDashboard size={15} /> Overview & Analytics
@@ -521,9 +522,9 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
         <button
           onClick={() => setActiveTab('upi_verification')}
           style={{
-            background: activeTab === 'upi_verification' ? '#10b981' : '#0d1422',
-            color: activeTab === 'upi_verification' ? '#022c22' : '#cbd5e1',
-            border: activeTab === 'upi_verification' ? '1px solid #10b981' : '1px solid var(--border-card)',
+            background: activeTab === 'upi_verification' ? '#059669' : '#ffffff',
+            color: activeTab === 'upi_verification' ? '#ffffff' : '#334155',
+            border: activeTab === 'upi_verification' ? '1px solid #059669' : '1px solid #cbd5e1',
             borderRadius: 8,
             padding: '8px 16px',
             fontWeight: 700,
@@ -534,7 +535,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
             gap: 7,
             position: 'relative',
             whiteSpace: 'nowrap',
-            boxShadow: activeTab === 'upi_verification' ? '0 0 12px rgba(16, 185, 129, 0.3)' : 'none'
+            boxShadow: '0 1px 2px rgba(0,0,0,0.04)'
           }}
         >
           <ShieldCheck size={15} /> UPI Direct Audit
@@ -548,9 +549,9 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
         <button
           onClick={() => setActiveTab('courts')}
           style={{
-            background: activeTab === 'courts' ? '#10b981' : '#0d1422',
-            color: activeTab === 'courts' ? '#022c22' : '#cbd5e1',
-            border: activeTab === 'courts' ? '1px solid #10b981' : '1px solid var(--border-card)',
+            background: activeTab === 'courts' ? '#059669' : '#ffffff',
+            color: activeTab === 'courts' ? '#ffffff' : '#334155',
+            border: activeTab === 'courts' ? '1px solid #059669' : '1px solid #cbd5e1',
             borderRadius: 8,
             padding: '8px 16px',
             fontWeight: 700,
@@ -560,7 +561,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
             alignItems: 'center',
             gap: 7,
             whiteSpace: 'nowrap',
-            boxShadow: activeTab === 'courts' ? '0 0 12px rgba(16, 185, 129, 0.3)' : 'none'
+            boxShadow: '0 1px 2px rgba(0,0,0,0.04)'
           }}
         >
           <Settings size={15} /> Courts & Rates
@@ -569,9 +570,9 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
         <button
           onClick={() => setActiveTab('crm')}
           style={{
-            background: activeTab === 'crm' ? '#10b981' : '#0d1422',
-            color: activeTab === 'crm' ? '#022c22' : '#cbd5e1',
-            border: activeTab === 'crm' ? '1px solid #10b981' : '1px solid var(--border-card)',
+            background: activeTab === 'crm' ? '#059669' : '#ffffff',
+            color: activeTab === 'crm' ? '#ffffff' : '#334155',
+            border: activeTab === 'crm' ? '1px solid #059669' : '1px solid #cbd5e1',
             borderRadius: 8,
             padding: '8px 16px',
             fontWeight: 700,
@@ -581,7 +582,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
             alignItems: 'center',
             gap: 7,
             whiteSpace: 'nowrap',
-            boxShadow: activeTab === 'crm' ? '0 0 12px rgba(16, 185, 129, 0.3)' : 'none'
+            boxShadow: '0 1px 2px rgba(0,0,0,0.04)'
           }}
         >
           <Users size={15} /> Customer CRM
@@ -596,22 +597,22 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
           {/* Calendar Controls Header */}
           <div className="mobile-stack" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 14, marginBottom: 16 }}>
             <div>
-              <h2 className="font-display" style={{ fontSize: 22, fontWeight: 800, color: '#fff', margin: 0 }}>
+              <h2 className="font-display" style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', margin: 0 }}>
                 Live Slot Control & Calendar Grid
               </h2>
-              <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: '4px 0 0 0' }}>
+              <p style={{ fontSize: 13, color: '#64748b', margin: '4px 0 0 0' }}>
                 Manage live slot statuses, edit rates set by owner, and accept full-time inquiries on partially registered slots.
               </p>
             </div>
 
             {/* View Mode Switcher (Cards vs Table) */}
-            <div style={{ display: 'flex', background: '#090e1c', padding: 3, borderRadius: 8, border: '1px solid var(--border-card)', gap: 3 }}>
+            <div style={{ display: 'flex', background: '#f8fafc', padding: 3, borderRadius: 8, border: '1px solid #e2e8f0', gap: 3 }}>
               <button
                 onClick={() => setSlotViewMode('cards')}
                 style={{
-                  background: slotViewMode === 'cards' ? '#1e293b' : 'transparent',
-                  color: slotViewMode === 'cards' ? '#10b981' : 'var(--text-secondary)',
-                  border: 'none',
+                  background: slotViewMode === 'cards' ? '#ffffff' : 'transparent',
+                  color: slotViewMode === 'cards' ? '#059669' : '#64748b',
+                  border: slotViewMode === 'cards' ? '1px solid #cbd5e1' : '1px solid transparent',
                   borderRadius: 6,
                   padding: '6px 12px',
                   fontSize: 12,
@@ -627,9 +628,9 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
               <button
                 onClick={() => setSlotViewMode('table')}
                 style={{
-                  background: slotViewMode === 'table' ? '#1e293b' : 'transparent',
-                  color: slotViewMode === 'table' ? '#10b981' : 'var(--text-secondary)',
-                  border: 'none',
+                  background: slotViewMode === 'table' ? '#ffffff' : 'transparent',
+                  color: slotViewMode === 'table' ? '#059669' : '#64748b',
+                  border: slotViewMode === 'table' ? '1px solid #cbd5e1' : '1px solid transparent',
                   borderRadius: 6,
                   padding: '6px 12px',
                   fontSize: 12,
@@ -658,16 +659,16 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                   key={dateStr}
                   onClick={() => handleDateChange(dateStr)}
                   style={{
-                    background: isSelected ? '#10b981' : '#0d1422',
-                    color: isSelected ? '#022c22' : '#cbd5e1',
-                    border: isSelected ? '1px solid #10b981' : '1px solid var(--border-card)',
+                    background: isSelected ? '#059669' : '#ffffff',
+                    color: isSelected ? '#ffffff' : '#334155',
+                    border: isSelected ? '1px solid #059669' : '1px solid #cbd5e1',
                     borderRadius: 999,
                     padding: '7px 16px',
                     fontWeight: 700,
                     fontSize: 12,
                     cursor: 'pointer',
                     whiteSpace: 'nowrap',
-                    boxShadow: isSelected ? '0 0 10px rgba(16, 185, 129, 0.3)' : 'none'
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
                   }}
                 >
                   {label}

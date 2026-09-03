@@ -122,16 +122,16 @@ export default function OpenGamesHub({ onNavigateToVenue }) {
   return (
     <div className="animate-fade-in" style={{ maxWidth: 1120, margin: '0 auto', padding: '16px 20px 80px' }}>
       {/* Header Banner */}
-      <div className="nexus-card" style={{ padding: '30px 28px', marginBottom: 28, background: 'linear-gradient(135deg, #131720 0%, #1e2638 100%)', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
+      <div className="nexus-card" style={{ padding: '30px 28px', marginBottom: 28, background: 'linear-gradient(135deg, #ffffff 0%, #f0fdf4 100%)', border: '1px solid #d1fae5', boxShadow: '0 4px 16px rgba(5, 150, 105, 0.06)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 20 }}>
           <div style={{ maxWidth: 640 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--accent-neon)', fontWeight: 700, fontSize: 13, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>
-              <Sparkles size={16} /> Key Differentiator
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#059669', fontWeight: 700, fontSize: 13, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>
+              <Sparkles size={16} /> Community Pickup Games
             </div>
-            <h1 className="font-display" style={{ fontSize: 32, fontWeight: 800, color: '#fff', lineHeight: 1.15 }}>
+            <h1 className="font-display" style={{ fontSize: 32, fontWeight: 800, color: '#0f172a', lineHeight: 1.15 }}>
               Open Games Hub
             </h1>
-            <p style={{ color: 'var(--text-secondary)', marginTop: 8, fontSize: 15, lineHeight: 1.5 }}>
+            <p style={{ color: '#475569', marginTop: 8, fontSize: 15, lineHeight: 1.5 }}>
               Short of players for tonight's match? Discover nearby public pickup games, join individual seats, pay your own share, or create your own open lobby.
             </p>
           </div>
@@ -151,15 +151,16 @@ export default function OpenGamesHub({ onNavigateToVenue }) {
         <button
           onClick={() => setSelectedSport('all')}
           style={{
-            background: selectedSport === 'all' ? 'var(--accent-neon)' : 'var(--bg-card)',
-            color: selectedSport === 'all' ? '#042f1f' : '#fff',
-            border: `1px solid ${selectedSport === 'all' ? 'var(--accent-neon)' : 'var(--border-card)'}`,
+            background: selectedSport === 'all' ? '#059669' : '#ffffff',
+            color: selectedSport === 'all' ? '#ffffff' : '#334155',
+            border: `1px solid ${selectedSport === 'all' ? '#059669' : '#cbd5e1'}`,
             padding: '8px 16px',
             borderRadius: 999,
             fontWeight: 700,
             fontSize: 13,
             cursor: 'pointer',
-            whiteSpace: 'nowrap'
+            whiteSpace: 'nowrap',
+            boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
           }}
         >
           All Sports ({games.length})
@@ -171,9 +172,9 @@ export default function OpenGamesHub({ onNavigateToVenue }) {
               key={s.id}
               onClick={() => setSelectedSport(s.id)}
               style={{
-                background: selectedSport === s.id ? 'var(--accent-neon)' : 'var(--bg-card)',
-                color: selectedSport === s.id ? '#042f1f' : '#fff',
-                border: `1px solid ${selectedSport === s.id ? 'var(--accent-neon)' : 'var(--border-card)'}`,
+                background: selectedSport === s.id ? '#059669' : '#ffffff',
+                color: selectedSport === s.id ? '#ffffff' : '#334155',
+                border: `1px solid ${selectedSport === s.id ? '#059669' : '#cbd5e1'}`,
                 padding: '8px 16px',
                 borderRadius: 999,
                 fontWeight: 700,
@@ -182,7 +183,8 @@ export default function OpenGamesHub({ onNavigateToVenue }) {
                 display: 'flex',
                 alignItems: 'center',
                 gap: 6,
-                whiteSpace: 'nowrap'
+                whiteSpace: 'nowrap',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
               }}
             >
               <span>{s.icon}</span> {s.name} ({count})
@@ -193,14 +195,14 @@ export default function OpenGamesHub({ onNavigateToVenue }) {
 
       {/* Games List Grid */}
       {loading ? (
-        <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-secondary)' }}>
+        <div style={{ padding: 40, textAlign: 'center', color: '#64748b' }}>
           Loading active open games...
         </div>
       ) : filteredGames.length === 0 ? (
-        <div className="nexus-card" style={{ padding: 48, textAlign: 'center' }}>
-          <Trophy size={42} style={{ color: 'var(--text-muted)', margin: '0 auto 12px' }} />
-          <h3 style={{ fontSize: 18, fontWeight: 700, color: '#fff' }}>No active games for this sport yet</h3>
-          <p style={{ color: 'var(--text-secondary)', fontSize: 14, marginTop: 4 }}>Be the pioneer organizer and host tonight's match!</p>
+        <div className="nexus-card" style={{ padding: 48, textAlign: 'center', background: '#ffffff', border: '1px solid #e2e8f0' }}>
+          <Trophy size={42} style={{ color: '#94a3b8', margin: '0 auto 12px' }} />
+          <h3 style={{ fontSize: 18, fontWeight: 700, color: '#0f172a' }}>No active games for this sport yet</h3>
+          <p style={{ color: '#64748b', fontSize: 14, marginTop: 4 }}>Be the pioneer organizer and host tonight's match!</p>
           <button className="btn-primary" onClick={() => setShowCreateModal(true)} style={{ marginTop: 16 }}>
             Create First Game
           </button>
@@ -213,7 +215,7 @@ export default function OpenGamesHub({ onNavigateToVenue }) {
             const isFull = spotsRemaining === 0;
 
             return (
-              <div key={game.id} className="nexus-card" style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+              <div key={game.id} className="nexus-card" style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column', background: '#ffffff', border: '1px solid #e2e8f0', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
                 <div style={{ position: 'relative', height: 140 }}>
                   <img
                     src={game.venue_photos?.[0] || 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=600&q=80'}
@@ -221,46 +223,46 @@ export default function OpenGamesHub({ onNavigateToVenue }) {
                     style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                   />
                   <div style={{ position: 'absolute', top: 10, left: 10, display: 'flex', gap: 6 }}>
-                    <span className="badge-neon" style={{ borderRadius: 6, padding: '3px 8px', fontSize: 11, fontWeight: 700 }}>
+                    <span className="badge-neon" style={{ borderRadius: 6, padding: '3px 8px', fontSize: 11, fontWeight: 700, background: '#059669', color: '#ffffff' }}>
                       {game.sport_icon} {game.sport_name}
                     </span>
-                    <span style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', color: '#fff', borderRadius: 6, padding: '3px 8px', fontSize: 11, fontWeight: 600 }}>
+                    <span style={{ background: 'rgba(15, 23, 42, 0.75)', backdropFilter: 'blur(4px)', color: '#fff', borderRadius: 6, padding: '3px 8px', fontSize: 11, fontWeight: 600 }}>
                       {game.skill_level}
                     </span>
                   </div>
-                  <div style={{ position: 'absolute', bottom: 10, right: 10, background: 'rgba(0,0,0,0.75)', color: '#34d399', fontWeight: 800, fontSize: 15, padding: '4px 10px', borderRadius: 8 }}>
-                    ₹{game.cost_per_player} <span style={{ fontSize: 11, color: '#e2e8f0', fontWeight: 500 }}>/ player</span>
+                  <div style={{ position: 'absolute', bottom: 10, right: 10, background: 'rgba(15, 23, 42, 0.85)', color: '#34d399', fontWeight: 800, fontSize: 15, padding: '4px 10px', borderRadius: 8 }}>
+                    ₹{game.cost_per_player} <span style={{ fontSize: 11, color: '#cbd5e1', fontWeight: 500 }}>/ player</span>
                   </div>
                 </div>
 
-                <div style={{ padding: 18, flex: 1, display: 'flex', flexDirection: 'column' }}>
-                  <h3 style={{ fontSize: 17, fontWeight: 800, color: '#fff', marginBottom: 4 }}>
+                <div style={{ padding: 18, flex: 1, display: 'flex', flexDirection: 'column', background: '#ffffff' }}>
+                  <h3 style={{ fontSize: 17, fontWeight: 800, color: '#0f172a', marginBottom: 4 }}>
                     {game.title}
                   </h3>
-                  <div style={{ fontSize: 13, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 5, marginBottom: 12 }}>
-                    <MapPin size={14} style={{ color: 'var(--accent-neon)', flexShrink: 0 }} />
+                  <div style={{ fontSize: 13, color: '#64748b', display: 'flex', alignItems: 'center', gap: 5, marginBottom: 12 }}>
+                    <MapPin size={14} style={{ color: '#059669', flexShrink: 0 }} />
                     <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{game.venue_name}</span>
                   </div>
 
-                  <div style={{ display: 'flex', gap: 14, fontSize: 12.5, color: '#e2e8f0', background: '#12141a', padding: '8px 12px', borderRadius: 8, marginBottom: 14 }}>
+                  <div style={{ display: 'flex', gap: 14, fontSize: 12.5, color: '#334155', background: '#f8fafc', border: '1px solid #e2e8f0', padding: '8px 12px', borderRadius: 8, marginBottom: 14 }}>
                     <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                      <Calendar size={13} style={{ color: 'var(--accent-neon)' }} /> {game.date}
+                      <Calendar size={13} style={{ color: '#059669' }} /> {game.date}
                     </span>
                     <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                      <Clock size={13} style={{ color: 'var(--accent-neon)' }} /> {game.start_time} - {game.end_time}
+                      <Clock size={13} style={{ color: '#059669' }} /> {game.start_time} - {game.end_time}
                     </span>
                   </div>
 
                   {/* Player Capacity Bar */}
                   <div style={{ marginBottom: 16, marginTop: 'auto' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
-                      <span style={{ color: 'var(--text-muted)' }}>Player Capacity</span>
-                      <strong style={{ color: isFull ? 'var(--accent-neon)' : '#fff' }}>
+                      <span style={{ color: '#64748b' }}>Player Capacity</span>
+                      <strong style={{ color: isFull ? '#059669' : '#0f172a' }}>
                         {game.current_players}/{game.required_players} Joined ({spotsRemaining} left)
                       </strong>
                     </div>
-                    <div style={{ height: 6, background: 'rgba(255, 255, 255, 0.08)', borderRadius: 3, overflow: 'hidden' }}>
-                      <div style={{ height: '100%', width: `${fillPercent}%`, background: isFull ? '#10b981' : '#34d399', transition: 'width 0.3s' }} />
+                    <div style={{ height: 6, background: '#e2e8f0', borderRadius: 3, overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${fillPercent}%`, background: isFull ? '#059669' : '#10b981', transition: 'width 0.3s' }} />
                     </div>
                   </div>
 
@@ -291,30 +293,30 @@ export default function OpenGamesHub({ onNavigateToVenue }) {
 
       {/* MODAL: Join Game */}
       {activeJoinGame && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 20 }}>
-          <div className="nexus-card animate-fade-in" style={{ maxWidth: 480, width: '100%', padding: 26, background: '#181b22' }}>
-            <h2 className="font-display" style={{ fontSize: 22, fontWeight: 800, color: '#fff', marginBottom: 6 }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 20 }}>
+          <div className="nexus-card animate-fade-in" style={{ maxWidth: 480, width: '100%', padding: 26, background: '#ffffff', border: '1px solid #e2e8f0', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)' }}>
+            <h2 className="font-display" style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', marginBottom: 6 }}>
               Join Open Game
             </h2>
-            <p style={{ fontSize: 13.5, color: 'var(--text-secondary)', marginBottom: 18 }}>
+            <p style={{ fontSize: 13.5, color: '#64748b', marginBottom: 18 }}>
               {activeJoinGame.title} · {activeJoinGame.venue_name}
             </p>
 
             {joinSuccess ? (
               <div style={{ textAlign: 'center', padding: '20px 0' }}>
-                <CheckCircle size={44} style={{ color: 'var(--accent-neon)', margin: '0 auto 12px' }} />
-                <div style={{ color: '#fff', fontWeight: 700, fontSize: 16 }}>{joinSuccess}</div>
+                <CheckCircle size={44} style={{ color: '#059669', margin: '0 auto 12px' }} />
+                <div style={{ color: '#0f172a', fontWeight: 700, fontSize: 16 }}>{joinSuccess}</div>
               </div>
             ) : (
               <form onSubmit={handleJoinSubmit}>
                 {joinError && (
-                  <div style={{ background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#fca5a5', padding: 10, borderRadius: 8, fontSize: 12.5, marginBottom: 14 }}>
+                  <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', padding: 10, borderRadius: 8, fontSize: 12.5, marginBottom: 14 }}>
                     {joinError}
                   </div>
                 )}
 
                 <div style={{ marginBottom: 14 }}>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 5 }}>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 5 }}>
                     YOUR FULL NAME *
                   </label>
                   <input
@@ -329,7 +331,7 @@ export default function OpenGamesHub({ onNavigateToVenue }) {
                 </div>
 
                 <div style={{ marginBottom: 18 }}>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 5 }}>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#64748b', marginBottom: 5 }}>
                     PHONE NUMBER *
                   </label>
                   <input
@@ -343,12 +345,12 @@ export default function OpenGamesHub({ onNavigateToVenue }) {
                   />
                 </div>
 
-                <div style={{ background: '#12141a', padding: 14, borderRadius: 10, border: '1px solid var(--border-card)', marginBottom: 20 }}>
+                <div style={{ background: '#f8fafc', padding: 14, borderRadius: 10, border: '1px solid #e2e8f0', marginBottom: 20 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
-                    <span style={{ color: 'var(--text-secondary)' }}>Individual Player Share</span>
-                    <strong style={{ color: '#fff' }}>₹{activeJoinGame.cost_per_player}</strong>
+                    <span style={{ color: '#475569' }}>Individual Player Share</span>
+                    <strong style={{ color: '#0f172a' }}>₹{activeJoinGame.cost_per_player}</strong>
                   </div>
-                  <div style={{ fontSize: 11.5, color: 'var(--accent-neon)' }}>
+                  <div style={{ fontSize: 11.5, color: '#059669', fontWeight: 600 }}>
                     ✓ Instant Confirmation · Direct Venue Routing
                   </div>
                 </div>
@@ -379,18 +381,18 @@ export default function OpenGamesHub({ onNavigateToVenue }) {
 
       {/* MODAL: Create Open Game */}
       {showCreateModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 20 }}>
-          <div className="nexus-card animate-fade-in" style={{ maxWidth: 540, width: '100%', maxHeight: '90vh', overflowY: 'auto', padding: 26, background: '#181b22' }}>
-            <h2 className="font-display" style={{ fontSize: 22, fontWeight: 800, color: '#fff', marginBottom: 6 }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 20 }}>
+          <div className="nexus-card animate-fade-in" style={{ maxWidth: 540, width: '100%', maxHeight: '90vh', overflowY: 'auto', padding: 26, background: '#ffffff', border: '1px solid #e2e8f0', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)' }}>
+            <h2 className="font-display" style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', marginBottom: 6 }}>
               Host an Open Game
             </h2>
-            <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 18 }}>
+            <p style={{ fontSize: 13, color: '#64748b', marginBottom: 18 }}>
               Post an open match for players to discover and join. Each player pays their individual share.
             </p>
 
             <form onSubmit={handleCreateGame} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
-                <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#64748b', marginBottom: 4 }}>
                   MATCH TITLE *
                 </label>
                 <input
@@ -406,7 +408,7 @@ export default function OpenGamesHub({ onNavigateToVenue }) {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
+                  <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#64748b', marginBottom: 4 }}>
                     SPORT *
                   </label>
                   <select
@@ -419,7 +421,7 @@ export default function OpenGamesHub({ onNavigateToVenue }) {
                   </select>
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
+                  <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#64748b', marginBottom: 4 }}>
                     SKILL LEVEL
                   </label>
                   <select
@@ -438,7 +440,7 @@ export default function OpenGamesHub({ onNavigateToVenue }) {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
+                  <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#64748b', marginBottom: 4 }}>
                     DATE *
                   </label>
                   <input
@@ -451,7 +453,7 @@ export default function OpenGamesHub({ onNavigateToVenue }) {
                   />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
+                  <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#64748b', marginBottom: 4 }}>
                     START TIME *
                   </label>
                   <input
@@ -467,7 +469,7 @@ export default function OpenGamesHub({ onNavigateToVenue }) {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
+                  <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#64748b', marginBottom: 4 }}>
                     TOTAL PLAYERS NEEDED *
                   </label>
                   <input
@@ -482,7 +484,7 @@ export default function OpenGamesHub({ onNavigateToVenue }) {
                   />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
+                  <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#64748b', marginBottom: 4 }}>
                     PRICE PER PLAYER (₹) *
                   </label>
                   <input
@@ -499,7 +501,7 @@ export default function OpenGamesHub({ onNavigateToVenue }) {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
+                  <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#64748b', marginBottom: 4 }}>
                     ORGANIZER NAME *
                   </label>
                   <input
@@ -513,7 +515,7 @@ export default function OpenGamesHub({ onNavigateToVenue }) {
                   />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
+                  <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: '#64748b', marginBottom: 4 }}>
                     ORGANIZER PHONE *
                   </label>
                   <input
