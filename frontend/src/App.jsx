@@ -10,43 +10,66 @@ import {
 
 export default function App() {
   // Navigation tabs: 'marketplace', 'opengames', 'owner', 'venue-page'
-  const [activeView, setActiveView] = useState('marketplace');
-  const [activeVenueSlug, setActiveVenueSlug] = useState('nexus-central-koramangala');
+  const [activeView, setActiveView] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('venue') || params.get('v')) return 'venue-page';
+    if (params.get('view') === 'owner') return 'owner';
+    if (params.get('view') === 'opengames') return 'opengames';
+    return 'marketplace';
+  });
+
+  const [activeVenueSlug, setActiveVenueSlug] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('venue') || params.get('v') || 'nexus-central-koramangala';
+  });
+
+  // Keep URL updated for bookmarking and unique links
+  function navigateTo(view, venueSlug = activeVenueSlug) {
+    setActiveView(view);
+    if (view === 'venue-page') {
+      setActiveVenueSlug(venueSlug);
+      window.history.pushState({}, '', `/?venue=${venueSlug}`);
+    } else if (view === 'owner') {
+      window.history.pushState({}, '', '/?view=owner');
+    } else if (view === 'opengames') {
+      window.history.pushState({}, '', '/?view=opengames');
+    } else {
+      window.history.pushState({}, '', '/');
+    }
+  }
 
   function handleSelectVenue(slugOrId) {
-    setActiveVenueSlug(slugOrId);
-    setActiveView('venue-page');
+    navigateTo('venue-page', slugOrId);
   }
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg-dark)' }}>
       {/* Global Brand Header */}
       <header
         style={{
-          background: '#12141a',
+          background: 'rgba(10, 15, 29, 0.94)',
           borderBottom: '1px solid var(--border-card)',
           position: 'sticky',
           top: 0,
           zIndex: 50,
-          backdropFilter: 'blur(8px)'
+          backdropFilter: 'blur(12px)'
         }}
       >
         <div
           style={{
-            maxWidth: 1240,
+            maxWidth: 1280,
             margin: '0 auto',
-            padding: '14px 24px',
+            padding: '12px 20px',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            flexWrap: 'wrap',
             gap: 12
           }}
         >
           {/* Logo & Tagline */}
           <div
             style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}
-            onClick={() => setActiveView('marketplace')}
+            onClick={() => navigateTo('marketplace')}
           >
             <div
               style={{
@@ -57,116 +80,119 @@ export default function App() {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#042f1f',
+                color: '#022c22',
                 fontWeight: 900,
                 fontSize: 18,
-                boxShadow: '0 0 20px rgba(16, 185, 129, 0.3)'
+                boxShadow: '0 0 16px rgba(16, 185, 129, 0.35)'
               }}
             >
               NP
             </div>
             <div>
-              <div className="font-display" style={{ fontSize: 20, fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', lineHeight: 1 }}>
-                NEXUS<span style={{ color: 'var(--accent-neon)' }}>PLAY</span>
+              <div className="font-display" style={{ fontSize: 19, fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', lineHeight: 1.1 }}>
+                NEXUS<span style={{ color: '#10b981' }}>PLAY</span>
               </div>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                Turf SaaS & Player Hub
+              <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                Sports Operating System & Arena Network
               </div>
             </div>
           </div>
 
-          {/* Center Navigation Switcher */}
-          <nav style={{ display: 'flex', background: '#0e1117', padding: 4, borderRadius: 12, border: '1px solid var(--border-card)' }}>
+          {/* Desktop Navigation Switcher */}
+          <nav className="desktop-nav" style={{ background: '#070b14', padding: 4, borderRadius: 10, border: '1px solid var(--border-card)', gap: 3 }}>
             <button
-              onClick={() => setActiveView('marketplace')}
+              onClick={() => navigateTo('marketplace')}
               style={{
-                background: activeView === 'marketplace' ? 'var(--bg-card)' : 'transparent',
-                color: activeView === 'marketplace' ? 'var(--accent-neon)' : 'var(--text-secondary)',
-                border: 'none',
-                borderRadius: 8,
-                padding: '8px 16px',
-                fontSize: 13,
-                fontWeight: 700,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6
-              }}
-            >
-              <Compass size={15} /> Venues
-            </button>
-
-            <button
-              onClick={() => setActiveView('opengames')}
-              style={{
-                background: activeView === 'opengames' ? 'var(--bg-card)' : 'transparent',
-                color: activeView === 'opengames' ? 'var(--accent-neon)' : 'var(--text-secondary)',
-                border: 'none',
-                borderRadius: 8,
-                padding: '8px 16px',
-                fontSize: 13,
+                background: activeView === 'marketplace' ? '#141e34' : 'transparent',
+                color: activeView === 'marketplace' ? '#34d399' : 'var(--text-secondary)',
+                border: activeView === 'marketplace' ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid transparent',
+                borderRadius: 7,
+                padding: '7px 15px',
+                fontSize: 12.5,
                 fontWeight: 700,
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 gap: 6,
-                position: 'relative'
+                transition: 'all 0.15s ease'
               }}
             >
-              <Trophy size={15} /> Open Games
-              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#fb923c' }} />
+              <Compass size={14} /> Nearby Turfs
             </button>
 
             <button
-              onClick={() => setActiveView('venue-page')}
+              onClick={() => navigateTo('opengames')}
               style={{
-                background: activeView === 'venue-page' ? 'var(--bg-card)' : 'transparent',
-                color: activeView === 'venue-page' ? 'var(--accent-neon)' : 'var(--text-secondary)',
-                border: 'none',
-                borderRadius: 8,
-                padding: '8px 16px',
-                fontSize: 13,
+                background: activeView === 'opengames' ? '#141e34' : 'transparent',
+                color: activeView === 'opengames' ? '#fbbf24' : 'var(--text-secondary)',
+                border: activeView === 'opengames' ? '1px solid rgba(245, 158, 11, 0.3)' : '1px solid transparent',
+                borderRadius: 7,
+                padding: '7px 15px',
+                fontSize: 12.5,
                 fontWeight: 700,
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                gap: 6
+                gap: 6,
+                transition: 'all 0.15s ease'
               }}
             >
-              <Share2 size={15} /> Public Turf URL
+              <Trophy size={14} /> Pickup Games
             </button>
 
             <button
-              onClick={() => setActiveView('owner')}
+              onClick={() => navigateTo('venue-page')}
+              style={{
+                background: activeView === 'venue-page' ? '#141e34' : 'transparent',
+                color: activeView === 'venue-page' ? '#34d399' : 'var(--text-secondary)',
+                border: activeView === 'venue-page' ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid transparent',
+                borderRadius: 7,
+                padding: '7px 15px',
+                fontSize: 12.5,
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <Share2 size={14} /> Unique Turf URL
+            </button>
+
+            <button
+              onClick={() => navigateTo('owner')}
               style={{
                 background: activeView === 'owner' ? '#10b981' : 'transparent',
-                color: activeView === 'owner' ? '#042f1f' : 'var(--text-secondary)',
-                border: 'none',
-                borderRadius: 8,
-                padding: '8px 16px',
-                fontSize: 13,
+                color: activeView === 'owner' ? '#022c22' : 'var(--text-secondary)',
+                border: '1px solid transparent',
+                borderRadius: 7,
+                padding: '7px 15px',
+                fontSize: 12.5,
                 fontWeight: 700,
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                gap: 6
+                gap: 6,
+                boxShadow: activeView === 'owner' ? '0 0 12px rgba(16, 185, 129, 0.4)' : 'none',
+                transition: 'all 0.15s ease'
               }}
             >
-              <LayoutDashboard size={15} /> Venue Owner SaaS
+              <LayoutDashboard size={14} /> Owner Dashboard
             </button>
           </nav>
 
-          {/* User / Direct Route Badge */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 5 }}>
-              <ShieldCheck size={14} style={{ color: 'var(--accent-neon)' }} /> Direct-to-Venue Routing
-            </div>
+          {/* Direct Settlement Badge */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span className="badge-emerald" style={{ fontSize: 11, padding: '4px 10px' }}>
+              <ShieldCheck size={13} /> Direct Settlement
+            </span>
           </div>
         </div>
       </header>
 
       {/* Main Screen Views */}
-      <main style={{ flex: 1, padding: '24px 0' }}>
+      <main style={{ flex: 1, padding: '20px 0 80px' }}>
         {activeView === 'marketplace' && (
           <PlayerMarketplace onSelectVenue={handleSelectVenue} />
         )}
@@ -178,23 +204,57 @@ export default function App() {
         {activeView === 'venue-page' && (
           <PublicBookingView
             slug={activeVenueSlug}
-            onBack={() => setActiveView('marketplace')}
+            onBack={() => navigateTo('marketplace')}
           />
         )}
 
         {activeView === 'owner' && (
           <OwnerSaaSView
             onNavigateToPublicPage={(slug) => {
-              setActiveVenueSlug(slug);
-              setActiveView('venue-page');
+              navigateTo('venue-page', slug);
             }}
           />
         )}
       </main>
 
+      {/* Native Mobile Bottom Navigation Bar */}
+      <nav className="mobile-bottom-bar">
+        <button
+          className={`mobile-bottom-btn ${activeView === 'marketplace' ? 'active' : ''}`}
+          onClick={() => navigateTo('marketplace')}
+        >
+          <Compass size={20} />
+          <span>Turfs</span>
+        </button>
+
+        <button
+          className={`mobile-bottom-btn ${activeView === 'opengames' ? 'active' : ''}`}
+          onClick={() => navigateTo('opengames')}
+        >
+          <Trophy size={20} />
+          <span>Pickup</span>
+        </button>
+
+        <button
+          className={`mobile-bottom-btn ${activeView === 'venue-page' ? 'active' : ''}`}
+          onClick={() => navigateTo('venue-page')}
+        >
+          <Share2 size={20} />
+          <span>Turf Link</span>
+        </button>
+
+        <button
+          className={`mobile-bottom-btn ${activeView === 'owner' ? 'active' : ''}`}
+          onClick={() => navigateTo('owner')}
+        >
+          <LayoutDashboard size={20} />
+          <span>Owner Hub</span>
+        </button>
+      </nav>
+
       {/* Footer */}
-      <footer style={{ background: '#0b0d11', borderTop: '1px solid var(--border-card)', padding: '24px 20px', textAlign: 'center', fontSize: 13, color: 'var(--text-muted)' }}>
-        NexusPlay Multi-Tenant Sports Operating System · Real-time concurrency slot locks & direct merchant settlement
+      <footer style={{ background: '#070b14', borderTop: '1px solid var(--border-card)', padding: '20px 20px', textAlign: 'center', fontSize: 12.5, color: 'var(--text-muted)' }}>
+        NexusPlay Sports Operating System · Location-based discovery, live slot management, and direct owner bank settlement
       </footer>
     </div>
   );

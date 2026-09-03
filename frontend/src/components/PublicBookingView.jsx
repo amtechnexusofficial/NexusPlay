@@ -220,13 +220,13 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
 
       {/* Hero Photos & Venue Header */}
       <div className="nexus-card" style={{ overflow: 'hidden', marginBottom: 24 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 4, height: 320, background: '#000' }}>
+        <div className="venue-gallery-grid">
           <img
             src={venue.photos?.[0] || 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=1200&q=80'}
             alt={venue.name}
             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
           />
-          <div style={{ display: 'grid', gridTemplateRows: '1fr 1fr', gap: 4 }}>
+          <div className="venue-gallery-side" style={{ display: 'grid', gridTemplateRows: '1fr 1fr', gap: 4 }}>
             <img
               src={venue.photos?.[1] || 'https://images.unsplash.com/photo-1529900241452-94f4c281df69?auto=format&fit=crop&w=600&q=80'}
               alt="Turf side"
@@ -370,7 +370,7 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
           </div>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: '2.2fr 1fr', gap: 24 }}>
+        <div className="public-booking-layout">
           {/* Left Column: Sport, Court, Date & Slots */}
           <div>
             {/* 1. Sport Selector */}

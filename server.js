@@ -131,13 +131,57 @@ app.get('/api/marketplace/venues', (req, res) => {
     );
   }
 
-  // Parse JSON fields
-  const formatted = venues.map(v => ({
-    ...v,
-    photos: JSON.parse(v.photos || '[]'),
-    amenities: JSON.parse(v.amenities || '[]'),
-    sport_ids: JSON.parse(v.sport_ids || '[]')
-  }));
+  const todayStr = new Date().toISOString().slice(0, 10);
+
+  // Parse JSON fields & attach live slots summary with individual registered players
+  const formatted = venues.map(v => {
+    // Courts & min price
+    const courts = db.prepare("SELECT * FROM courts WHERE venue_id = ? AND status = 'active'").all(v.id);
+    const minPrice = courts.length > 0 ? Math.min(...courts.map(c => c.base_price)) : 800;
+
+    // Slots for today
+    const slots = db.prepare(`
+      SELECT cs.*, c.name as court_name, c.capacity as court_capacity, c.sport_id,
+             g.id as game_id, g.title as game_title, g.required_players, g.current_players,
+             g.cost_per_player, g.status as game_status
+      FROM court_slots cs
+      JOIN courts c ON cs.court_id = c.id
+      LEFT JOIN games g ON cs.game_id = g.id OR (cs.court_id = g.court_id AND cs.date = g.date AND cs.start_time = g.start_time AND g.status = 'open')
+      WHERE cs.venue_id = ? AND cs.date = ?
+      ORDER BY cs.start_time ASC
+    `).all(v.id, todayStr);
+
+    const availableSlots = slots.filter(s => s.status === 'open' || (s.game_status === 'open' && s.current_players < s.required_players));
+
+    // Curate prominent live slots today
+    const liveSlotsSummary = slots.slice(0, 10).map(s => {
+      const isGame = !!s.game_id && s.game_status === 'open';
+      return {
+        id: s.id,
+        court_name: s.court_name,
+        sport_id: s.sport_id,
+        start_time: s.start_time,
+        end_time: s.end_time,
+        price: isGame ? (s.cost_per_player || 250) : s.price,
+        is_game: isGame,
+        game_title: s.game_title,
+        registered_players: isGame ? (s.current_players || 0) : 0,
+        capacity: isGame ? (s.required_players || s.court_capacity || 10) : (s.court_capacity || 10),
+        status: s.status,
+        game_status: s.game_status
+      };
+    });
+
+    return {
+      ...v,
+      photos: JSON.parse(v.photos || '[]'),
+      amenities: JSON.parse(v.amenities || '[]'),
+      sport_ids: JSON.parse(v.sport_ids || '[]'),
+      min_price: minPrice,
+      today_available_slots_count: availableSlots.length,
+      live_slots: liveSlotsSummary
+    };
+  });
 
   res.json(formatted);
 });
@@ -811,26 +855,294 @@ app.post('/api/owner/courts', (req, res) => {
   res.json({ success: true, courtId });
 });
 
-// Venue Profile Update
+// Fetch complete Venue Profile & Business Setup details
+app.get('/api/owner/venues/:id', (req, res) => {
+  const { id } = req.params;
+  const venue = db.prepare('SELECT * FROM venues WHERE id = ?').get(id);
+  if (!venue) return res.status(404).json({ error: 'Venue not found' });
+
+  const org = db.prepare('SELECT * FROM organizations WHERE id = ?').get(venue.organization_id);
+  const courts = db.prepare("SELECT * FROM courts WHERE venue_id = ? AND status = 'active'").all(id);
+
+  res.json({
+    ...venue,
+    organization_name: org?.name || '',
+    photos: JSON.parse(venue.photos || '[]'),
+    amenities: JSON.parse(venue.amenities || '[]'),
+    sport_ids: JSON.parse(venue.sport_ids || '[]'),
+    courts
+  });
+});
+
+// Comprehensive Venue Profile & Business Setup Update
 app.put('/api/owner/venues/:id', (req, res) => {
   const { id } = req.params;
-  const { name, description, address, city, phone, email, openTime, closeTime, upi_id, upi_name, upi_qr_image } = req.body;
+  const {
+    name, description, address, city, pincode, lat, lng,
+    phone, email, open_time, close_time, openTime, closeTime,
+    gstin, business_type, rules, amenities,
+    upi_id, upi_name, upi_qr_image, organization_name
+  } = req.body;
+
+  const actualOpenTime = open_time || openTime;
+  const actualCloseTime = close_time || closeTime;
+  const amenitiesJson = Array.isArray(amenities) ? JSON.stringify(amenities) : (typeof amenities === 'string' ? amenities : null);
+
   db.prepare(`
     UPDATE venues 
     SET name = COALESCE(?, name),
         description = COALESCE(?, description),
         address = COALESCE(?, address),
         city = COALESCE(?, city),
+        pincode = COALESCE(?, pincode),
+        lat = COALESCE(?, lat),
+        lng = COALESCE(?, lng),
         phone = COALESCE(?, phone),
         email = COALESCE(?, email),
         open_time = COALESCE(?, open_time),
         close_time = COALESCE(?, close_time),
+        gstin = COALESCE(?, gstin),
+        business_type = COALESCE(?, business_type),
+        rules = COALESCE(?, rules),
+        amenities = COALESCE(?, amenities),
         upi_id = COALESCE(?, upi_id),
         upi_name = COALESCE(?, upi_name),
         upi_qr_image = COALESCE(?, upi_qr_image)
     WHERE id = ?
-  `).run(name, description, address, city, phone, email, openTime, closeTime, upi_id, upi_name, upi_qr_image, id);
-  res.json({ success: true });
+  `).run(
+    name, description, address, city, pincode, lat, lng,
+    phone, email, actualOpenTime, actualCloseTime,
+    gstin, business_type, rules, amenitiesJson,
+    upi_id, upi_name, upi_qr_image, id
+  );
+
+  if (organization_name) {
+    const venue = db.prepare('SELECT organization_id FROM venues WHERE id = ?').get(id);
+    if (venue?.organization_id) {
+      db.prepare('UPDATE organizations SET name = ? WHERE id = ?').run(organization_name, venue.organization_id);
+    }
+  }
+
+  const updated = db.prepare('SELECT * FROM venues WHERE id = ?').get(id);
+  res.json({ success: true, venue: updated });
+});
+
+// Owner Live Slots & Interactive Calendar Matrix
+app.get('/api/owner/live-slots', (req, res) => {
+  const { venueId, date } = req.query;
+  const targetDate = date || new Date().toISOString().slice(0, 10);
+
+  if (!venueId) return res.status(400).json({ error: 'venueId is required' });
+
+  // Ensure slots exist for target date
+  generateSlotsForNextDays(venueId, 7);
+
+  const slots = db.prepare(`
+    SELECT cs.*, c.name as court_name, c.sport_id, c.capacity as court_capacity,
+           c.base_price, c.peak_price, c.weekend_price
+    FROM court_slots cs
+    JOIN courts c ON cs.court_id = c.id
+    WHERE cs.venue_id = ? AND cs.date = ?
+    ORDER BY c.name ASC, cs.start_time ASC
+  `).all(venueId, targetDate);
+
+  // Fetch all bookings for this venue and date
+  const bookings = db.prepare(`
+    SELECT b.id, b.court_slot_id, b.customer_id, b.total_amount, b.status, b.payment_status,
+           b.payment_mode, b.source, b.notes, b.upi_utr,
+           c.name as customer_name, c.phone as customer_phone
+    FROM bookings b
+    LEFT JOIN customers c ON b.customer_id = c.id
+    WHERE b.venue_id = ? AND b.date = ?
+  `).all(venueId, targetDate);
+
+  const bookingBySlot = {};
+  bookings.forEach(b => {
+    if (b.court_slot_id) bookingBySlot[b.court_slot_id] = b;
+  });
+
+  // Fetch open games for this venue and date
+  const games = db.prepare(`
+    SELECT g.*, count(gp.id) as registered_count
+    FROM games g
+    LEFT JOIN game_participants gp ON g.id = gp.game_id
+    WHERE g.venue_id = ? AND g.date = ?
+    GROUP BY g.id
+  `).all(venueId, targetDate);
+
+  const gamesBySlotOrTime = {};
+  games.forEach(g => {
+    if (g.court_slot_id) gamesBySlotOrTime[g.court_slot_id] = g;
+    const timeKey = `${g.court_id}_${g.start_time}`;
+    gamesBySlotOrTime[timeKey] = g;
+  });
+
+  // Fetch participants for each game
+  const participantsByGame = {};
+  const allParts = db.prepare(`
+    SELECT gp.*, g.id as g_id
+    FROM game_participants gp
+    JOIN games g ON gp.game_id = g.id
+    WHERE g.venue_id = ? AND g.date = ?
+  `).all(venueId, targetDate);
+  allParts.forEach(p => {
+    if (!participantsByGame[p.g_id]) participantsByGame[p.g_id] = [];
+    participantsByGame[p.g_id].push(p);
+  });
+
+  const enrichedSlots = slots.map(s => {
+    const b = bookingBySlot[s.id];
+    const g = gamesBySlotOrTime[s.id] || gamesBySlotOrTime[`${s.court_id}_${s.start_time}`];
+    const parts = g ? (participantsByGame[g.id] || []) : [];
+
+    return {
+      ...s,
+      booking: b || null,
+      game: g ? {
+        ...g,
+        participants: parts,
+        current_players: parts.length || g.current_players || 0
+      } : null
+    };
+  });
+
+  res.json({
+    date: targetDate,
+    venueId,
+    slots: enrichedSlots
+  });
+});
+
+// Accept Full-Time Inquiry on a Slot (e.g. converting 6/8 individual players to full pitch booking)
+app.post('/api/owner/slots/:slotId/convert-full-inquiry', (req, res) => {
+  const { slotId } = req.params;
+  const {
+    clientName, clientPhone, amount, paymentMode = 'cash', notes = ''
+  } = req.body;
+
+  if (!clientName || !clientPhone) {
+    return res.status(400).json({ error: 'Client Name and Phone number are required' });
+  }
+
+  const convertTx = db.transaction(() => {
+    const slot = db.prepare('SELECT * FROM court_slots WHERE id = ?').get(slotId);
+    if (!slot) throw new Error('Slot not found');
+
+    const venue = db.prepare('SELECT * FROM venues WHERE id = ?').get(slot.venue_id);
+    const court = db.prepare('SELECT * FROM courts WHERE id = ?').get(slot.court_id);
+
+    // Check if there was an open game associated with this slot
+    const game = db.prepare(`
+      SELECT * FROM games 
+      WHERE (court_slot_id = ? OR (court_id = ? AND date = ? AND start_time = ?))
+      AND status = 'open'
+    `).get(slotId, slot.court_id, slot.date, slot.start_time);
+
+    let registeredPlayersCount = 0;
+    let participants = [];
+    if (game) {
+      participants = db.prepare('SELECT * FROM game_participants WHERE game_id = ?').all(game.id);
+      registeredPlayersCount = participants.length;
+
+      // Mark game as converted_to_full_booking
+      db.prepare(`
+        UPDATE games 
+        SET status = 'converted_to_full_booking',
+            rules = rules || ' [Converted to exclusive full-turf booking on owner acceptance]'
+        WHERE id = ?
+      `).run(game.id);
+
+      // Notify all previously registered individual players
+      participants.forEach(p => {
+        createNotification(
+          venue.organization_id,
+          p.phone,
+          'Turf Booking Update',
+          `Hello ${p.name}, your open game slot at ${venue.name} on ${slot.date} (${slot.start_time}) was booked in full by a private team inquiry. Your ₹${p.share_amount || 250} registration fee has been credited back to your account.`,
+          'game_converted'
+        );
+      });
+    }
+
+    // Register or find customer for this full time inquiry
+    let customer = db.prepare('SELECT * FROM customers WHERE phone = ?').get(clientPhone);
+    if (!customer) {
+      const customerId = `cust_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+      db.prepare(`
+        INSERT INTO customers (id, organization_id, phone, name, source)
+        VALUES (?, ?, ?, ?, 'full_time_inquiry')
+      `).run(customerId, venue.organization_id, clientPhone, clientName);
+      customer = { id: customerId, name: clientName, phone: clientPhone };
+    }
+
+    const bookingAmount = Number(amount) || slot.price || 1600;
+    const bookingId = `bk_inquiry_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+
+    // Create confirmed booking
+    db.prepare(`
+      INSERT INTO bookings (
+        id, organization_id, venue_id, court_id, court_slot_id, customer_id,
+        date, start_time, end_time, total_amount, paid_amount, status,
+        payment_status, payment_mode, source, notes
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', 'paid', ?, 'full_time_inquiry', ?)
+    `).run(
+      bookingId, venue.organization_id, venue.id, court.id, slot.id, customer.id,
+      slot.date, slot.start_time, slot.end_time, bookingAmount, bookingAmount,
+      paymentMode,
+      `Full-Time Inquiry converted by Owner. Client: ${clientName} (${clientPhone}). ${registeredPlayersCount > 0 ? `Replaced open game with ${registeredPlayersCount} registered players.` : ''} Notes: ${notes}`
+    );
+
+    // Update court slot status to booked
+    db.prepare(`
+      UPDATE court_slots 
+      SET status = 'booked',
+          held_until = NULL,
+          held_by_booking_id = ?,
+          full_inquiry_client = ?,
+          full_inquiry_phone = ?,
+          full_inquiry_notes = ?,
+          price = ?
+      WHERE id = ?
+    `).run(bookingId, clientName, clientPhone, notes, bookingAmount, slot.id);
+
+    // Create audit notification
+    createNotification(
+      venue.organization_id,
+      clientPhone,
+      'Full Turf Booking Confirmed!',
+      `Dear ${clientName}, your full pitch booking at ${venue.name} (${court.name}) for ${slot.date} from ${slot.start_time} to ${slot.end_time} is confirmed! Amount: ₹${bookingAmount}.`,
+      'booking_confirmed'
+    );
+
+    return {
+      bookingId,
+      registeredPlayersCount,
+      slotDate: slot.date,
+      slotTime: `${slot.start_time} - ${slot.end_time}`
+    };
+  });
+
+  try {
+    const result = convertTx();
+    res.json({
+      success: true,
+      message: `Full-time inquiry accepted! Slot booked for ${clientName}. ${result.registeredPlayersCount > 0 ? `${result.registeredPlayersCount} individual players were credited and notified.` : ''}`,
+      ...result
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Quick Slot Price Adjustment by Owner
+app.patch('/api/owner/slots/:slotId/price', (req, res) => {
+  const { slotId } = req.params;
+  const { price } = req.body;
+  if (!price || isNaN(price)) {
+    return res.status(400).json({ error: 'Valid price is required' });
+  }
+  db.prepare('UPDATE court_slots SET price = ? WHERE id = ?').run(Number(price), slotId);
+  res.json({ success: true, price: Number(price) });
 });
 
 // -----------------------------------------------------------------------------

@@ -5,7 +5,8 @@ import {
   Plus, CheckCircle, XCircle, AlertTriangle, ChevronRight,
   TrendingUp, Activity, Lock, Unlock, Phone, RefreshCw,
   Building, Settings, QrCode, Copy, ShieldCheck, CheckCircle2,
-  FileText, Check, ExternalLink
+  FileText, Check, ExternalLink, MapPin, Share2, Flame,
+  Tag, AlertCircle, Edit3, Save, Navigation, Sparkles
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -13,29 +14,63 @@ import {
 } from 'recharts';
 
 export default function OwnerSaaSView({ onNavigateToPublicPage }) {
-  const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard', 'upi_verification', 'calendar', 'crm', 'courts', 'upi_settings'
+  // Tabs: 'dashboard', 'live_slots', 'business_setup', 'upi_verification', 'crm', 'courts'
+  const [activeTab, setActiveTab] = useState('live_slots');
   const [context, setContext] = useState(null);
+  const [venues, setVenues] = useState([]);
+  const [selectedVenue, setSelectedVenue] = useState(null);
   const [analytics, setAnalytics] = useState(null);
   const [bookings, setBookings] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [pendingUpiBookings, setPendingUpiBookings] = useState([]);
-  const [selectedVenue, setSelectedVenue] = useState(null);
-  const [calendarDate, setCalendarDate] = useState(new Date().toISOString().slice(0, 10));
   const [loading, setLoading] = useState(true);
 
-  // UPI Settings Form State
-  const [upiIdInput, setUpiIdInput] = useState('');
-  const [upiNameInput, setUpiNameInput] = useState('');
-  const [savingUpiSettings, setSavingUpiSettings] = useState(false);
-  const [upiSuccessMsg, setUpiSuccessMsg] = useState('');
-  const [copiedUtrId, setCopiedUtrId] = useState(null);
+  // Live Slots & Interactive Calendar State
+  const [calendarDate, setCalendarDate] = useState(new Date().toISOString().slice(0, 10));
+  const [liveSlots, setLiveSlots] = useState([]);
+  const [loadingSlots, setLoadingSlots] = useState(false);
+  const [courtFilter, setCourtFilter] = useState('all');
+
+  // Full-Time Inquiry Modal State
+  const [showInquiryModal, setShowInquiryModal] = useState(false);
+  const [inquirySlot, setInquirySlot] = useState(null);
+  const [inquiryClientName, setInquiryClientName] = useState('');
+  const [inquiryClientPhone, setInquiryClientPhone] = useState('');
+  const [inquiryAmount, setInquiryAmount] = useState(1600);
+  const [inquiryPaymentMode, setInquiryPaymentMode] = useState('cash');
+  const [inquiryNotes, setInquiryNotes] = useState('Corporate private match booking');
+  const [submittingInquiry, setSubmittingInquiry] = useState(false);
+
+  // Slot Price Editing Inline Modal
+  const [editingPriceSlot, setEditingPriceSlot] = useState(null);
+  const [newPriceValue, setNewPriceValue] = useState(1200);
+
+  // Business Setup Form State
+  const [bizName, setBizName] = useState('');
+  const [bizOrgName, setBizOrgName] = useState('');
+  const [bizAddress, setBizAddress] = useState('');
+  const [bizCity, setBizCity] = useState('');
+  const [bizPincode, setBizPincode] = useState('');
+  const [bizPhone, setBizPhone] = useState('');
+  const [bizEmail, setBizEmail] = useState('');
+  const [bizGstin, setBizGstin] = useState('');
+  const [bizType, setBizType] = useState('Private Limited Company');
+  const [bizOpenTime, setBizOpenTime] = useState('06:00');
+  const [bizCloseTime, setBizCloseTime] = useState('23:30');
+  const [bizLat, setBizLat] = useState('12.9352');
+  const [bizLng, setBizLng] = useState('77.6245');
+  const [bizRules, setBizRules] = useState('');
+  const [bizAmenities, setBizAmenities] = useState([]);
+  const [bizUpiId, setBizUpiId] = useState('');
+  const [bizUpiName, setBizUpiName] = useState('');
+  const [savingBiz, setSavingBiz] = useState(false);
+  const [bizSuccessMsg, setBizSuccessMsg] = useState('');
 
   // Walk-in modal
   const [showWalkInModal, setShowWalkInModal] = useState(false);
   const [walkInCourtId, setWalkInCourtId] = useState('');
   const [walkInDate, setWalkInDate] = useState(new Date().toISOString().slice(0, 10));
   const [walkInStartTime, setWalkInStartTime] = useState('18:00');
-  const [walkInEndTime, setWalkInEndTime] = useState('19:00');
   const [walkInCustomerName, setWalkInCustomerName] = useState('');
   const [walkInCustomerPhone, setWalkInCustomerPhone] = useState('');
   const [walkInAmount, setWalkInAmount] = useState(1200);
@@ -46,7 +81,6 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
   const [blockCourtId, setBlockCourtId] = useState('');
   const [blockDate, setBlockDate] = useState(new Date().toISOString().slice(0, 10));
   const [blockStartTime, setBlockStartTime] = useState('14:00');
-  const [blockEndTime, setBlockEndTime] = useState('15:00');
   const [blockReason, setBlockReason] = useState('Turf Maintenance & Brushing');
 
   // Add Court modal
@@ -58,28 +92,39 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
   const [newCourtPeakPrice, setNewCourtPeakPrice] = useState(1500);
   const [newCourtWeekendPrice, setNewCourtWeekendPrice] = useState(1800);
 
-  async function loadData() {
+  // Link copy toast
+  const [copiedLink, setCopiedLink] = useState(false);
+  const [showQrModal, setShowQrModal] = useState(false);
+  const [slotViewMode, setSlotViewMode] = useState('cards'); // 'cards' or 'table'
+
+  // Load Initial Data
+  async function loadData(targetVenueId = null) {
     try {
       setLoading(true);
       const ctx = await api.getOwnerContext();
       setContext(ctx);
-      if (ctx.venues?.length > 0) {
-        const venue = ctx.venues[0];
-        setSelectedVenue(venue);
-        setUpiIdInput(venue.upi_id || 'koramangala.sports@okaxis');
-        setUpiNameInput(venue.upi_name || venue.name);
+      setVenues(ctx.venues || []);
 
-        const vId = venue.id;
+      if (ctx.venues?.length > 0) {
+        const v = targetVenueId ? ctx.venues.find(item => item.id === targetVenueId) || ctx.venues[0] : ctx.venues[0];
+        setSelectedVenue(v);
+        populateBizForm(v);
+
+        const vId = v.id;
         const [anData, bData, cData, pendingUpi] = await Promise.all([
-          api.getOwnerAnalytics(vId),
-          api.getOwnerBookings({ venueId: vId }),
-          api.getCustomers(),
+          api.getOwnerAnalytics(vId).catch(() => null),
+          api.getOwnerBookings({ venueId: vId }).catch(() => []),
+          api.getCustomers().catch(() => []),
           api.getPendingUpiBookings(vId).catch(() => [])
         ]);
+
         setAnalytics(anData);
-        setBookings(bData);
-        setCustomers(cData);
+        setBookings(bData || []);
+        setCustomers(cData || []);
         setPendingUpiBookings(pendingUpi || []);
+
+        // Load live slots for default date
+        loadLiveSlots(vId, calendarDate);
       }
     } catch (err) {
       console.error('Error fetching owner data:', err);
@@ -88,52 +133,168 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
     }
   }
 
+  function populateBizForm(v) {
+    setBizName(v.name || '');
+    setBizOrgName(v.organization_name || context?.organization?.name || 'Nexus Arena Sports Pvt Ltd');
+    setBizAddress(v.address || '');
+    setBizCity(v.city || 'Bangalore');
+    setBizPincode(v.pincode || '560034');
+    setBizPhone(v.phone || '+91 98765 43210');
+    setBizEmail(v.email || 'contact@nexusplay.com');
+    setBizGstin(v.gstin || '29AABCN1234F1Z5');
+    setBizType(v.business_type || 'Private Limited Company');
+    setBizOpenTime(v.open_time || '06:00');
+    setBizCloseTime(v.close_time || '23:30');
+    setBizLat(String(v.lat || '12.9352'));
+    setBizLng(String(v.lng || '77.6245'));
+    setBizRules(v.rules || '1. Turf shoes or rubber studs only (No metal spikes).\n2. Arrive 10 minutes prior to slot start.\n3. Zero food or chewing gum on the artificial turf.\n4. Free cancellation up to 4 hours before slot time.');
+    setBizAmenities(Array.isArray(v.amenities) ? v.amenities : [
+      'FIFA Approved Artificial Turf', 'LED Floodlights (500 Lux)', 'Shower & Locker Rooms',
+      'Free Parking (Car & 2-Wheeler)', 'Cafeteria & Energy Drinks', 'Bibs & Match Balls', 'First Aid Kit'
+    ]);
+    setBizUpiId(v.upi_id || 'koramangala.sports@okaxis');
+    setBizUpiName(v.upi_name || v.name);
+  }
+
+  async function loadLiveSlots(vId, date) {
+    if (!vId) return;
+    try {
+      setLoadingSlots(true);
+      const res = await api.getOwnerLiveSlots(vId, date);
+      setLiveSlots(res.slots || []);
+    } catch (err) {
+      console.error('Error fetching live slots:', err);
+    } finally {
+      setLoadingSlots(false);
+    }
+  }
+
   useEffect(() => {
     loadData();
   }, []);
 
-  async function handleVerifyUpi(bookingId) {
-    try {
-      await api.verifyUpiPayment(bookingId, { action: 'verify_credit' });
-      await loadData();
-      alert('✅ UPI Payment verified as credited! Customer notified and booking confirmed.');
-    } catch (err) {
-      alert('Verification failed: ' + err.message);
+  function handleVenueChange(vId) {
+    const v = venues.find(item => item.id === vId);
+    if (v) {
+      setSelectedVenue(v);
+      populateBizForm(v);
+      loadLiveSlots(v.id, calendarDate);
     }
   }
 
-  async function handleRejectUpi(bookingId) {
-    const reason = prompt('Reason for rejection (e.g. Credit not found in bank statement, invalid UTR):', 'Payment not received in owner UPI bank account');
-    if (reason === null) return;
-    try {
-      await api.verifyUpiPayment(bookingId, { action: 'reject', notes: reason });
-      await loadData();
-      alert('❌ Booking rejected and slot released back to open.');
-    } catch (err) {
-      alert('Rejection failed: ' + err.message);
+  function handleDateChange(newDate) {
+    setCalendarDate(newDate);
+    if (selectedVenue) {
+      loadLiveSlots(selectedVenue.id, newDate);
     }
   }
 
-  async function handleSaveUpiSettings(e) {
+  // Save Full Business Details
+  async function handleSaveBusinessDetails(e) {
     e.preventDefault();
-    if (!upiIdInput || !upiIdInput.includes('@')) {
-      alert('Please enter a valid UPI ID (e.g. yourname@okaxis, turf@icici)');
-      return;
-    }
-    setSavingUpiSettings(true);
-    setUpiSuccessMsg('');
+    if (!selectedVenue) return;
+    setSavingBiz(true);
+    setBizSuccessMsg('');
+
     try {
-      await api.updateVenueUpiSettings(selectedVenue.id, {
-        upi_id: upiIdInput.trim(),
-        upi_name: upiNameInput.trim()
+      await api.updateVenueProfile(selectedVenue.id, {
+        name: bizName.trim(),
+        organization_name: bizOrgName.trim(),
+        address: bizAddress.trim(),
+        city: bizCity.trim(),
+        pincode: bizPincode.trim(),
+        phone: bizPhone.trim(),
+        email: bizEmail.trim(),
+        gstin: bizGstin.trim(),
+        business_type: bizType.trim(),
+        open_time: bizOpenTime,
+        close_time: bizCloseTime,
+        lat: parseFloat(bizLat) || 12.9352,
+        lng: parseFloat(bizLng) || 77.6245,
+        rules: bizRules.trim(),
+        amenities: bizAmenities,
+        upi_id: bizUpiId.trim(),
+        upi_name: bizUpiName.trim()
       });
-      setUpiSuccessMsg('Owner UPI details updated successfully!');
-      await loadData();
-      setTimeout(() => setUpiSuccessMsg(''), 3500);
+
+      setBizSuccessMsg('Business details updated successfully! Changes are live on your public booking page.');
+      await loadData(selectedVenue.id);
+      setTimeout(() => setBizSuccessMsg(''), 4000);
     } catch (err) {
-      alert('Failed to save UPI settings: ' + err.message);
+      alert('Failed to save business details: ' + err.message);
     } finally {
-      setSavingUpiSettings(false);
+      setSavingBiz(false);
+    }
+  }
+
+  // Accept Full-Time Inquiry on a Slot (e.g. 6/8 players)
+  function handleOpenInquiryModal(slot) {
+    setInquirySlot(slot);
+    setInquiryClientName('Bangalore Tech League / Corporate FC');
+    setInquiryClientPhone('+91 98800 12345');
+    setInquiryAmount(slot.price || 1600);
+    setInquiryPaymentMode('cash');
+    setInquiryNotes('Private team reservation inquiry approved by owner');
+    setShowInquiryModal(true);
+  }
+
+  async function handleConfirmFullInquiry(e) {
+    e.preventDefault();
+    if (!inquirySlot) return;
+
+    try {
+      setSubmittingInquiry(true);
+      const res = await api.convertSlotToFullInquiry(inquirySlot.id, {
+        clientName: inquiryClientName.trim(),
+        clientPhone: inquiryClientPhone.trim(),
+        amount: Number(inquiryAmount),
+        paymentMode: inquiryPaymentMode,
+        notes: inquiryNotes.trim()
+      });
+
+      setShowInquiryModal(false);
+      alert(`✅ ${res.message || 'Full-time inquiry accepted!'}`);
+      if (selectedVenue) {
+        loadLiveSlots(selectedVenue.id, calendarDate);
+        api.getOwnerBookings({ venueId: selectedVenue.id }).then(setBookings);
+      }
+    } catch (err) {
+      alert('Error accepting inquiry: ' + err.message);
+    } finally {
+      setSubmittingInquiry(false);
+    }
+  }
+
+  // Quick Price adjustment
+  async function handleSavePrice(e) {
+    e.preventDefault();
+    if (!editingPriceSlot) return;
+    try {
+      await api.updateSlotPrice(editingPriceSlot.id, Number(newPriceValue));
+      setEditingPriceSlot(null);
+      if (selectedVenue) {
+        loadLiveSlots(selectedVenue.id, calendarDate);
+      }
+    } catch (err) {
+      alert('Failed to update price: ' + err.message);
+    }
+  }
+
+  // Slot block & walkin handlers
+  async function handleBlockSlotSubmit(e) {
+    e.preventDefault();
+    try {
+      await api.blockSlot({
+        courtId: blockCourtId || selectedVenue.courts?.[0]?.id,
+        date: blockDate,
+        startTime: blockStartTime,
+        reason: blockReason
+      });
+      setShowBlockModal(false);
+      if (selectedVenue) loadLiveSlots(selectedVenue.id, calendarDate);
+      alert('Slot blocked for maintenance successfully.');
+    } catch (err) {
+      alert('Failed to block slot: ' + err.message);
     }
   }
 
@@ -141,664 +302,1338 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
     e.preventDefault();
     try {
       await api.createWalkInBooking({
-        venueId: selectedVenue.id,
-        courtId: walkInCourtId || 'crt_fb_1',
+        courtId: walkInCourtId || selectedVenue.courts?.[0]?.id,
         date: walkInDate,
         startTime: walkInStartTime,
-        endTime: walkInEndTime,
         customerName: walkInCustomerName,
         customerPhone: walkInCustomerPhone,
-        amount: Number(walkInAmount),
+        totalAmount: Number(walkInAmount),
         paymentMode: walkInPaymentMode
       });
       setShowWalkInModal(false);
-      loadData();
-      alert('Walk-in booking recorded successfully!');
+      if (selectedVenue) {
+        loadLiveSlots(selectedVenue.id, calendarDate);
+        api.getOwnerBookings({ venueId: selectedVenue.id }).then(setBookings);
+      }
+      alert('Walk-in booking confirmed.');
     } catch (err) {
-      alert(err.message);
+      alert('Failed to create walk-in: ' + err.message);
     }
   }
 
-  async function handleBlockSlotSubmit(e) {
-    e.preventDefault();
+  async function handleVerifyUpi(bookingId) {
     try {
-      await api.blockSlot({
-        venueId: selectedVenue.id,
-        courtId: blockCourtId || 'crt_fb_1',
-        date: blockDate,
-        startTime: blockStartTime,
-        endTime: blockEndTime,
-        reason: blockReason
-      });
-      setShowBlockModal(false);
-      loadData();
-      alert('Slot blocked for maintenance/blackout.');
+      await api.verifyUpiPayment(bookingId, { action: 'verify_credit' });
+      await loadData(selectedVenue?.id);
+      alert('✅ UPI Payment verified as credited! Customer notified and booking confirmed.');
     } catch (err) {
-      alert(err.message);
+      alert('Verification failed: ' + err.message);
     }
   }
 
-  async function handleAddCourtSubmit(e) {
-    e.preventDefault();
+  async function handleRejectUpi(bookingId) {
+    const reason = prompt('Reason for rejection:', 'Payment not received in owner UPI bank account');
+    if (reason === null) return;
     try {
-      await api.createCourt({
-        venueId: selectedVenue.id,
-        name: newCourtName,
-        sportId: newCourtSportId,
-        capacity: Number(newCourtCapacity),
-        basePrice: Number(newCourtBasePrice),
-        peakPrice: Number(newCourtPeakPrice),
-        weekendPrice: Number(newCourtWeekendPrice),
-        slotDurationMinutes: 60
-      });
-      setShowCourtModal(false);
-      loadData();
-      alert('New court added to venue catalog!');
+      await api.verifyUpiPayment(bookingId, { action: 'reject', notes: reason });
+      await loadData(selectedVenue?.id);
+      alert('❌ Booking rejected and slot released back to open.');
     } catch (err) {
-      alert(err.message);
+      alert('Rejection failed: ' + err.message);
     }
   }
 
-  async function handleBookingAction(bookingId, action) {
-    try {
-      await api.updateBookingAction(bookingId, { action });
-      loadData();
-    } catch (err) {
-      alert(err.message);
-    }
+  function handleCopyUniqueTurfLink() {
+    if (!selectedVenue) return;
+    const url = `${window.location.origin}/?venue=${selectedVenue.slug || selectedVenue.id}`;
+    navigator.clipboard.writeText(url);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2500);
   }
 
-  if (loading) {
+  const uniqueTurfUrl = selectedVenue ? `${window.location.origin}/?venue=${selectedVenue.slug || selectedVenue.id}` : '';
+
+  // Filter live slots by court
+  const displaySlots = liveSlots.filter(s => {
+    if (courtFilter === 'all') return true;
+    return s.court_id === courtFilter;
+  });
+
+  if (loading && !selectedVenue) {
     return (
-      <div style={{ padding: 60, textAlign: 'center', color: 'var(--text-secondary)' }}>
-        Loading SaaS Management Suite...
+      <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
+        Loading Turf Management System...
       </div>
     );
   }
 
   return (
-    <div className="animate-fade-in" style={{ maxWidth: 1240, margin: '0 auto', padding: '16px 24px 80px' }}>
-      {/* Top Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', gap: 16 }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span className="badge-neon" style={{ padding: '3px 10px', borderRadius: 999, fontSize: 11, fontWeight: 700 }}>
-              ORGANIZATION: {context?.org?.name}
-            </span>
-            <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Multi-Tenant Isolated</span>
-          </div>
-          <h1 className="font-display" style={{ fontSize: 28, fontWeight: 800, color: '#fff', marginTop: 4 }}>
-            {selectedVenue?.name || 'Venue SaaS Management'}
-          </h1>
-        </div>
-
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button
-            className="btn-secondary"
-            onClick={() => onNavigateToPublicPage?.(selectedVenue?.slug || selectedVenue?.id)}
-            style={{ fontSize: 13 }}
-          >
-            View Public Page (URL)
-          </button>
-          <button
-            className="btn-primary"
-            onClick={() => setShowWalkInModal(true)}
-            style={{ fontSize: 13 }}
-          >
-            <Plus size={16} /> Fast Walk-in Booking
-          </button>
-        </div>
-      </div>
-
-      {/* SaaS Navigation Tabs */}
-      <div style={{ display: 'flex', gap: 8, borderBottom: '1px solid var(--border-card)', paddingBottom: 12, marginBottom: 24, overflowX: 'auto' }}>
-        {[
-          { id: 'dashboard', label: 'Overview & Analytics', icon: <LayoutDashboard size={16} /> },
-          {
-            id: 'upi_verification',
-            label: 'UPI Verification',
-            icon: <ShieldCheck size={16} />,
-            badge: pendingUpiBookings.length > 0 ? pendingUpiBookings.length : null
-          },
-          { id: 'calendar', label: 'Booking Calendar', icon: <Calendar size={16} /> },
-          { id: 'crm', label: 'Customer CRM', icon: <Users size={16} /> },
-          { id: 'courts', label: 'Court Management & Pricing', icon: <Building size={16} /> },
-          { id: 'upi_settings', label: 'UPI QR Settings', icon: <QrCode size={16} /> },
-        ].map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            style={{
-              background: activeTab === tab.id ? 'var(--bg-card)' : 'transparent',
-              color: activeTab === tab.id ? 'var(--accent-neon)' : 'var(--text-secondary)',
-              border: `1px solid ${activeTab === tab.id ? 'var(--border-card)' : 'transparent'}`,
-              borderRadius: 10,
-              padding: '8px 16px',
-              fontSize: 13.5,
-              fontWeight: 700,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              transition: 'all 0.15s',
-              whiteSpace: 'nowrap'
-            }}
-          >
-            {tab.icon} {tab.label}
-            {tab.badge && (
-              <span style={{
-                background: '#fb923c',
-                color: '#000',
-                fontSize: 11,
-                fontWeight: 800,
-                padding: '2px 7px',
-                borderRadius: 999,
-                lineHeight: 1
-              }}>
-                {tab.badge}
-              </span>
-            )}
-          </button>
-        ))}
-      </div>
-
-      {/* TAB 1: OVERVIEW & ANALYTICS */}
-      {activeTab === 'dashboard' && analytics && (
-        <div>
-          {/* Key Metric Cards */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 18, marginBottom: 24 }}>
-            <div className="nexus-card" style={{ padding: 20 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)', fontSize: 12, fontWeight: 700, textTransform: 'uppercase' }}>
-                <span>Today's Revenue</span>
-                <DollarSign size={16} style={{ color: 'var(--accent-neon)' }} />
-              </div>
-              <div className="font-display" style={{ fontSize: 32, fontWeight: 800, color: '#fff', marginTop: 8 }}>
-                ₹{analytics.todayRevenue.toLocaleString()}
-              </div>
-              <div style={{ fontSize: 12, color: 'var(--accent-neon)', marginTop: 4 }}>
-                +18% from last week
-              </div>
+    <div className="animate-fade-in" style={{ maxWidth: 1280, margin: '0 auto', padding: '16px 16px 80px' }}>
+      
+      {/* VENUE UNIQUE LINK & SWITCHER BANNER */}
+      {selectedVenue && (
+        <div
+          className="nexus-card mobile-stack"
+          style={{
+            padding: '16px 20px',
+            marginBottom: 20,
+            background: '#0d1422',
+            border: '1px solid rgba(16, 185, 129, 0.25)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: 16
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <div style={{ width: 44, height: 44, borderRadius: 10, background: '#1e293b', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#10b981', flexShrink: 0 }}>
+              <Building size={22} />
             </div>
-
-            <div className="nexus-card" style={{ padding: 20 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)', fontSize: 12, fontWeight: 700, textTransform: 'uppercase' }}>
-                <span>Today's Bookings</span>
-                <Calendar size={16} style={{ color: 'var(--accent-neon)' }} />
-              </div>
-              <div className="font-display" style={{ fontSize: 32, fontWeight: 800, color: '#fff', marginTop: 8 }}>
-                {analytics.todayBookings} slots
-              </div>
-              <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
-                Occupancy: {analytics.occupancyRate}%
-              </div>
-            </div>
-
-            <div className="nexus-card" style={{ padding: 20 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)', fontSize: 12, fontWeight: 700, textTransform: 'uppercase' }}>
-                <span>Weekly Revenue</span>
-                <TrendingUp size={16} style={{ color: '#fb923c' }} />
-              </div>
-              <div className="font-display" style={{ fontSize: 32, fontWeight: 800, color: '#fff', marginTop: 8 }}>
-                ₹{analytics.weeklyRevenue.toLocaleString()}
-              </div>
-              <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
-                Peak hours: {analytics.peakHours}
-              </div>
-            </div>
-
-            <div className="nexus-card" style={{ padding: 20 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)', fontSize: 12, fontWeight: 700, textTransform: 'uppercase' }}>
-                <span>Monthly Gross</span>
-                <Activity size={16} style={{ color: 'var(--accent-neon)' }} />
-              </div>
-              <div className="font-display" style={{ fontSize: 32, fontWeight: 800, color: '#fff', marginTop: 8 }}>
-                ₹{analytics.monthlyRevenue.toLocaleString()}
-              </div>
-              <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
-                Direct Venue Settlement
-              </div>
-            </div>
-          </div>
-
-          {/* Revenue & Occupancy Charts */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1.8fr 1.2fr', gap: 20, marginBottom: 28 }}>
-            <div className="nexus-card" style={{ padding: 22 }}>
-              <h3 style={{ fontSize: 16, fontWeight: 700, color: '#fff', marginBottom: 16 }}>
-                Weekly Revenue & Slot Trajectory (₹)
-              </h3>
-              <div style={{ height: 260 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={analytics.revenueTrend}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#232733" />
-                    <XAxis dataKey="period" stroke="#64748b" />
-                    <YAxis stroke="#64748b" />
-                    <Tooltip contentStyle={{ background: '#12141a', borderColor: '#232733', borderRadius: 8, color: '#fff' }} />
-                    <Bar dataKey="revenue" fill="#10b981" radius={[6, 6, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
-            <div className="nexus-card" style={{ padding: 22 }}>
-              <h3 style={{ fontSize: 16, fontWeight: 700, color: '#fff', marginBottom: 16 }}>
-                Revenue Distribution by Sport
-              </h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                {analytics.revenueBySport.map((item, idx) => (
-                  <div key={idx} style={{ background: '#12141a', padding: 12, borderRadius: 10, border: '1px solid var(--border-card)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 600, color: '#fff', marginBottom: 4 }}>
-                      <span>{item.sport}</span>
-                      <span>₹{item.revenue.toLocaleString()}</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: 'var(--text-muted)' }}>
-                      <span>{item.count} bookings</span>
-                      <span>{Math.round((item.revenue / 196100) * 100)}% of turnover</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* TAB 2: BOOKING CALENDAR & MANAGEMENT */}
-      {activeTab === 'calendar' && (
-        <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18, flexWrap: 'wrap', gap: 12 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <input
-                type="date"
-                value={calendarDate}
-                onChange={e => setCalendarDate(e.target.value)}
-                className="nexus-input"
-              />
-              <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-                Showing schedule & walk-ins for this date
-              </span>
-            </div>
-
-            <div style={{ display: 'flex', gap: 10 }}>
-              <button className="btn-secondary" onClick={() => setShowBlockModal(true)} style={{ fontSize: 13 }}>
-                <Lock size={14} /> Block Slot for Maintenance
-              </button>
-              <button className="btn-primary" onClick={() => setShowWalkInModal(true)} style={{ fontSize: 13 }}>
-                <Plus size={14} /> Add Walk-in
-              </button>
-            </div>
-          </div>
-
-          {/* Bookings Table */}
-          <div className="nexus-card" style={{ overflow: 'hidden' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 13.5 }}>
-              <thead>
-                <tr style={{ background: '#12141a', borderBottom: '1px solid var(--border-card)', color: 'var(--text-muted)' }}>
-                  <th style={{ padding: '14px 18px', fontWeight: 600 }}>TIME</th>
-                  <th style={{ padding: '14px 18px', fontWeight: 600 }}>COURT</th>
-                  <th style={{ padding: '14px 18px', fontWeight: 600 }}>CUSTOMER</th>
-                  <th style={{ padding: '14px 18px', fontWeight: 600 }}>AMOUNT</th>
-                  <th style={{ padding: '14px 18px', fontWeight: 600 }}>STATUS</th>
-                  <th style={{ padding: '14px 18px', fontWeight: 600 }}>ACTIONS</th>
-                </tr>
-              </thead>
-              <tbody>
-                {bookings.map(b => (
-                  <tr key={b.id} style={{ borderBottom: '1px solid var(--border-card)' }}>
-                    <td style={{ padding: '14px 18px', fontWeight: 700, color: '#fff' }}>
-                      {b.start_time} - {b.end_time}
-                      <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 400 }}>{b.date}</div>
-                    </td>
-                    <td style={{ padding: '14px 18px', color: '#e2e8f0' }}>
-                      {b.court_name || 'Pro Turf'}
-                    </td>
-                    <td style={{ padding: '14px 18px' }}>
-                      <div style={{ fontWeight: 600, color: '#fff' }}>{b.customer_name || 'Walk-in Guest'}</div>
-                      <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{b.customer_phone}</div>
-                    </td>
-                    <td style={{ padding: '14px 18px', fontWeight: 700, color: 'var(--accent-neon)' }}>
-                      ₹{b.total_amount}
-                      <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                        {b.payment_mode === 'upi' ? 'Owner UPI' : b.payment_mode}
-                      </div>
-                      {b.upi_utr && (
-                        <div style={{ fontSize: 10, color: '#93c5fd', fontFamily: 'monospace', marginTop: 2 }}>
-                          UTR: {b.upi_utr}
-                        </div>
-                      )}
-                    </td>
-                    <td style={{ padding: '14px 18px' }}>
-                      {b.payment_status === 'pending_verification' ? (
-                        <span
-                          style={{
-                            background: 'rgba(251, 146, 60, 0.15)',
-                            border: '1px solid rgba(251, 146, 60, 0.35)',
-                            color: '#fb923c',
-                            padding: '4px 10px',
-                            borderRadius: 999,
-                            fontSize: 11,
-                            fontWeight: 700,
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: 4
-                          }}
-                        >
-                          <Clock size={11} /> Pending UPI Verification
-                        </span>
-                      ) : (
-                        <span
-                          className={b.status === 'confirmed' ? 'badge-neon' : b.status === 'cancelled' ? 'badge-orange' : ''}
-                          style={{ padding: '4px 10px', borderRadius: 999, fontSize: 11, fontWeight: 700, textTransform: 'uppercase' }}
-                        >
-                          {b.status} {b.payment_mode === 'upi' && b.payment_status === 'paid' ? '· UPI Paid' : ''}
-                        </span>
-                      )}
-                    </td>
-                    <td style={{ padding: '14px 18px' }}>
-                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                        {b.payment_status === 'pending_verification' && (
-                          <>
-                            <button
-                              onClick={() => handleVerifyUpi(b.id)}
-                              style={{
-                                background: '#10b981',
-                                border: 'none',
-                                color: '#000',
-                                padding: '4px 9px',
-                                borderRadius: 6,
-                                fontSize: 11,
-                                fontWeight: 700,
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 3
-                              }}
-                            >
-                              <Check size={12} /> Verify Credit
-                            </button>
-                            <button
-                              onClick={() => handleRejectUpi(b.id)}
-                              style={{
-                                background: 'rgba(239,68,68,0.1)',
-                                border: '1px solid rgba(239,68,68,0.3)',
-                                color: '#f87171',
-                                padding: '4px 7px',
-                                borderRadius: 6,
-                                fontSize: 11,
-                                cursor: 'pointer'
-                              }}
-                            >
-                              Reject
-                            </button>
-                          </>
-                        )}
-                        {b.payment_mode === 'cash' && b.payment_status !== 'paid' && (
-                          <button
-                            className="btn-secondary"
-                            onClick={() => handleBookingAction(b.id, 'mark_cash_paid')}
-                            style={{ padding: '4px 8px', fontSize: 11 }}
-                          >
-                            Collect Cash
-                          </button>
-                        )}
-                        {b.status !== 'cancelled' && b.payment_status !== 'pending_verification' && (
-                          <button
-                            onClick={() => handleBookingAction(b.id, 'cancel')}
-                            style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#f87171', padding: '4px 8px', borderRadius: 6, fontSize: 11, cursor: 'pointer' }}
-                          >
-                            Cancel
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* TAB: UPI VERIFICATION QUEUE */}
-      {activeTab === 'upi_verification' && (
-        <div className="animate-fade-in">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 22, flexWrap: 'wrap', gap: 14 }}>
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span className="badge-neon" style={{ padding: '3px 10px', borderRadius: 999, fontSize: 11, fontWeight: 700 }}>
-                  DIRECT-TO-BANK AUDIT
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span className="badge-emerald" style={{ fontSize: 10, padding: '2px 8px' }}>
+                  ACTIVE ARENA
                 </span>
-                <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>0% Gateway Commission</span>
+                {venues.length > 1 && (
+                  <select
+                    value={selectedVenue.id}
+                    onChange={e => handleVenueChange(e.target.value)}
+                    style={{ background: '#1e293b', border: '1px solid var(--border-card)', color: '#f8fafc', padding: '3px 8px', borderRadius: 6, fontSize: 12, outline: 'none' }}
+                  >
+                    {venues.map(v => (
+                      <option key={v.id} value={v.id}>{v.name}</option>
+                    ))}
+                  </select>
+                )}
               </div>
-              <h2 className="font-display" style={{ fontSize: 24, fontWeight: 800, color: '#fff', marginTop: 4 }}>
-                UPI Payments Verification & Credit Queue
+              <h2 className="font-display" style={{ fontSize: 20, fontWeight: 800, color: '#fff', margin: '3px 0 0 0' }}>
+                {selectedVenue.name}
               </h2>
-              <p style={{ fontSize: 13.5, color: 'var(--text-secondary)' }}>
-                Audit incoming player UPI payments. Check the 12-digit UTR against your bank statement or merchant app (PhonePe/GPay/Paytm Business) and click <strong>Verify & Credit</strong> to confirm the booking.
+              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                {selectedVenue.address} · UPI: <strong style={{ color: '#cbd5e1' }}>{selectedVenue.upi_id}</strong>
+              </div>
+            </div>
+          </div>
+
+          {/* Unique Turf Booking Link Controls */}
+          <div className="mobile-btn-group" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <div style={{ background: '#090d16', padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border-card)', display: 'flex', alignItems: 'center', gap: 6, flex: '1 1 auto', minWidth: 160 }}>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>Link:</span>
+              <span style={{ fontSize: 12, fontFamily: 'monospace', color: '#93c5fd', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                /?venue={selectedVenue.slug}
+              </span>
+            </div>
+
+            <button
+              onClick={handleCopyUniqueTurfLink}
+              className="btn-primary"
+              style={{ fontSize: 12, padding: '7px 12px', flex: '1 1 auto' }}
+            >
+              {copiedLink ? <Check size={14} /> : <Copy size={14} />}
+              {copiedLink ? 'Copied' : 'Copy Link'}
+            </button>
+
+            <button
+              onClick={() => onNavigateToPublicPage(selectedVenue.slug)}
+              className="btn-secondary"
+              style={{ fontSize: 12, padding: '7px 12px', flex: '1 1 auto' }}
+            >
+              <ExternalLink size={14} /> View Page
+            </button>
+
+            <button
+              onClick={() => setShowQrModal(true)}
+              className="btn-secondary"
+              title="Show QR Code"
+              style={{ fontSize: 12, padding: '7px 10px' }}
+            >
+              <QrCode size={15} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* NAVIGATION TABS (TOUCH-FRIENDLY HORIZONTAL SCROLL) */}
+      <div className="scroll-pills" style={{ borderBottom: '1px solid var(--border-card)', paddingBottom: 10, marginBottom: 20 }}>
+        <button
+          onClick={() => setActiveTab('live_slots')}
+          style={{
+            background: activeTab === 'live_slots' ? '#10b981' : '#0d1422',
+            color: activeTab === 'live_slots' ? '#022c22' : '#cbd5e1',
+            border: activeTab === 'live_slots' ? '1px solid #10b981' : '1px solid var(--border-card)',
+            borderRadius: 8,
+            padding: '8px 16px',
+            fontWeight: 700,
+            fontSize: 13,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 7,
+            whiteSpace: 'nowrap',
+            boxShadow: activeTab === 'live_slots' ? '0 0 12px rgba(16, 185, 129, 0.3)' : 'none'
+          }}
+        >
+          <Calendar size={15} /> Live Slots & Calendar
+        </button>
+
+        <button
+          onClick={() => setActiveTab('business_setup')}
+          style={{
+            background: activeTab === 'business_setup' ? '#10b981' : '#0d1422',
+            color: activeTab === 'business_setup' ? '#022c22' : '#cbd5e1',
+            border: activeTab === 'business_setup' ? '1px solid #10b981' : '1px solid var(--border-card)',
+            borderRadius: 8,
+            padding: '8px 16px',
+            fontWeight: 700,
+            fontSize: 13,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 7,
+            whiteSpace: 'nowrap',
+            boxShadow: activeTab === 'business_setup' ? '0 0 12px rgba(16, 185, 129, 0.3)' : 'none'
+          }}
+        >
+          <Building size={15} /> Business Setup
+        </button>
+
+        <button
+          onClick={() => setActiveTab('dashboard')}
+          style={{
+            background: activeTab === 'dashboard' ? '#10b981' : '#0d1422',
+            color: activeTab === 'dashboard' ? '#022c22' : '#cbd5e1',
+            border: activeTab === 'dashboard' ? '1px solid #10b981' : '1px solid var(--border-card)',
+            borderRadius: 8,
+            padding: '8px 16px',
+            fontWeight: 700,
+            fontSize: 13,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 7,
+            whiteSpace: 'nowrap',
+            boxShadow: activeTab === 'dashboard' ? '0 0 12px rgba(16, 185, 129, 0.3)' : 'none'
+          }}
+        >
+          <LayoutDashboard size={15} /> Overview & Analytics
+        </button>
+
+        <button
+          onClick={() => setActiveTab('upi_verification')}
+          style={{
+            background: activeTab === 'upi_verification' ? '#10b981' : '#0d1422',
+            color: activeTab === 'upi_verification' ? '#022c22' : '#cbd5e1',
+            border: activeTab === 'upi_verification' ? '1px solid #10b981' : '1px solid var(--border-card)',
+            borderRadius: 8,
+            padding: '8px 16px',
+            fontWeight: 700,
+            fontSize: 13,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 7,
+            position: 'relative',
+            whiteSpace: 'nowrap',
+            boxShadow: activeTab === 'upi_verification' ? '0 0 12px rgba(16, 185, 129, 0.3)' : 'none'
+          }}
+        >
+          <ShieldCheck size={15} /> UPI Direct Audit
+          {pendingUpiBookings.length > 0 && (
+            <span style={{ background: '#f59e0b', color: '#000', fontSize: 10, fontWeight: 800, padding: '1px 6px', borderRadius: 999 }}>
+              {pendingUpiBookings.length}
+            </span>
+          )}
+        </button>
+
+        <button
+          onClick={() => setActiveTab('courts')}
+          style={{
+            background: activeTab === 'courts' ? '#10b981' : '#0d1422',
+            color: activeTab === 'courts' ? '#022c22' : '#cbd5e1',
+            border: activeTab === 'courts' ? '1px solid #10b981' : '1px solid var(--border-card)',
+            borderRadius: 8,
+            padding: '8px 16px',
+            fontWeight: 700,
+            fontSize: 13,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 7,
+            whiteSpace: 'nowrap',
+            boxShadow: activeTab === 'courts' ? '0 0 12px rgba(16, 185, 129, 0.3)' : 'none'
+          }}
+        >
+          <Settings size={15} /> Courts & Rates
+        </button>
+
+        <button
+          onClick={() => setActiveTab('crm')}
+          style={{
+            background: activeTab === 'crm' ? '#10b981' : '#0d1422',
+            color: activeTab === 'crm' ? '#022c22' : '#cbd5e1',
+            border: activeTab === 'crm' ? '1px solid #10b981' : '1px solid var(--border-card)',
+            borderRadius: 8,
+            padding: '8px 16px',
+            fontWeight: 700,
+            fontSize: 13,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 7,
+            whiteSpace: 'nowrap',
+            boxShadow: activeTab === 'crm' ? '0 0 12px rgba(16, 185, 129, 0.3)' : 'none'
+          }}
+        >
+          <Users size={15} /> Customer CRM
+        </button>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* TAB: LIVE SLOTS & INTERACTIVE CALENDAR (WITH FULL TIME INQUIRY CONVERSION) */}
+      {/* ========================================================================= */}
+      {activeTab === 'live_slots' && (
+        <div className="animate-fade-in">
+          {/* Calendar Controls Header */}
+          <div className="mobile-stack" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 14, marginBottom: 16 }}>
+            <div>
+              <h2 className="font-display" style={{ fontSize: 22, fontWeight: 800, color: '#fff', margin: 0 }}>
+                Live Slot Control & Calendar Grid
+              </h2>
+              <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: '4px 0 0 0' }}>
+                Manage live slot statuses, edit rates set by owner, and accept full-time inquiries on partially registered slots.
               </p>
             </div>
 
-            <div style={{ display: 'flex', gap: 10 }}>
-              <button className="btn-secondary" onClick={loadData} style={{ fontSize: 13 }}>
-                <RefreshCw size={14} /> Refresh Queue
+            {/* View Mode Switcher (Cards vs Table) */}
+            <div style={{ display: 'flex', background: '#090e1c', padding: 3, borderRadius: 8, border: '1px solid var(--border-card)', gap: 3 }}>
+              <button
+                onClick={() => setSlotViewMode('cards')}
+                style={{
+                  background: slotViewMode === 'cards' ? '#1e293b' : 'transparent',
+                  color: slotViewMode === 'cards' ? '#10b981' : 'var(--text-secondary)',
+                  border: 'none',
+                  borderRadius: 6,
+                  padding: '6px 12px',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 5
+                }}
+              >
+                <LayoutDashboard size={13} /> Cards View
               </button>
-              <button className="btn-primary" onClick={() => setActiveTab('upi_settings')} style={{ fontSize: 13 }}>
-                <QrCode size={14} /> QR Code Settings
+              <button
+                onClick={() => setSlotViewMode('table')}
+                style={{
+                  background: slotViewMode === 'table' ? '#1e293b' : 'transparent',
+                  color: slotViewMode === 'table' ? '#10b981' : 'var(--text-secondary)',
+                  border: 'none',
+                  borderRadius: 6,
+                  padding: '6px 12px',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 5
+                }}
+              >
+                <Calendar size={13} /> Table View
               </button>
             </div>
           </div>
 
-          {/* Quick Metrics */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginBottom: 24 }}>
-            <div className="nexus-card" style={{ padding: 18, borderLeft: '3px solid #fb923c' }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: '#fb923c', textTransform: 'uppercase' }}>
-                Pending Verifications
-              </div>
-              <div className="font-display" style={{ fontSize: 28, fontWeight: 800, color: '#fff', marginTop: 6 }}>
-                {pendingUpiBookings.length} bookings
-              </div>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
-                Awaiting bank credit confirmation
+          {/* Quick Date Chips (Touch-Friendly Horizontal Scroll) */}
+          <div className="scroll-pills" style={{ marginBottom: 16 }}>
+            {[0, 1, 2, 3, 4, 5, 6].map(offset => {
+              const d = new Date();
+              d.setDate(d.getDate() + offset);
+              const dateStr = d.toISOString().slice(0, 10);
+              const isSelected = calendarDate === dateStr;
+              const label = offset === 0 ? 'Today' : offset === 1 ? 'Tomorrow' : d.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+              return (
+                <button
+                  key={dateStr}
+                  onClick={() => handleDateChange(dateStr)}
+                  style={{
+                    background: isSelected ? '#10b981' : '#0d1422',
+                    color: isSelected ? '#022c22' : '#cbd5e1',
+                    border: isSelected ? '1px solid #10b981' : '1px solid var(--border-card)',
+                    borderRadius: 999,
+                    padding: '7px 16px',
+                    fontWeight: 700,
+                    fontSize: 12,
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                    boxShadow: isSelected ? '0 0 10px rgba(16, 185, 129, 0.3)' : 'none'
+                  }}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Filter & Action Bar */}
+          <div className="mobile-stack" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', flex: 1 }}>
+              <input
+                type="date"
+                value={calendarDate}
+                onChange={e => handleDateChange(e.target.value)}
+                className="nexus-input"
+                style={{ padding: '7px 12px', fontSize: 13 }}
+              />
+
+              <select
+                value={courtFilter}
+                onChange={e => setCourtFilter(e.target.value)}
+                className="nexus-input"
+                style={{ padding: '7px 12px', fontSize: 13 }}
+              >
+                <option value="all">All Courts ({selectedVenue?.courts?.length || 0})</option>
+                {selectedVenue?.courts?.map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+
+              <button
+                onClick={() => selectedVenue && loadLiveSlots(selectedVenue.id, calendarDate)}
+                className="btn-secondary"
+                style={{ fontSize: 12, padding: '7px 12px' }}
+                title="Refresh Slots"
+              >
+                <RefreshCw size={13} />
+              </button>
+            </div>
+
+            <div className="mobile-btn-group" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <button
+                onClick={() => setShowWalkInModal(true)}
+                className="btn-primary"
+                style={{ fontSize: 12.5, padding: '7px 14px', flex: '1 1 auto' }}
+              >
+                <Plus size={14} /> Walk-in Booking
+              </button>
+
+              <button
+                onClick={() => setShowBlockModal(true)}
+                className="btn-secondary"
+                style={{ fontSize: 12.5, padding: '7px 14px', flex: '1 1 auto' }}
+              >
+                <Lock size={14} /> Block Slot
+              </button>
+            </div>
+          </div>
+
+          {/* Quick Slot Stats Pills (Responsive 2-col on mobile, 4-col on desktop) */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 20 }}>
+            <div className="nexus-card" style={{ padding: '12px 14px', borderLeft: '3px solid #10b981' }}>
+              <div style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Available Open</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: '#34d399', marginTop: 2 }}>
+                {displaySlots.filter(s => s.status === 'open' && !s.game).length}
               </div>
             </div>
 
-            <div className="nexus-card" style={{ padding: 18, borderLeft: '3px solid var(--accent-neon)' }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent-neon)', textTransform: 'uppercase' }}>
-                Total Pending Value
-              </div>
-              <div className="font-display" style={{ fontSize: 28, fontWeight: 800, color: '#fff', marginTop: 6 }}>
-                ₹{pendingUpiBookings.reduce((sum, b) => sum + (b.total_amount || 0), 0).toLocaleString()}
-              </div>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
-                Direct to owner bank account
+            <div className="nexus-card" style={{ padding: '12px 14px', borderLeft: '3px solid #f59e0b' }}>
+              <div style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Pickup Games Active</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: '#fbbf24', marginTop: 2 }}>
+                {displaySlots.filter(s => !!s.game).length}
               </div>
             </div>
 
-            <div className="nexus-card" style={{ padding: 18, borderLeft: '3px solid #3b82f6' }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: '#93c5fd', textTransform: 'uppercase' }}>
-                Active Owner UPI ID
+            <div className="nexus-card" style={{ padding: '12px 14px', borderLeft: '3px solid #6366f1' }}>
+              <div style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Confirmed Bookings</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: '#a5b4fc', marginTop: 2 }}>
+                {displaySlots.filter(s => s.status === 'booked').length}
               </div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: '#fff', marginTop: 8, wordBreak: 'break-all' }}>
-                {selectedVenue?.upi_id || 'koramangala.sports@okaxis'}
-              </div>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
-                Payee: {selectedVenue?.upi_name || selectedVenue?.name}
+            </div>
+
+            <div className="nexus-card" style={{ padding: '12px 14px', borderLeft: '3px solid #64748b' }}>
+              <div style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Maintenance Blocked</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: '#cbd5e1', marginTop: 2 }}>
+                {displaySlots.filter(s => s.status === 'blocked' || s.status === 'maintenance').length}
               </div>
             </div>
           </div>
 
-          {/* Pending Verifications Queue */}
-          <div style={{ marginBottom: 32 }}>
-            <h3 style={{ fontSize: 16, fontWeight: 800, color: '#fff', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Clock size={16} style={{ color: '#fb923c' }} />
-              Awaiting Your Verification ({pendingUpiBookings.length})
-            </h3>
+          {loadingSlots ? (
+            <div className="nexus-card" style={{ padding: 50, textAlign: 'center', color: 'var(--text-muted)' }}>
+              <RefreshCw size={24} className="animate-spin" style={{ margin: '0 auto 10px', color: '#10b981' }} />
+              <div>Loading live slots for {calendarDate}...</div>
+            </div>
+          ) : displaySlots.length === 0 ? (
+            <div className="nexus-card" style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
+              <Calendar size={32} style={{ margin: '0 auto 10px', color: '#64748b' }} />
+              <div style={{ fontSize: 15, fontWeight: 700, color: '#f8fafc' }}>No slots scheduled for this date</div>
+              <div style={{ fontSize: 12.5, marginTop: 4 }}>Slots are automatically generated according to court operating hours.</div>
+            </div>
+          ) : slotViewMode === 'cards' ? (
+            /* ========================================================================= */
+            /* RESPONSIVE MOBILE-FIRST SLOT CARD GRID                                     */
+            /* ========================================================================= */
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(310px, 1fr))', gap: 14 }}>
+              {displaySlots.map(slot => {
+                const hasGame = !!slot.game;
+                const registeredCount = slot.game?.current_players || 0;
+                const requiredCount = slot.game?.required_players || slot.court_capacity || 8;
+                const isPartiallyFilled = hasGame && registeredCount > 0;
+                const isBooked = slot.status === 'booked';
+                const isBlocked = slot.status === 'blocked' || slot.status === 'maintenance';
+                const spotsRemaining = Math.max(0, requiredCount - registeredCount);
 
-            {pendingUpiBookings.length === 0 ? (
-              <div className="nexus-card" style={{ padding: 40, textAlign: 'center' }}>
-                <CheckCircle2 size={42} style={{ color: 'var(--accent-neon)', margin: '0 auto 12px' }} />
-                <h4 style={{ fontSize: 17, fontWeight: 700, color: '#fff', marginBottom: 6 }}>
-                  All UPI Payments Are Verified!
-                </h4>
-                <p style={{ fontSize: 13.5, color: 'var(--text-secondary)', maxWidth: 460, margin: '0 auto' }}>
-                  No pending UPI credit audits in the queue. When customers scan your venue QR code and enter their 12-digit UTR, they will appear here for verification.
-                </p>
-              </div>
-            ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 16 }}>
-                {pendingUpiBookings.map(b => (
-                  <div key={b.id} className="nexus-card" style={{ padding: 20, border: '1px solid rgba(251, 146, 60, 0.4)', background: '#161922' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
-                      <div>
-                        <div style={{ fontSize: 18, fontWeight: 800, color: '#fff' }}>
-                          ₹{b.total_amount}
-                        </div>
-                        <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                          {b.court_name} · {b.date} ({b.start_time} - {b.end_time})
-                        </div>
-                      </div>
-                      <span style={{ background: 'rgba(251, 146, 60, 0.15)', border: '1px solid rgba(251, 146, 60, 0.4)', color: '#fb923c', padding: '3px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700 }}>
-                        Pending Audit
-                      </span>
-                    </div>
-
-                    {/* Customer info */}
-                    <div style={{ background: '#101217', padding: 12, borderRadius: 8, marginBottom: 12 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                        <span style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>{b.customer_name || 'Player'}</span>
-                        <a
-                          href={`tel:${b.customer_phone}`}
-                          style={{ fontSize: 12, color: '#93c5fd', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}
-                        >
-                          <Phone size={11} /> {b.customer_phone}
-                        </a>
-                      </div>
-                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                        Submitted: {b.created_at ? new Date(b.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now'}
-                      </div>
-                    </div>
-
-                    {/* 12-Digit UTR Box with 1-click copy */}
-                    <div style={{ background: '#1a1d25', border: '1px dashed #3b82f6', borderRadius: 8, padding: '10px 12px', marginBottom: 16 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                return (
+                  <div
+                    key={slot.id}
+                    className="nexus-card"
+                    style={{
+                      padding: 16,
+                      background: isPartiallyFilled
+                        ? 'linear-gradient(180deg, #111a2e 0%, #0d1422 100%)'
+                        : isBooked
+                        ? 'linear-gradient(180deg, #121528 0%, #0d1120 100%)'
+                        : isBlocked
+                        ? '#090d16'
+                        : '#0d1422',
+                      border: isPartiallyFilled
+                        ? '1px solid rgba(245, 158, 11, 0.4)'
+                        : isBooked
+                        ? '1px solid rgba(99, 102, 241, 0.35)'
+                        : isBlocked
+                        ? '1px solid var(--border-card)'
+                        : '1px solid rgba(16, 185, 129, 0.25)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between',
+                      gap: 12,
+                      position: 'relative'
+                    }}
+                  >
+                    {/* Card Top: Time & Court Badges */}
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, marginBottom: 8 }}>
                         <div>
-                          <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 700, letterSpacing: '0.05em' }}>
-                            CUSTOMER SUBMITTED 12-DIGIT UTR / UPI REF
+                          <div style={{ fontSize: 16, fontWeight: 800, color: '#fff', letterSpacing: '-0.01em' }}>
+                            {slot.start_time} - {slot.end_time}
                           </div>
-                          <div style={{ fontSize: 16, fontWeight: 800, color: '#93c5fd', fontFamily: 'monospace', letterSpacing: '0.08em', marginTop: 2 }}>
-                            {b.upi_utr || 'Not provided'}
+                          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+                            {slot.court_name} · <span style={{ textTransform: 'capitalize' }}>{slot.sport_id}</span>
                           </div>
                         </div>
-                        {b.upi_utr && (
+
+                        {/* Price Badge with quick edit */}
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'flex-end' }}>
+                            <span style={{ fontSize: 16, fontWeight: 800, color: '#34d399' }}>
+                              ₹{slot.price}
+                            </span>
+                            <button
+                              onClick={() => {
+                                setEditingPriceSlot(slot);
+                                setNewPriceValue(slot.price);
+                              }}
+                              title="Set Slot Price"
+                              style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 2 }}
+                            >
+                              <Edit3 size={13} />
+                            </button>
+                          </div>
+                          <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>Set by Owner</div>
+                        </div>
+                      </div>
+
+                      {/* Status / Player Count Details */}
+                      {isPartiallyFilled ? (
+                        <div style={{ background: 'rgba(245, 158, 11, 0.08)', padding: 10, borderRadius: 8, border: '1px solid rgba(245, 158, 11, 0.25)' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                            <span className="badge-amber" style={{ fontSize: 11 }}>
+                              <Users size={12} /> {registeredCount} of {requiredCount} Players Joined
+                            </span>
+                            <span style={{ fontSize: 11, color: '#f59e0b', fontWeight: 700 }}>
+                              {spotsRemaining} spots left
+                            </span>
+                          </div>
+
+                          {/* Visual Progress Bar */}
+                          <div style={{ background: '#1e293b', borderRadius: 999, height: 6, overflow: 'hidden', marginBottom: 6 }}>
+                            <div
+                              style={{
+                                width: `${Math.min(100, (registeredCount / requiredCount) * 100)}%`,
+                                height: '100%',
+                                background: 'linear-gradient(90deg, #f59e0b, #fbbf24)',
+                                borderRadius: 999
+                              }}
+                            />
+                          </div>
+
+                          <div style={{ fontSize: 11.5, color: '#cbd5e1' }}>
+                            {slot.game.title || 'Pickup Match'} · Paid ₹{registeredCount * (slot.game.cost_per_player || 250)}
+                          </div>
+
+                          {/* Joined player badges */}
+                          {slot.game.participants && slot.game.participants.length > 0 && (
+                            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6 }}>
+                              {slot.game.participants.map((p, idx) => (
+                                <span key={idx} style={{ background: '#1e293b', color: '#cbd5e1', fontSize: 10, padding: '2px 6px', borderRadius: 4 }}>
+                                  {p.name.split(' ')[0]}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ) : isBooked ? (
+                        <div style={{ background: 'rgba(99, 102, 241, 0.08)', padding: 10, borderRadius: 8, border: '1px solid rgba(99, 102, 241, 0.25)' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                            <span className="badge-indigo" style={{ fontSize: 11 }}>
+                              <CheckCircle size={11} /> {slot.booking?.source === 'full_time_inquiry' ? 'Full Turf Inquiry' : 'Confirmed Booking'}
+                            </span>
+                          </div>
+                          <div style={{ fontWeight: 700, color: '#fff', fontSize: 13 }}>
+                            {slot.full_inquiry_client || slot.booking?.customer_name || 'Booked Client'}
+                          </div>
+                          <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
+                            {slot.full_inquiry_phone || slot.booking?.customer_phone || ''}
+                          </div>
+                        </div>
+                      ) : isBlocked ? (
+                        <div style={{ background: 'rgba(100, 116, 139, 0.08)', padding: 10, borderRadius: 8, border: '1px solid rgba(100, 116, 139, 0.2)' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span className="badge-slate" style={{ fontSize: 11 }}>
+                              <Lock size={11} /> Slot Blocked
+                            </span>
+                          </div>
+                          <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 4 }}>
+                            {slot.block_reason || 'Maintenance inspection'}
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ background: 'rgba(16, 185, 129, 0.05)', padding: 10, borderRadius: 8, border: '1px solid rgba(16, 185, 129, 0.15)' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span className="badge-emerald" style={{ fontSize: 11 }}>
+                              <Check size={11} /> Open for Booking
+                            </span>
+                          </div>
+                          <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 4 }}>
+                            Ready for individual registration or full arena reservation.
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Card Actions: Full Time Inquiry & Slot Operations */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, paddingTop: 4 }}>
+                      {/* USER DIRECT REQUIREMENT: FULL TIME INQUIRY ACCEPTANCE */}
+                      {isPartiallyFilled && (
+                        <button
+                          onClick={() => handleOpenInquiryModal(slot)}
+                          style={{
+                            background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                            color: '#ffffff',
+                            border: 'none',
+                            borderRadius: 8,
+                            padding: '10px 14px',
+                            fontSize: 12.5,
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: 6,
+                            boxShadow: '0 4px 12px rgba(99, 102, 241, 0.35)',
+                            minHeight: 42
+                          }}
+                        >
+                          <Sparkles size={14} /> Accept Full-Time Inquiry
+                        </button>
+                      )}
+
+                      {!isBooked && !isPartiallyFilled && !isBlocked && (
+                        <div style={{ display: 'flex', gap: 6 }}>
                           <button
-                            onClick={() => {
-                              navigator.clipboard.writeText(b.upi_utr);
-                              setCopiedUtrId(b.id);
-                              setTimeout(() => setCopiedUtrId(null), 2000);
-                            }}
+                            onClick={() => handleOpenInquiryModal(slot)}
                             style={{
-                              background: copiedUtrId === b.id ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255, 255, 255, 0.1)',
+                              flex: 1,
+                              background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                              color: '#fff',
                               border: 'none',
-                              color: copiedUtrId === b.id ? 'var(--accent-neon)' : '#fff',
                               borderRadius: 6,
-                              padding: '5px 9px',
-                              fontSize: 11,
+                              padding: '7px 10px',
+                              fontSize: 11.5,
+                              fontWeight: 700,
                               cursor: 'pointer',
                               display: 'flex',
                               alignItems: 'center',
+                              justifyContent: 'center',
                               gap: 4
                             }}
                           >
-                            {copiedUtrId === b.id ? <Check size={12} /> : <Copy size={12} />}
-                            {copiedUtrId === b.id ? 'Copied' : 'Copy UTR'}
+                            <Sparkles size={12} /> Full Inquiry
                           </button>
-                        )}
-                      </div>
-                    </div>
 
-                    {/* Action buttons */}
-                    <div style={{ display: 'flex', gap: 10 }}>
-                      <button
-                        onClick={() => handleVerifyUpi(b.id)}
-                        className="btn-primary"
-                        style={{ flex: 2, fontSize: 12.5, padding: '10px 12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
-                      >
-                        <CheckCircle size={15} /> Verify & Credit
-                      </button>
-                      <button
-                        onClick={() => handleRejectUpi(b.id)}
-                        style={{
-                          flex: 1,
-                          background: 'rgba(239, 68, 68, 0.12)',
-                          border: '1px solid rgba(239, 68, 68, 0.3)',
-                          color: '#f87171',
-                          borderRadius: 8,
-                          fontSize: 12,
-                          fontWeight: 600,
-                          cursor: 'pointer'
-                        }}
-                      >
-                        Reject
-                      </button>
+                          <button
+                            onClick={() => {
+                              setWalkInCourtId(slot.court_id);
+                              setWalkInDate(slot.date);
+                              setWalkInStartTime(slot.start_time);
+                              setWalkInAmount(slot.price);
+                              setShowWalkInModal(true);
+                            }}
+                            className="btn-secondary"
+                            style={{ flex: 1, fontSize: 11.5, padding: '7px 10px', justifyContent: 'center' }}
+                          >
+                            Walk-in
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              setBlockCourtId(slot.court_id);
+                              setBlockDate(slot.date);
+                              setBlockStartTime(slot.start_time);
+                              setShowBlockModal(true);
+                            }}
+                            style={{ background: '#1e293b', border: '1px solid var(--border-card)', color: '#94a3b8', borderRadius: 6, padding: '7px 10px', fontSize: 11.5, cursor: 'pointer' }}
+                          >
+                            Block
+                          </button>
+                        </div>
+                      )}
+
+                      {isBlocked && (
+                        <button
+                          onClick={async () => {
+                            await api.unblockSlot({ courtId: slot.court_id, date: slot.date, startTime: slot.start_time });
+                            if (selectedVenue) loadLiveSlots(selectedVenue.id, calendarDate);
+                          }}
+                          className="btn-secondary"
+                          style={{ fontSize: 12, padding: '7px 12px', justifyContent: 'center', width: '100%' }}
+                        >
+                          Unblock Slot
+                        </button>
+                      )}
                     </div>
                   </div>
-                ))}
+                );
+              })}
+            </div>
+          ) : (
+            /* ========================================================================= */
+            /* DESKTOP TABLE VIEW WITH SMOOTH TOUCH SCROLLING                             */
+            /* ========================================================================= */
+            <div className="nexus-card" style={{ overflow: 'hidden' }}>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ background: '#0b111e', borderBottom: '1px solid var(--border-card)', color: 'var(--text-muted)', fontSize: 11.5 }}>
+                      <th style={{ padding: '12px 16px', fontWeight: 600 }}>TIME & COURT</th>
+                      <th style={{ padding: '12px 16px', fontWeight: 600 }}>STATUS</th>
+                      <th style={{ padding: '12px 16px', fontWeight: 600 }}>PLAYER / CLIENT DETAILS</th>
+                      <th style={{ padding: '12px 16px', fontWeight: 600 }}>OWNER PRICE</th>
+                      <th style={{ padding: '12px 16px', fontWeight: 600, textAlign: 'right' }}>ACTIONS</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {displaySlots.map(slot => {
+                      const hasGame = !!slot.game;
+                      const registeredCount = slot.game?.current_players || 0;
+                      const requiredCount = slot.game?.required_players || slot.court_capacity || 8;
+                      const isPartiallyFilled = hasGame && registeredCount > 0;
+                      const isBooked = slot.status === 'booked';
+                      const isBlocked = slot.status === 'blocked' || slot.status === 'maintenance';
+
+                      return (
+                        <tr
+                          key={slot.id}
+                          style={{
+                            borderBottom: '1px solid var(--border-card)',
+                            background: isPartiallyFilled ? 'rgba(245, 158, 11, 0.04)' : isBooked ? 'rgba(99, 102, 241, 0.04)' : 'transparent'
+                          }}
+                        >
+                          {/* Time & Court */}
+                          <td style={{ padding: '12px 16px' }}>
+                            <div style={{ fontWeight: 700, color: '#f8fafc' }}>
+                              {slot.start_time} - {slot.end_time}
+                            </div>
+                            <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
+                              {slot.court_name} · <span style={{ textTransform: 'capitalize' }}>{slot.sport_id}</span>
+                            </div>
+                          </td>
+
+                          {/* Status Badge */}
+                          <td style={{ padding: '12px 16px' }}>
+                            {isPartiallyFilled ? (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'flex-start' }}>
+                                <span className="badge-amber" style={{ fontSize: 11 }}>
+                                  <Users size={11} /> {registeredCount}/{requiredCount} Players Joined
+                                </span>
+                                <span style={{ fontSize: 10.5, color: '#f59e0b' }}>
+                                  Pickup Match Active
+                                </span>
+                              </div>
+                            ) : isBooked ? (
+                              <span className="badge-indigo" style={{ fontSize: 11 }}>
+                                Booked {slot.booking?.source === 'full_time_inquiry' ? '· Full Inquiry' : ''}
+                              </span>
+                            ) : isBlocked ? (
+                              <span className="badge-slate" style={{ fontSize: 11 }}>
+                                <Lock size={10} /> Blocked
+                              </span>
+                            ) : (
+                              <span className="badge-emerald" style={{ fontSize: 11 }}>
+                                Open for Booking
+                              </span>
+                            )}
+                          </td>
+
+                          {/* Player / Client Details */}
+                          <td style={{ padding: '12px 16px' }}>
+                            {isPartiallyFilled ? (
+                              <div>
+                                <div style={{ fontWeight: 700, color: '#f8fafc', fontSize: 12.5 }}>
+                                  {slot.game.title || 'Open Game'}
+                                </div>
+                                <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 2 }}>
+                                  {registeredCount} players paid ₹{slot.game.cost_per_player}/spot
+                                </div>
+                              </div>
+                            ) : isBooked ? (
+                              <div>
+                                <div style={{ fontWeight: 600, color: '#f8fafc' }}>
+                                  {slot.full_inquiry_client || slot.booking?.customer_name || 'Booked Customer'}
+                                </div>
+                                <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
+                                  {slot.full_inquiry_phone || slot.booking?.customer_phone || ''}
+                                </div>
+                              </div>
+                            ) : isBlocked ? (
+                              <div style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                                {slot.block_reason || 'Maintenance & ground inspection'}
+                              </div>
+                            ) : (
+                              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                                Open for direct reservations.
+                              </div>
+                            )}
+                          </td>
+
+                          {/* Owner Price */}
+                          <td style={{ padding: '12px 16px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <strong style={{ fontSize: 14, color: '#34d399' }}>
+                                ₹{slot.price}
+                              </strong>
+                              <button
+                                onClick={() => {
+                                  setEditingPriceSlot(slot);
+                                  setNewPriceValue(slot.price);
+                                }}
+                                title="Adjust Slot Price"
+                                style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 2 }}
+                              >
+                                <Edit3 size={12} />
+                              </button>
+                            </div>
+                            <div style={{ fontSize: 10.5, color: 'var(--text-muted)' }}>
+                              Set by Owner
+                            </div>
+                          </td>
+
+                          {/* Actions */}
+                          <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                            <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                              {isPartiallyFilled && (
+                                <button
+                                  onClick={() => handleOpenInquiryModal(slot)}
+                                  style={{
+                                    background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                                    color: '#ffffff',
+                                    border: 'none',
+                                    borderRadius: 6,
+                                    padding: '6px 12px',
+                                    fontSize: 11.5,
+                                    fontWeight: 700,
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: 5,
+                                    boxShadow: '0 2px 8px rgba(99, 102, 241, 0.3)'
+                                  }}
+                                >
+                                  <Sparkles size={12} /> Accept Full Inquiry
+                                </button>
+                              )}
+
+                              {!isBooked && !isPartiallyFilled && !isBlocked && (
+                                <>
+                                  <button
+                                    onClick={() => handleOpenInquiryModal(slot)}
+                                    style={{
+                                      background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                                      color: '#fff',
+                                      border: 'none',
+                                      borderRadius: 6,
+                                      padding: '5px 10px',
+                                      fontSize: 11,
+                                      fontWeight: 700,
+                                      cursor: 'pointer'
+                                    }}
+                                  >
+                                    Full Inquiry
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setWalkInCourtId(slot.court_id);
+                                      setWalkInDate(slot.date);
+                                      setWalkInStartTime(slot.start_time);
+                                      setWalkInAmount(slot.price);
+                                      setShowWalkInModal(true);
+                                    }}
+                                    className="btn-secondary"
+                                    style={{ fontSize: 11, padding: '4px 8px' }}
+                                  >
+                                    Walk-in
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setBlockCourtId(slot.court_id);
+                                      setBlockDate(slot.date);
+                                      setBlockStartTime(slot.start_time);
+                                      setShowBlockModal(true);
+                                    }}
+                                    style={{ background: '#1e293b', border: '1px solid var(--border-card)', color: '#94a3b8', borderRadius: 6, padding: '4px 8px', fontSize: 11, cursor: 'pointer' }}
+                                  >
+                                    Block
+                                  </button>
+                                </>
+                              )}
+
+                              {isBlocked && (
+                                <button
+                                  onClick={async () => {
+                                    await api.unblockSlot({ courtId: slot.court_id, date: slot.date, startTime: slot.start_time });
+                                    if (selectedVenue) loadLiveSlots(selectedVenue.id, calendarDate);
+                                  }}
+                                  className="btn-secondary"
+                                  style={{ fontSize: 11, padding: '4px 8px' }}
+                                >
+                                  Unblock
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB: BUSINESS SETUP (BUSINESS DETAILS, GSTIN, LOCATION, RULES, HOURS) */}
+      {/* ========================================================================= */}
+      {activeTab === 'business_setup' && (
+        <div className="animate-fade-in">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 14, marginBottom: 20 }}>
+            <div>
+              <h2 className="font-display" style={{ fontSize: 22, fontWeight: 800, color: '#fff', margin: 0 }}>
+                Venue & Business Configuration
+              </h2>
+              <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: '4px 0 0 0' }}>
+                Set up all your business registration, contact details, ground coordinates, and operational policies.
+              </p>
+            </div>
+            
+            {bizSuccessMsg && (
+              <div style={{ background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(16, 185, 129, 0.3)', color: '#34d399', padding: '8px 14px', borderRadius: 8, fontSize: 12.5, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <CheckCircle2 size={15} /> {bizSuccessMsg}
               </div>
             )}
           </div>
 
-          {/* Historical Verified UPI Bookings */}
-          <div>
-            <h3 style={{ fontSize: 16, fontWeight: 800, color: '#fff', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <ShieldCheck size={16} style={{ color: 'var(--accent-neon)' }} />
-              Recently Verified UPI Payments Audit Log
-            </h3>
-            <div className="nexus-card" style={{ overflow: 'hidden' }}>
+          <form onSubmit={handleSaveBusinessDetails}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 20 }}>
+              
+              {/* Card 1: Business Identity & Legal Details */}
+              <div className="nexus-card" style={{ padding: 22 }}>
+                <h3 style={{ fontSize: 15, fontWeight: 700, color: '#f8fafc', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Building size={16} style={{ color: '#10b981' }} />
+                  Business & Legal Registration
+                </h3>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
+                      VENUE / ARENA DISPLAY NAME *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      className="nexus-input"
+                      style={{ width: '100%' }}
+                      value={bizName}
+                      onChange={e => setBizName(e.target.value)}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
+                      ORGANIZATION / LEGAL ENTITY NAME *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      className="nexus-input"
+                      style={{ width: '100%' }}
+                      value={bizOrgName}
+                      onChange={e => setBizOrgName(e.target.value)}
+                    />
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
+                        GSTIN / TAX NUMBER
+                      </label>
+                      <input
+                        type="text"
+                        className="nexus-input"
+                        style={{ width: '100%' }}
+                        value={bizGstin}
+                        onChange={e => setBizGstin(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
+                        BUSINESS STRUCTURE
+                      </label>
+                      <select
+                        className="nexus-input"
+                        style={{ width: '100%' }}
+                        value={bizType}
+                        onChange={e => setBizType(e.target.value)}
+                      >
+                        <option value="Private Limited Company">Private Limited</option>
+                        <option value="Limited Liability Partnership (LLP)">LLP</option>
+                        <option value="Sole Proprietorship">Proprietorship</option>
+                        <option value="Partnership Firm">Partnership</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
+                        BUSINESS PHONE *
+                      </label>
+                      <input
+                        type="tel"
+                        required
+                        className="nexus-input"
+                        style={{ width: '100%' }}
+                        value={bizPhone}
+                        onChange={e => setBizPhone(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
+                        OFFICIAL EMAIL
+                      </label>
+                      <input
+                        type="email"
+                        className="nexus-input"
+                        style={{ width: '100%' }}
+                        value={bizEmail}
+                        onChange={e => setBizEmail(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Card 2: Physical Address & Geolocation Coordinates */}
+              <div className="nexus-card" style={{ padding: 22 }}>
+                <h3 style={{ fontSize: 15, fontWeight: 700, color: '#f8fafc', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <MapPin size={16} style={{ color: '#10b981' }} />
+                  Address & GPS Geolocation
+                </h3>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
+                      FULL STREET ADDRESS *
+                    </label>
+                    <textarea
+                      required
+                      rows={2}
+                      className="nexus-input"
+                      style={{ width: '100%', resize: 'none' }}
+                      value={bizAddress}
+                      onChange={e => setBizAddress(e.target.value)}
+                    />
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 10 }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
+                        CITY
+                      </label>
+                      <input
+                        type="text"
+                        className="nexus-input"
+                        style={{ width: '100%' }}
+                        value={bizCity}
+                        onChange={e => setBizCity(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
+                        PINCODE
+                      </label>
+                      <input
+                        type="text"
+                        className="nexus-input"
+                        style={{ width: '100%' }}
+                        value={bizPincode}
+                        onChange={e => setBizPincode(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
+                        LATITUDE (FOR NEARBY SEARCH)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.0001"
+                        className="nexus-input"
+                        style={{ width: '100%' }}
+                        value={bizLat}
+                        onChange={e => setBizLat(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
+                        LONGITUDE
+                      </label>
+                      <input
+                        type="number"
+                        step="0.0001"
+                        className="nexus-input"
+                        style={{ width: '100%' }}
+                        value={bizLng}
+                        onChange={e => setBizLng(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ fontSize: 11.5, color: 'var(--text-muted)', background: '#0b111e', padding: 8, borderRadius: 6 }}>
+                    Coordinates enable customer proximity calculation when nearby players search for turfs.
+                  </div>
+                </div>
+              </div>
+
+              {/* Card 3: Operating Hours & Direct UPI Details */}
+              <div className="nexus-card" style={{ padding: 22 }}>
+                <h3 style={{ fontSize: 15, fontWeight: 700, color: '#f8fafc', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Clock size={16} style={{ color: '#10b981' }} />
+                  Operating Hours & Direct UPI Settlement
+                </h3>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
+                        OPENING TIME
+                      </label>
+                      <input
+                        type="time"
+                        className="nexus-input"
+                        style={{ width: '100%' }}
+                        value={bizOpenTime}
+                        onChange={e => setBizOpenTime(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
+                        CLOSING TIME
+                      </label>
+                      <input
+                        type="time"
+                        className="nexus-input"
+                        style={{ width: '100%' }}
+                        value={bizCloseTime}
+                        onChange={e => setBizCloseTime(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
+                      REGISTERED OWNER UPI ID (0% COMMISSION) *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. yourturf@okaxis"
+                      className="nexus-input"
+                      style={{ width: '100%' }}
+                      value={bizUpiId}
+                      onChange={e => setBizUpiId(e.target.value)}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
+                      PAYEE DISPLAY NAME ON QR
+                    </label>
+                    <input
+                      type="text"
+                      className="nexus-input"
+                      style={{ width: '100%' }}
+                      value={bizUpiName}
+                      onChange={e => setBizUpiName(e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Card 4: Ground Rules & Cancellation Policy */}
+              <div className="nexus-card" style={{ padding: 22 }}>
+                <h3 style={{ fontSize: 15, fontWeight: 700, color: '#f8fafc', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <FileText size={16} style={{ color: '#10b981' }} />
+                  House Rules & Cancellation Policy
+                </h3>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
+                    GROUND POLICIES & FOOTWEAR REQUIREMENTS
+                  </label>
+                  <textarea
+                    rows={5}
+                    className="nexus-input"
+                    style={{ width: '100%', resize: 'vertical' }}
+                    value={bizRules}
+                    onChange={e => setBizRules(e.target.value)}
+                  />
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                    Shown to players during slot selection and in confirmation SMS / WhatsApp alerts.
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Bottom Save Action Bar */}
+            <div style={{ marginTop: 22, display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+              <button
+                type="submit"
+                disabled={savingBiz}
+                className="btn-primary"
+                style={{ padding: '10px 24px', fontSize: 13.5 }}
+              >
+                <Save size={15} />
+                {savingBiz ? 'Saving Details...' : 'Save All Business Details'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB: OVERVIEW & ANALYTICS */}
+      {/* ========================================================================= */}
+      {activeTab === 'dashboard' && (
+        <div className="animate-fade-in">
+          {/* Key Metrics */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginBottom: 24 }}>
+            <div className="nexus-card" style={{ padding: 20 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Total Revenue</div>
+              <div className="font-display" style={{ fontSize: 26, fontWeight: 800, color: '#f8fafc', marginTop: 6 }}>
+                ₹{analytics?.totalRevenue?.toLocaleString() || '48,500'}
+              </div>
+              <div style={{ fontSize: 11.5, color: '#34d399', marginTop: 4 }}>
+                100% Direct-to-bank settlement
+              </div>
+            </div>
+
+            <div className="nexus-card" style={{ padding: 20 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Slots Booked</div>
+              <div className="font-display" style={{ fontSize: 26, fontWeight: 800, color: '#f8fafc', marginTop: 6 }}>
+                {analytics?.totalBookings || bookings.length || '38'}
+              </div>
+              <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 4 }}>
+                Across all courts this month
+              </div>
+            </div>
+
+            <div className="nexus-card" style={{ padding: 20 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Repeat Customer Rate</div>
+              <div className="font-display" style={{ fontSize: 26, fontWeight: 800, color: '#34d399', marginTop: 6 }}>
+                64%
+              </div>
+              <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 4 }}>
+                High weekly player retention
+              </div>
+            </div>
+
+            <div className="nexus-card" style={{ padding: 20 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Gateway Fee Saved</div>
+              <div className="font-display" style={{ fontSize: 26, fontWeight: 800, color: '#f59e0b', marginTop: 6 }}>
+                ₹{Math.round((analytics?.totalRevenue || 48500) * 0.025).toLocaleString()}
+              </div>
+              <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 4 }}>
+                0% fees via Direct UPI
+              </div>
+            </div>
+          </div>
+
+          {/* Recent Bookings Table */}
+          <div className="nexus-card" style={{ overflow: 'hidden' }}>
+            <div style={{ padding: '14px 18px', background: '#0e1424', borderBottom: '1px solid var(--border-card)' }}>
+              <h3 style={{ fontSize: 15, fontWeight: 700, color: '#f8fafc', margin: 0 }}>
+                Recent Bookings & Slot Reservations
+              </h3>
+            </div>
+            <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 13 }}>
                 <thead>
-                  <tr style={{ background: '#12141a', borderBottom: '1px solid var(--border-card)', color: 'var(--text-muted)' }}>
-                    <th style={{ padding: '12px 16px', fontWeight: 600 }}>BOOKING / TIME</th>
-                    <th style={{ padding: '12px 16px', fontWeight: 600 }}>CUSTOMER</th>
-                    <th style={{ padding: '12px 16px', fontWeight: 600 }}>AMOUNT</th>
-                    <th style={{ padding: '12px 16px', fontWeight: 600 }}>VERIFIED UTR</th>
-                    <th style={{ padding: '12px 16px', fontWeight: 600 }}>VERIFIED AT</th>
-                    <th style={{ padding: '12px 16px', fontWeight: 600 }}>AUDIT STATUS</th>
+                  <tr style={{ background: '#0b111e', borderBottom: '1px solid var(--border-card)', color: 'var(--text-muted)', fontSize: 11.5 }}>
+                    <th style={{ padding: '12px 16px' }}>DATE / TIME</th>
+                    <th style={{ padding: '12px 16px' }}>COURT</th>
+                    <th style={{ padding: '12px 16px' }}>CUSTOMER</th>
+                    <th style={{ padding: '12px 16px' }}>AMOUNT</th>
+                    <th style={{ padding: '12px 16px' }}>STATUS</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {bookings.filter(b => b.payment_mode === 'upi' && b.payment_status === 'paid').length === 0 ? (
-                    <tr>
-                      <td colSpan={6} style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>
-                        No verified UPI transactions yet. Verified payments will be logged here.
+                  {bookings.slice(0, 10).map(b => (
+                    <tr key={b.id} style={{ borderBottom: '1px solid var(--border-card)' }}>
+                      <td style={{ padding: '12px 16px', fontWeight: 600, color: '#f8fafc' }}>
+                        {b.date} · {b.start_time} - {b.end_time}
+                      </td>
+                      <td style={{ padding: '12px 16px', color: 'var(--text-secondary)' }}>
+                        {b.court_name || 'Pro Turf'}
+                      </td>
+                      <td style={{ padding: '12px 16px' }}>
+                        <div style={{ fontWeight: 600, color: '#fff' }}>{b.customer_name || 'Guest'}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{b.customer_phone}</div>
+                      </td>
+                      <td style={{ padding: '12px 16px', fontWeight: 700, color: '#34d399' }}>
+                        ₹{b.total_amount}
+                      </td>
+                      <td style={{ padding: '12px 16px' }}>
+                        <span className={b.status === 'confirmed' ? 'badge-emerald' : 'badge-slate'} style={{ fontSize: 11 }}>
+                          {b.status} {b.payment_mode === 'upi' ? '· UPI' : ''}
+                        </span>
                       </td>
                     </tr>
-                  ) : (
-                    bookings.filter(b => b.payment_mode === 'upi' && b.payment_status === 'paid').slice(0, 10).map(b => (
-                      <tr key={b.id} style={{ borderBottom: '1px solid var(--border-card)' }}>
-                        <td style={{ padding: '12px 16px', color: '#fff', fontWeight: 600 }}>
-                          {b.court_name}
-                          <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 400 }}>{b.date} · {b.start_time} - {b.end_time}</div>
-                        </td>
-                        <td style={{ padding: '12px 16px' }}>
-                          <div style={{ color: '#fff', fontWeight: 600 }}>{b.customer_name || 'Player'}</div>
-                          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{b.customer_phone}</div>
-                        </td>
-                        <td style={{ padding: '12px 16px', fontWeight: 700, color: 'var(--accent-neon)' }}>
-                          ₹{b.total_amount}
-                        </td>
-                        <td style={{ padding: '12px 16px', fontFamily: 'monospace', color: '#93c5fd', fontSize: 12 }}>
-                          {b.upi_utr || 'Manual Verified'}
-                        </td>
-                        <td style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontSize: 11.5 }}>
-                          {b.upi_verified_at ? new Date(b.upi_verified_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : 'Earlier'}
-                        </td>
-                        <td style={{ padding: '12px 16px' }}>
-                          <span className="badge-neon" style={{ padding: '3px 8px', borderRadius: 999, fontSize: 10.5, fontWeight: 700 }}>
-                            CREDITED
-                          </span>
-                        </td>
-                      </tr>
-                    ))
-                  )}
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -806,216 +1641,116 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
         </div>
       )}
 
-      {/* TAB: OWNER UPI QR SETTINGS */}
-      {activeTab === 'upi_settings' && selectedVenue && (
+      {/* ========================================================================= */}
+      {/* TAB: UPI DIRECT AUDIT */}
+      {/* ========================================================================= */}
+      {activeTab === 'upi_verification' && (
         <div className="animate-fade-in">
-          <div style={{ marginBottom: 20 }}>
-            <h2 className="font-display" style={{ fontSize: 24, fontWeight: 800, color: '#fff' }}>
-              Owner Direct UPI & QR Configuration
-            </h2>
-            <p style={{ fontSize: 13.5, color: 'var(--text-secondary)' }}>
-              Set up your personal or business UPI ID. Players will scan this exact QR code and pay directly to your bank account with <strong>0% platform commission</strong>.
-            </p>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 24 }}>
-            {/* Settings Form */}
-            <div className="nexus-card" style={{ padding: 24 }}>
-              <h3 style={{ fontSize: 16, fontWeight: 700, color: '#fff', marginBottom: 16 }}>
-                UPI Bank Account Details
-              </h3>
-
-              {upiSuccessMsg && (
-                <div style={{ background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(16, 185, 129, 0.3)', color: 'var(--accent-neon)', padding: '10px 14px', borderRadius: 8, fontSize: 13, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <CheckCircle2 size={16} /> {upiSuccessMsg}
-                </div>
-              )}
-
-              <form onSubmit={handleSaveUpiSettings} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 6 }}>
-                    VENUE / OWNER UPI ID (VPA) *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. yourturf@okaxis, 9876543210@paytm"
-                    className="nexus-input"
-                    style={{ width: '100%', fontSize: 14 }}
-                    value={upiIdInput}
-                    onChange={e => setUpiIdInput(e.target.value)}
-                  />
-                  <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 4 }}>
-                    Supported: Google Pay, PhonePe, Paytm, BHIM, HDFC, ICICI, SBI VPAs.
-                  </div>
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 6 }}>
-                    PAYEE DISPLAY NAME (Business / Owner Name)
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Nexus Sports Koramangala Arena"
-                    className="nexus-input"
-                    style={{ width: '100%', fontSize: 14 }}
-                    value={upiNameInput}
-                    onChange={e => setUpiNameInput(e.target.value)}
-                  />
-                  <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 4 }}>
-                    Name shown on the customer's UPI payment screen.
-                  </div>
-                </div>
-
-                <div style={{ background: '#12141a', padding: 14, borderRadius: 10, border: '1px solid var(--border-card)', fontSize: 12.5 }}>
-                  <div style={{ fontWeight: 700, color: '#fff', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <ShieldCheck size={15} style={{ color: 'var(--accent-neon)' }} />
-                    Zero Gateway Commission Model
-                  </div>
-                  <ul style={{ margin: 0, paddingLeft: 18, color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    <li>100% of player payments land directly in your registered bank account.</li>
-                    <li>No payment gateway intermediary cuts 2-3% of your revenue.</li>
-                    <li>Instant settlements: no T+2 settlement waiting periods.</li>
-                  </ul>
-                </div>
-
-                <button
-                  type="submit"
-                  className="btn-primary"
-                  disabled={savingUpiSettings}
-                  style={{ width: '100%', padding: '12px', fontSize: 13.5 }}
-                >
-                  {savingUpiSettings ? 'Saving Settings...' : 'Save UPI Payment Settings'}
-                </button>
-              </form>
-            </div>
-
-            {/* Live QR Preview */}
-            <div className="nexus-card" style={{ padding: 24, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 12 }}>
-                Live Player Booking QR Preview
-              </div>
-
-              <div style={{ background: '#fff', padding: 16, borderRadius: 16, boxShadow: '0 8px 24px rgba(0,0,0,0.4)', marginBottom: 16 }}>
-                <img
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(`upi://pay?pa=${upiIdInput || 'koramangala.sports@okaxis'}&pn=${encodeURIComponent(upiNameInput || selectedVenue.name)}&cu=INR`)}`}
-                  alt="Live UPI QR Code"
-                  style={{ width: 190, height: 190, display: 'block' }}
-                />
-              </div>
-
-              <div style={{ fontSize: 16, fontWeight: 800, color: '#fff', marginBottom: 4 }}>
-                {upiNameInput || selectedVenue.name}
-              </div>
-              <div style={{ fontSize: 13, color: 'var(--accent-neon)', fontWeight: 700, marginBottom: 14 }}>
-                {upiIdInput || 'koramangala.sports@okaxis'}
-              </div>
-
-              <div style={{ fontSize: 12, color: 'var(--text-secondary)', background: '#12141a', padding: 12, borderRadius: 8, width: '100%', textAlign: 'left' }}>
-                <div style={{ fontWeight: 600, color: '#fff', marginBottom: 4 }}>
-                  How customers book:
-                </div>
-                1. Player selects court & time slot.<br />
-                2. Player scans this QR with GPay / PhonePe / Paytm.<br />
-                3. Player enters 12-digit UTR on checkout.<br />
-                4. You verify the UTR in your Verification tab to credit slot!
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* TAB 3: CUSTOMER CRM */}
-      {activeTab === 'crm' && (
-        <div>
-          <div style={{ marginBottom: 18 }}>
-            <h2 className="font-display" style={{ fontSize: 22, fontWeight: 800, color: '#fff', marginBottom: 4 }}>
-              Customer Relationship Management (CRM)
-            </h2>
-            <p style={{ fontSize: 14, color: 'var(--text-secondary)' }}>
-              Automatically compiled customer directory with spend histories, repeat booking ratios, and phone contacts.
-            </p>
-          </div>
-
-          <div className="nexus-card" style={{ overflow: 'hidden' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 13.5 }}>
-              <thead>
-                <tr style={{ background: '#12141a', borderBottom: '1px solid var(--border-card)', color: 'var(--text-muted)' }}>
-                  <th style={{ padding: '14px 18px', fontWeight: 600 }}>CUSTOMER NAME</th>
-                  <th style={{ padding: '14px 18px', fontWeight: 600 }}>PHONE NUMBER</th>
-                  <th style={{ padding: '14px 18px', fontWeight: 600 }}>BOOKINGS</th>
-                  <th style={{ padding: '14px 18px', fontWeight: 600 }}>LIFETIME SPEND</th>
-                  <th style={{ padding: '14px 18px', fontWeight: 600 }}>LAST VISIT</th>
-                </tr>
-              </thead>
-              <tbody>
-                {customers.map(c => (
-                  <tr key={c.id} style={{ borderBottom: '1px solid var(--border-card)' }}>
-                    <td style={{ padding: '14px 18px', fontWeight: 700, color: '#fff' }}>
-                      {c.name || 'Anonymous Customer'}
-                    </td>
-                    <td style={{ padding: '14px 18px', color: 'var(--text-secondary)' }}>
-                      {c.phone}
-                    </td>
-                    <td style={{ padding: '14px 18px', fontWeight: 600, color: '#e2e8f0' }}>
-                      {c.booking_count} times
-                    </td>
-                    <td style={{ padding: '14px 18px', fontWeight: 700, color: 'var(--accent-neon)' }}>
-                      ₹{c.total_spend.toLocaleString()}
-                    </td>
-                    <td style={{ padding: '14px 18px', color: 'var(--text-muted)', fontSize: 12 }}>
-                      {c.last_booking_date ? new Date(c.last_booking_date).toLocaleDateString() : 'N/A'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* TAB 4: COURT MANAGEMENT & PRICING */}
-      {activeTab === 'courts' && selectedVenue && (
-        <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
             <div>
-              <h2 className="font-display" style={{ fontSize: 22, fontWeight: 800, color: '#fff' }}>
-                Court & Tiered Pricing Configuration
+              <h2 className="font-display" style={{ fontSize: 22, fontWeight: 800, color: '#fff', margin: 0 }}>
+                Direct UPI Bank Settlement & UTR Audit Queue
               </h2>
-              <p style={{ fontSize: 13.5, color: 'var(--text-secondary)' }}>
-                Configure base pricing, peak hours surge, and weekend rates.
+              <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: '4px 0 0 0' }}>
+                Verify 12-digit bank UTR numbers for player reservations directly paid to your UPI ID (<strong>{selectedVenue?.upi_id}</strong>).
+              </p>
+            </div>
+          </div>
+
+          {pendingUpiBookings.length === 0 ? (
+            <div className="nexus-card" style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
+              <CheckCircle size={36} style={{ color: '#10b981', margin: '0 auto 10px' }} />
+              <div style={{ fontSize: 16, fontWeight: 700, color: '#f8fafc' }}>All Caught Up!</div>
+              <div style={{ fontSize: 13, marginTop: 4 }}>No pending UPI payments awaiting verification.</div>
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 16 }}>
+              {pendingUpiBookings.map(b => (
+                <div key={b.id} className="nexus-card" style={{ padding: 18, borderLeft: '3px solid #f59e0b' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div>
+                      <div style={{ fontWeight: 700, color: '#f8fafc' }}>{b.customer_name || 'Player'}</div>
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{b.customer_phone}</div>
+                    </div>
+                    <div style={{ fontSize: 16, fontWeight: 800, color: '#34d399' }}>
+                      ₹{b.total_amount}
+                    </div>
+                  </div>
+
+                  <div style={{ background: '#0b111e', padding: '8px 10px', borderRadius: 6, margin: '12px 0', fontSize: 12 }}>
+                    <div>Slot: <strong>{b.date} · {b.start_time} - {b.end_time}</strong></div>
+                    <div>Court: <strong>{b.court_name}</strong></div>
+                    <div style={{ color: '#93c5fd', fontFamily: 'monospace', marginTop: 2 }}>
+                      UTR: {b.upi_utr || 'Pending submission'}
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      onClick={() => handleVerifyUpi(b.id)}
+                      className="btn-primary"
+                      style={{ flex: 2, fontSize: 12, padding: '7px 10px' }}
+                    >
+                      <Check size={13} /> Verify & Credit
+                    </button>
+                    <button
+                      onClick={() => handleRejectUpi(b.id)}
+                      style={{ flex: 1, background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#f87171', borderRadius: 6, fontSize: 12, cursor: 'pointer' }}
+                    >
+                      Reject
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB: COURTS & TIERED PRICING */}
+      {/* ========================================================================= */}
+      {activeTab === 'courts' && selectedVenue && (
+        <div className="animate-fade-in">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+            <div>
+              <h2 className="font-display" style={{ fontSize: 22, fontWeight: 800, color: '#fff', margin: 0 }}>
+                Court Inventory & Hourly Rates
+              </h2>
+              <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: '4px 0 0 0' }}>
+                Configure base pricing, peak hours surge, and weekend rates set by owner.
               </p>
             </div>
             <button className="btn-primary" onClick={() => setShowCourtModal(true)}>
-              <Plus size={16} /> Add New Court
+              <Plus size={15} /> Add Court / Pitch
             </button>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 20 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 18 }}>
             {selectedVenue.courts?.map(c => (
-              <div key={c.id} className="nexus-card" style={{ padding: 22 }}>
-                <h3 style={{ fontSize: 18, fontWeight: 800, color: '#fff', marginBottom: 4 }}>{c.name}</h3>
-                <div style={{ fontSize: 13, color: 'var(--accent-neon)', textTransform: 'capitalize', fontWeight: 600, marginBottom: 16 }}>
-                  Sport: {c.sport_id} · Max Capacity: {c.capacity}
+              <div key={c.id} className="nexus-card" style={{ padding: 20 }}>
+                <h3 style={{ fontSize: 17, fontWeight: 800, color: '#f8fafc', margin: 0 }}>{c.name}</h3>
+                <div style={{ fontSize: 12, color: '#34d399', textTransform: 'capitalize', fontWeight: 600, marginTop: 2, marginBottom: 14 }}>
+                  Sport: {c.sport_id} · Capacity: {c.capacity} Players
                 </div>
 
-                <div style={{ background: '#12141a', padding: 14, borderRadius: 10, border: '1px solid var(--border-card)', marginBottom: 16 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 6 }}>
-                    <span style={{ color: 'var(--text-secondary)' }}>Base Hourly Price:</span>
+                <div style={{ background: '#0b111e', padding: 12, borderRadius: 8, border: '1px solid var(--border-card)', marginBottom: 14 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, marginBottom: 5 }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Base Hourly Rate:</span>
                     <strong style={{ color: '#fff' }}>₹{c.base_price}</strong>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 6 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, marginBottom: 5 }}>
                     <span style={{ color: 'var(--text-secondary)' }}>Peak Hours (18:00 - 22:00):</span>
-                    <strong style={{ color: '#fb923c' }}>₹{c.peak_price || c.base_price}</strong>
+                    <strong style={{ color: '#f59e0b' }}>₹{c.peak_price || c.base_price}</strong>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-                    <span style={{ color: 'var(--text-secondary)' }}>Weekend (Sat - Sun):</span>
-                    <strong style={{ color: 'var(--accent-neon)' }}>₹{c.weekend_price || c.base_price}</strong>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5 }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Weekend Rate:</span>
+                    <strong style={{ color: '#34d399' }}>₹{c.weekend_price || c.base_price}</strong>
                   </div>
                 </div>
 
-                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                  Slot Duration: {c.slot_duration_minutes} minutes
+                <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
+                  Slot Duration: {c.slot_duration_minutes} minutes per interval
                 </div>
               </div>
             ))}
@@ -1023,18 +1758,269 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
         </div>
       )}
 
-      {/* MODAL: Walk-in Booking */}
+      {/* ========================================================================= */}
+      {/* TAB: CUSTOMER CRM */}
+      {/* ========================================================================= */}
+      {activeTab === 'crm' && (
+        <div className="animate-fade-in">
+          <div style={{ marginBottom: 18 }}>
+            <h2 className="font-display" style={{ fontSize: 22, fontWeight: 800, color: '#fff', margin: 0 }}>
+              Customer Relationship Management (CRM)
+            </h2>
+            <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: '4px 0 0 0' }}>
+              Customer profiles, repeat bookings, contact phones, and lifetime spend history.
+            </p>
+          </div>
+
+          <div className="nexus-card" style={{ overflow: 'hidden' }}>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 13 }}>
+                <thead>
+                  <tr style={{ background: '#0b111e', borderBottom: '1px solid var(--border-card)', color: 'var(--text-muted)', fontSize: 11.5 }}>
+                    <th style={{ padding: '12px 16px' }}>NAME</th>
+                    <th style={{ padding: '12px 16px' }}>PHONE</th>
+                    <th style={{ padding: '12px 16px' }}>BOOKINGS</th>
+                    <th style={{ padding: '12px 16px' }}>LIFETIME SPEND</th>
+                    <th style={{ padding: '12px 16px' }}>LAST VISIT</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {customers.map(c => (
+                    <tr key={c.id} style={{ borderBottom: '1px solid var(--border-card)' }}>
+                      <td style={{ padding: '12px 16px', fontWeight: 600, color: '#f8fafc' }}>
+                        {c.name || 'Player'}
+                      </td>
+                      <td style={{ padding: '12px 16px', color: 'var(--text-secondary)' }}>
+                        {c.phone}
+                      </td>
+                      <td style={{ padding: '12px 16px', color: '#f8fafc' }}>
+                        {c.booking_count} bookings
+                      </td>
+                      <td style={{ padding: '12px 16px', fontWeight: 700, color: '#34d399' }}>
+                        ₹{c.total_spend?.toLocaleString()}
+                      </td>
+                      <td style={{ padding: '12px 16px', color: 'var(--text-muted)', fontSize: 12 }}>
+                        {c.last_booking_date ? new Date(c.last_booking_date).toLocaleDateString() : 'Recent'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: ACCEPT FULL-TIME INQUIRY (USER EXPLICIT REQUIREMENT) */}
+      {/* ========================================================================= */}
+      {showInquiryModal && inquirySlot && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 20 }}>
+          <div className="nexus-card animate-fade-in" style={{ maxWidth: 520, width: '100%', padding: 26, background: '#111726', border: '1px solid rgba(99, 102, 241, 0.4)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+              <div style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(99, 102, 241, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#818cf8' }}>
+                <Sparkles size={20} />
+              </div>
+              <div>
+                <h3 className="font-display" style={{ fontSize: 18, fontWeight: 800, color: '#f8fafc', margin: 0 }}>
+                  Accept Full-Time Inquiry
+                </h3>
+                <div style={{ fontSize: 12, color: '#a5b4fc' }}>
+                  Slot: {inquirySlot.date} · {inquirySlot.start_time} - {inquirySlot.end_time} ({inquirySlot.court_name})
+                </div>
+              </div>
+            </div>
+
+            {/* Explanatory summary of the 6/8 player conversion */}
+            <div style={{ background: 'rgba(245, 158, 11, 0.08)', border: '1px solid rgba(245, 158, 11, 0.25)', padding: 12, borderRadius: 8, fontSize: 12, color: '#fbbf24', marginBottom: 16 }}>
+              <strong>Automatic Player Credit & Slot Lock:</strong> This slot currently has{' '}
+              <strong>{inquirySlot.game?.current_players || 6} of {inquirySlot.game?.required_players || 8} players</strong> registered. Accepting this inquiry converts the slot into an exclusive full-turf reservation. The previously registered players will receive a notification and their fee will be credited back.
+            </div>
+
+            <form onSubmit={handleConfirmFullInquiry} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
+                  INQUIRING CLIENT / TEAM NAME *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Bangalore Corporate League / Tech FC"
+                  className="nexus-input"
+                  style={{ width: '100%' }}
+                  value={inquiryClientName}
+                  onChange={e => setInquiryClientName(e.target.value)}
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 10 }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
+                    CLIENT PHONE NUMBER *
+                  </label>
+                  <input
+                    type="tel"
+                    required
+                    placeholder="+91 98800 12345"
+                    className="nexus-input"
+                    style={{ width: '100%' }}
+                    value={inquiryClientPhone}
+                    onChange={e => setInquiryClientPhone(e.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
+                    FULL TURF PRICE (₹) *
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    className="nexus-input"
+                    style={{ width: '100%' }}
+                    value={inquiryAmount}
+                    onChange={e => setInquiryAmount(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
+                  PAYMENT COLLECTION
+                </label>
+                <select
+                  value={inquiryPaymentMode}
+                  onChange={e => setInquiryPaymentMode(e.target.value)}
+                  className="nexus-input"
+                  style={{ width: '100%' }}
+                >
+                  <option value="cash">Cash Collected at Reception</option>
+                  <option value="upi">Direct UPI (Paid to Owner UPI)</option>
+                  <option value="pay_at_venue">Pay at Venue upon Arrival</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
+                  BOOKING NOTES
+                </label>
+                <input
+                  type="text"
+                  className="nexus-input"
+                  style={{ width: '100%' }}
+                  value={inquiryNotes}
+                  onChange={e => setInquiryNotes(e.target.value)}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  style={{ flex: 1 }}
+                  onClick={() => setShowInquiryModal(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingInquiry}
+                  style={{
+                    flex: 1.6,
+                    background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                    color: '#fff',
+                    fontWeight: 700,
+                    borderRadius: 8,
+                    border: 'none',
+                    padding: '10px 16px',
+                    cursor: 'pointer',
+                    fontSize: 13
+                  }}
+                >
+                  {submittingInquiry ? 'Confirming...' : 'Accept & Book Full Turf'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: EDIT SLOT PRICE */}
+      {editingPriceSlot && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 20 }}>
+          <div className="nexus-card animate-fade-in" style={{ maxWidth: 380, width: '100%', padding: 22, background: '#111726' }}>
+            <h3 style={{ fontSize: 16, fontWeight: 700, color: '#f8fafc', marginBottom: 4 }}>
+              Set Slot Price
+            </h3>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 14 }}>
+              {editingPriceSlot.court_name} · {editingPriceSlot.start_time} - {editingPriceSlot.end_time}
+            </div>
+
+            <form onSubmit={handleSavePrice} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
+                  SLOT PRICE (₹)
+                </label>
+                <input
+                  type="number"
+                  required
+                  className="nexus-input"
+                  style={{ width: '100%' }}
+                  value={newPriceValue}
+                  onChange={e => setNewPriceValue(e.target.value)}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+                <button type="button" className="btn-secondary" style={{ flex: 1 }} onClick={() => setEditingPriceSlot(null)}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn-primary" style={{ flex: 1 }}>
+                  Save Price
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: WALK-IN BOOKING */}
       {showWalkInModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 20 }}>
-          <div className="nexus-card animate-fade-in" style={{ maxWidth: 480, width: '100%', padding: 26, background: '#181b22' }}>
-            <h2 className="font-display" style={{ fontSize: 22, fontWeight: 800, color: '#fff', marginBottom: 6 }}>
-              Create Walk-in Booking
-            </h2>
-            <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 18 }}>
-              Quickly record reception desk walk-ins and collect cash.
+          <div className="nexus-card animate-fade-in" style={{ maxWidth: 460, width: '100%', padding: 24, background: '#111726' }}>
+            <h3 style={{ fontSize: 18, fontWeight: 800, color: '#f8fafc', marginBottom: 6 }}>
+              New Walk-in Booking
+            </h3>
+            <p style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginBottom: 16 }}>
+              Instantly reserve a slot for a guest present at the turf counter.
             </p>
 
             <form onSubmit={handleWalkInSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>DATE</label>
+                  <input
+                    type="date"
+                    required
+                    className="nexus-input"
+                    style={{ width: '100%' }}
+                    value={walkInDate}
+                    onChange={e => setWalkInDate(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>START TIME</label>
+                  <input
+                    type="time"
+                    required
+                    className="nexus-input"
+                    style={{ width: '100%' }}
+                    value={walkInStartTime}
+                    onChange={e => setWalkInStartTime(e.target.value)}
+                  />
+                </div>
+              </div>
+
               <div>
                 <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>CUSTOMER PHONE *</label>
                 <input
@@ -1052,7 +2038,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                 <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>CUSTOMER NAME</label>
                 <input
                   type="text"
-                  placeholder="Player Name"
+                  placeholder="Player / Guest Name"
                   className="nexus-input"
                   style={{ width: '100%' }}
                   value={walkInCustomerName}
@@ -1062,32 +2048,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>DATE *</label>
-                  <input
-                    type="date"
-                    required
-                    className="nexus-input"
-                    style={{ width: '100%' }}
-                    value={walkInDate}
-                    onChange={e => setWalkInDate(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>START TIME *</label>
-                  <input
-                    type="time"
-                    required
-                    className="nexus-input"
-                    style={{ width: '100%' }}
-                    value={walkInStartTime}
-                    onChange={e => setWalkInStartTime(e.target.value)}
-                  />
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>AMOUNT (₹) *</label>
+                  <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>AMOUNT (₹)</label>
                   <input
                     type="number"
                     required
@@ -1124,20 +2085,20 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
         </div>
       )}
 
-      {/* MODAL: Block Slot for Maintenance */}
+      {/* MODAL: BLOCK SLOT */}
       {showBlockModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 20 }}>
-          <div className="nexus-card animate-fade-in" style={{ maxWidth: 460, width: '100%', padding: 26, background: '#181b22' }}>
-            <h2 className="font-display" style={{ fontSize: 22, fontWeight: 800, color: '#fff', marginBottom: 6 }}>
-              Block Slot / Blackout
-            </h2>
-            <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 18 }}>
-              Take slot off the public booking schedule for maintenance, tournament booking, or holidays.
+          <div className="nexus-card animate-fade-in" style={{ maxWidth: 440, width: '100%', padding: 24, background: '#111726' }}>
+            <h3 style={{ fontSize: 18, fontWeight: 800, color: '#f8fafc', marginBottom: 6 }}>
+              Block Slot for Maintenance
+            </h3>
+            <p style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginBottom: 16 }}>
+              Take slot off the public calendar for grass repair, lighting maintenance, or private events.
             </p>
 
             <form onSubmit={handleBlockSlotSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div>
-                <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>REASON *</label>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>REASON</label>
                 <input
                   type="text"
                   required
@@ -1151,7 +2112,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>DATE *</label>
+                  <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>DATE</label>
                   <input
                     type="date"
                     required
@@ -1162,7 +2123,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                   />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>START TIME *</label>
+                  <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>START TIME</label>
                   <input
                     type="time"
                     required
@@ -1178,7 +2139,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                 <button type="button" className="btn-secondary" style={{ flex: 1 }} onClick={() => setShowBlockModal(false)}>
                   Cancel
                 </button>
-                <button type="submit" className="btn-primary" style={{ flex: 1.5, background: '#fb923c', color: '#000' }}>
+                <button type="submit" className="btn-primary" style={{ flex: 1.5, background: '#f59e0b', color: '#000' }}>
                   Block Slot
                 </button>
               </div>
@@ -1187,15 +2148,36 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
         </div>
       )}
 
-      {/* MODAL: Add Court */}
+      {/* MODAL: ADD COURT */}
       {showCourtModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 20 }}>
-          <div className="nexus-card animate-fade-in" style={{ maxWidth: 480, width: '100%', padding: 26, background: '#181b22' }}>
-            <h2 className="font-display" style={{ fontSize: 22, fontWeight: 800, color: '#fff', marginBottom: 6 }}>
+          <div className="nexus-card animate-fade-in" style={{ maxWidth: 460, width: '100%', padding: 24, background: '#111726' }}>
+            <h3 style={{ fontSize: 18, fontWeight: 800, color: '#f8fafc', marginBottom: 6 }}>
               Add Court / Pitch
-            </h2>
+            </h3>
 
-            <form onSubmit={handleAddCourtSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <form
+              onSubmit={async e => {
+                e.preventDefault();
+                try {
+                  await api.createCourt({
+                    venueId: selectedVenue.id,
+                    name: newCourtName,
+                    sportId: newCourtSportId,
+                    capacity: Number(newCourtCapacity),
+                    basePrice: Number(newCourtBasePrice),
+                    peakPrice: Number(newCourtPeakPrice),
+                    weekendPrice: Number(newCourtWeekendPrice)
+                  });
+                  setShowCourtModal(false);
+                  loadData(selectedVenue.id);
+                  alert('Court created successfully.');
+                } catch (err) {
+                  alert('Failed to create court: ' + err.message);
+                }
+              }}
+              style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
+            >
               <div>
                 <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>COURT NAME *</label>
                 <input
@@ -1211,7 +2193,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>SPORT *</label>
+                  <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>SPORT</label>
                   <select
                     value={newCourtSportId}
                     onChange={e => setNewCourtSportId(e.target.value)}
@@ -1283,6 +2265,36 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: TURF QR CODE */}
+      {showQrModal && selectedVenue && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 20 }}>
+          <div className="nexus-card animate-fade-in" style={{ maxWidth: 360, width: '100%', padding: 26, background: '#111726', textAlign: 'center' }}>
+            <h3 style={{ fontSize: 18, fontWeight: 800, color: '#f8fafc', marginBottom: 4 }}>
+              {selectedVenue.name}
+            </h3>
+            <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 18 }}>
+              Scan to open the unique public booking page for this turf
+            </div>
+
+            <div style={{ background: '#fff', padding: 14, borderRadius: 12, display: 'inline-block', marginBottom: 16 }}>
+              <img
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(uniqueTurfUrl)}`}
+                alt="Turf QR Code"
+                style={{ width: 180, height: 180, display: 'block' }}
+              />
+            </div>
+
+            <div style={{ fontSize: 11.5, color: '#93c5fd', fontFamily: 'monospace', wordBreak: 'break-all', marginBottom: 16 }}>
+              {uniqueTurfUrl}
+            </div>
+
+            <button className="btn-secondary" style={{ width: '100%' }} onClick={() => setShowQrModal(false)}>
+              Close QR
+            </button>
           </div>
         </div>
       )}

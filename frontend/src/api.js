@@ -169,13 +169,50 @@ export const api = {
     return res.json();
   },
 
+  async getOwnerVenueDetails(venueId) {
+    const res = await fetch(`${API_BASE}/owner/venues/${venueId}`);
+    if (!res.ok) throw new Error('Failed to fetch venue details');
+    return res.json();
+  },
+
   async updateVenueProfile(venueId, data) {
     const res = await fetch(`${API_BASE}/owner/venues/${venueId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error || 'Failed to update venue profile');
+    return body;
+  },
+
+  async getOwnerLiveSlots(venueId, date) {
+    const q = new URLSearchParams({ venueId, date: date || '' }).toString();
+    const res = await fetch(`${API_BASE}/owner/live-slots?${q}`);
+    if (!res.ok) throw new Error('Failed to fetch live slots');
     return res.json();
+  },
+
+  async convertSlotToFullInquiry(slotId, data) {
+    const res = await fetch(`${API_BASE}/owner/slots/${slotId}/convert-full-inquiry`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error || 'Failed to convert slot to full inquiry');
+    return body;
+  },
+
+  async updateSlotPrice(slotId, price) {
+    const res = await fetch(`${API_BASE}/owner/slots/${slotId}/price`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ price })
+    });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error || 'Failed to update slot price');
+    return body;
   },
 
   // Owner Direct UPI Verification & Credit Audit

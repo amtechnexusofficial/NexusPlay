@@ -2,16 +2,38 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../api.js';
 import {
   Search, MapPin, Calendar, Clock, Star,
-  Shield, Compass, Sparkles, Filter, ChevronRight
+  Shield, Compass, Sparkles, Filter, ChevronRight,
+  Navigation, Check, Copy, Share2, Users, Flame, ArrowUpDown
 } from 'lucide-react';
+
+// Haversine distance calculation in kilometers
+function calculateDistanceKm(lat1, lon1, lat2, lon2) {
+  if (!lat1 || !lon1 || !lat2 || !lon2) return null;
+  const R = 6371; // Earth's radius in km
+  const dLat = (lat2 - lat1) * (Math.PI / 180);
+  const dLon = (lon2 - lon1) * (Math.PI / 180);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return Math.round(R * c * 10) / 10;
+}
 
 export default function PlayerMarketplace({ onSelectVenue }) {
   const [venues, setVenues] = useState([]);
   const [sports, setSports] = useState([]);
   const [selectedSport, setSelectedSport] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [maxPrice, setMaxPrice] = useState(2500);
   const [loading, setLoading] = useState(true);
+
+  // Geolocation state
+  const [userCoords, setUserCoords] = useState(null);
+  const [locatingUser, setLocatingUser] = useState(false);
+  const [locationStatusText, setLocationStatusText] = useState('Allow location to sort turfs by distance to you');
+  const [locationPermissionGranted, setLocationPermissionGranted] = useState(false);
+  const [sortBy, setSortBy] = useState('distance'); // 'distance', 'price_asc', 'slots_desc', 'rating'
+  const [copiedSlug, setCopiedSlug] = useState(null);
 
   useEffect(() => {
     async function load() {
@@ -32,79 +54,243 @@ export default function PlayerMarketplace({ onSelectVenue }) {
     load();
   }, []);
 
-  const filteredVenues = venues.filter(v => {
+  function handleRequestLocation() {
+    if (!navigator.geolocation) {
+      setLocationStatusText('Geolocation is not supported by your browser. You can use Bangalore presets below.');
+      return;
+    }
+    setLocatingUser(true);
+    setLocationStatusText('Acquiring your GPS position...');
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setUserCoords({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude
+        });
+        setLocationPermissionGranted(true);
+        setLocatingUser(false);
+        setLocationStatusText(`Location active! Showing nearest turfs to you.`);
+        setSortBy('distance');
+      },
+      (err) => {
+        setLocatingUser(false);
+        console.warn('Geolocation denied or error:', err.message);
+        setLocationStatusText('Location access was denied or timed out. Click any quick area preset below.');
+      },
+      { timeout: 10000, enableHighAccuracy: true }
+    );
+  }
+
+  function handlePresetLocation(area) {
+    if (area === 'koramangala') {
+      setUserCoords({ lat: 12.9352, lng: 77.6245 });
+      setLocationPermissionGranted(true);
+      setLocationStatusText('Using Koramangala GPS reference point (12.9352° N, 77.6245° E)');
+    } else if (area === 'indiranagar') {
+      setUserCoords({ lat: 12.9784, lng: 77.6408 });
+      setLocationPermissionGranted(true);
+      setLocationStatusText('Using Indiranagar GPS reference point (12.9784° N, 77.6408° E)');
+    } else if (area === 'hsr') {
+      setUserCoords({ lat: 12.9116, lng: 77.6534 });
+      setLocationPermissionGranted(true);
+      setLocationStatusText('Using HSR Layout GPS reference point (12.9116° N, 77.6534° E)');
+    } else {
+      setUserCoords(null);
+      setLocationPermissionGranted(false);
+      setLocationStatusText('Showing all turfs across Bengaluru');
+    }
+  }
+
+  function handleCopyUniqueLink(e, venue) {
+    e.stopPropagation();
+    const url = `${window.location.origin}/?venue=${venue.slug || venue.id}`;
+    navigator.clipboard.writeText(url);
+    setCopiedSlug(venue.slug || venue.id);
+    setTimeout(() => setCopiedSlug(null), 2500);
+  }
+
+  // Filter & calculate distances
+  const enrichedVenues = venues.map(v => {
+    let distance = null;
+    if (userCoords && v.lat && v.lng) {
+      distance = calculateDistanceKm(userCoords.lat, userCoords.lng, v.lat, v.lng);
+    }
+    return {
+      ...v,
+      distanceKm: distance
+    };
+  });
+
+  const filteredVenues = enrichedVenues.filter(v => {
     const matchesSport = selectedSport === 'all' || v.sport_ids?.includes(selectedSport);
     const matchesSearch = !searchQuery ||
       v.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       v.address.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      v.city.toLowerCase().includes(searchQuery.toLowerCase());
+      (v.city && v.city.toLowerCase().includes(searchQuery.toLowerCase()));
     return matchesSport && matchesSearch;
   });
 
-  return (
-    <div className="animate-fade-in" style={{ maxWidth: 1120, margin: '0 auto', padding: '16px 20px 80px' }}>
-      {/* Search Hero Banner */}
-      <div className="nexus-card" style={{ padding: '36px 32px', marginBottom: 28, background: 'linear-gradient(135deg, #10141d 0%, #17212f 100%)', position: 'relative', overflow: 'hidden' }}>
-        <div style={{ position: 'relative', zIndex: 2, maxWidth: 680 }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(16, 185, 129, 0.15)', color: 'var(--accent-neon)', padding: '5px 12px', borderRadius: 999, fontSize: 12, fontWeight: 700, marginBottom: 12 }}>
-            <Sparkles size={14} /> Direct Venue Reservation & Open Pickups
-          </div>
-          <h1 className="font-display" style={{ fontSize: 36, fontWeight: 800, color: '#fff', lineHeight: 1.15, marginBottom: 10 }}>
-            Find and Book Premium Sports Arenas
-          </h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: 15, lineHeight: 1.5, marginBottom: 24 }}>
-            Zero convenience fees. Direct payments to turf owners. Guaranteed slot locks with no double-booking race conditions.
-          </p>
+  // Sort venues
+  filteredVenues.sort((a, b) => {
+    if (sortBy === 'distance') {
+      if (a.distanceKm !== null && b.distanceKm !== null) return a.distanceKm - b.distanceKm;
+      if (a.distanceKm !== null) return -1;
+      if (b.distanceKm !== null) return 1;
+      return 0;
+    }
+    if (sortBy === 'price_asc') {
+      return (a.min_price || 0) - (b.min_price || 0);
+    }
+    if (sortBy === 'slots_desc') {
+      return (b.today_available_slots_count || 0) - (a.today_available_slots_count || 0);
+    }
+    if (sortBy === 'rating') {
+      return (b.rating || 0) - (a.rating || 0);
+    }
+    return 0;
+  });
 
-          {/* Search Bar */}
-          <div style={{ display: 'flex', gap: 10, background: '#0e1117', padding: 8, borderRadius: 12, border: '1px solid var(--border-card)', maxWidth: 600 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, paddingLeft: 8 }}>
-              <Search size={18} style={{ color: 'var(--text-muted)' }} />
-              <input
-                type="text"
-                placeholder="Search venue name, area (e.g. Koramangala, Indiranagar)..."
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                style={{ background: 'transparent', border: 'none', color: '#fff', outline: 'none', width: '100%', fontSize: 14 }}
-              />
+  return (
+    <div className="animate-fade-in" style={{ maxWidth: 1200, margin: '0 auto', padding: '16px 20px 80px' }}>
+      
+      {/* Search & Location Hero Header */}
+      <div
+        className="nexus-card"
+        style={{
+          padding: '28px 28px',
+          marginBottom: 24,
+          background: 'linear-gradient(180deg, #111827 0%, #0d131f 100%)',
+          border: '1px solid var(--border-card)'
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 16, marginBottom: 20 }}>
+          <div>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#34d399', fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
+              <Sparkles size={14} /> LIVE TURF DISCOVERY & LOCAL SLOTS
             </div>
-            <button className="btn-primary" style={{ padding: '8px 20px' }}>
-              Explore
+            <h1 className="font-display" style={{ fontSize: 30, fontWeight: 800, color: '#f8fafc', lineHeight: 1.2, margin: 0 }}>
+              Find Sports Arenas Near You
+            </h1>
+            <p style={{ color: 'var(--text-secondary)', fontSize: 14, marginTop: 4, marginBottom: 0 }}>
+              Allow location to calculate real-time distance, view live slot availability, registered player counts, and prices set by owners.
+            </p>
+          </div>
+
+          {/* Location Request Button & Quick Presets */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-start' }}>
+            <button
+              onClick={handleRequestLocation}
+              disabled={locatingUser}
+              className={locationPermissionGranted ? "btn-secondary" : "btn-primary"}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '9px 18px',
+                fontSize: 13,
+                fontWeight: 700
+              }}
+            >
+              <Navigation size={15} style={{ transform: locatingUser ? 'rotate(45deg)' : 'none', transition: 'transform 0.3s' }} />
+              {locatingUser ? 'Finding Your Location...' : locationPermissionGranted ? '📍 Location Active (Auto-Sorted)' : 'Use My Current Location'}
             </button>
+            <div style={{ fontSize: 11.5, color: locationPermissionGranted ? '#34d399' : 'var(--text-muted)' }}>
+              {locationStatusText}
+            </div>
+          </div>
+        </div>
+
+        {/* Location Presets if browser geolocation unavailable */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', paddingTop: 14, borderTop: '1px solid var(--border-card)', fontSize: 12 }}>
+          <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>Quick Bangalore Locations:</span>
+          <button
+            onClick={() => handlePresetLocation('koramangala')}
+            style={{ background: '#1e293b', border: '1px solid var(--border-card)', color: '#cbd5e1', padding: '3px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer' }}
+          >
+            Koramangala
+          </button>
+          <button
+            onClick={() => handlePresetLocation('indiranagar')}
+            style={{ background: '#1e293b', border: '1px solid var(--border-card)', color: '#cbd5e1', padding: '3px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer' }}
+          >
+            Indiranagar
+          </button>
+          <button
+            onClick={() => handlePresetLocation('hsr')}
+            style={{ background: '#1e293b', border: '1px solid var(--border-card)', color: '#cbd5e1', padding: '3px 10px', borderRadius: 6, fontSize: 12, cursor: 'pointer' }}
+          >
+            HSR Layout
+          </button>
+          {locationPermissionGranted && (
+            <button
+              onClick={() => handlePresetLocation('reset')}
+              style={{ background: 'transparent', border: 'none', color: '#94a3b8', textDecoration: 'underline', fontSize: 11.5, cursor: 'pointer', marginLeft: 'auto' }}
+            >
+              Reset Location Filter
+            </button>
+          )}
+        </div>
+
+        {/* Search Bar & Sort Dropdown */}
+        <div className="mobile-stack" style={{ display: 'flex', gap: 12, marginTop: 18 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#0b111e', padding: '8px 14px', borderRadius: 8, border: '1px solid var(--border-card)', flex: 1 }}>
+            <Search size={16} style={{ color: 'var(--text-muted)' }} />
+            <input
+              type="text"
+              placeholder="Search by arena name, location (e.g. Koramangala, Indiranagar, HSR)..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              style={{ background: 'transparent', border: 'none', color: '#fff', outline: 'none', width: '100%', fontSize: 13.5 }}
+            />
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <ArrowUpDown size={15} style={{ color: 'var(--text-muted)' }} />
+            <select
+              value={sortBy}
+              onChange={e => setSortBy(e.target.value)}
+              className="nexus-input"
+              style={{ padding: '8px 12px', fontSize: 13, width: '100%' }}
+            >
+              <option value="distance">Sort: Nearest to Me</option>
+              <option value="slots_desc">Sort: Most Live Slots Today</option>
+              <option value="price_asc">Sort: Price (Lowest First)</option>
+              <option value="rating">Sort: Highest Rated</option>
+            </select>
           </div>
         </div>
       </div>
 
-      {/* Sport Category Pills */}
-      <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 10, marginBottom: 24 }}>
+      {/* Sport Category Filter Pills */}
+      <div className="scroll-pills" style={{ marginBottom: 20 }}>
         <button
           onClick={() => setSelectedSport('all')}
           style={{
-            background: selectedSport === 'all' ? 'var(--accent-neon)' : 'var(--bg-card)',
-            color: selectedSport === 'all' ? '#042f1f' : '#fff',
-            border: `1px solid ${selectedSport === 'all' ? 'var(--accent-neon)' : 'var(--border-card)'}`,
-            padding: '8px 18px',
-            borderRadius: 999,
+            background: selectedSport === 'all' ? '#10b981' : '#131b2e',
+            color: selectedSport === 'all' ? '#022c22' : '#e2e8f0',
+            border: `1px solid ${selectedSport === 'all' ? '#10b981' : 'var(--border-card)'}`,
+            padding: '7px 16px',
+            borderRadius: 8,
             fontWeight: 700,
-            fontSize: 13,
+            fontSize: 12.5,
             cursor: 'pointer',
             whiteSpace: 'nowrap'
           }}
         >
-          All Arenas ({venues.length})
+          All Sports ({venues.length})
         </button>
         {sports.map(s => (
           <button
             key={s.id}
             onClick={() => setSelectedSport(s.id)}
             style={{
-              background: selectedSport === s.id ? 'var(--accent-neon)' : 'var(--bg-card)',
-              color: selectedSport === s.id ? '#042f1f' : '#fff',
-              border: `1px solid ${selectedSport === s.id ? 'var(--accent-neon)' : 'var(--border-card)'}`,
-              padding: '8px 16px',
-              borderRadius: 999,
+              background: selectedSport === s.id ? '#10b981' : '#131b2e',
+              color: selectedSport === s.id ? '#022c22' : '#e2e8f0',
+              border: `1px solid ${selectedSport === s.id ? '#10b981' : 'var(--border-card)'}`,
+              padding: '7px 14px',
+              borderRadius: 8,
               fontWeight: 700,
-              fontSize: 13,
+              fontSize: 12.5,
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
@@ -117,79 +303,240 @@ export default function PlayerMarketplace({ onSelectVenue }) {
         ))}
       </div>
 
-      {/* Venue List Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 24 }}>
-        {filteredVenues.map(venue => (
-          <div
-            key={venue.id}
-            className="nexus-card"
-            style={{ overflow: 'hidden', cursor: 'pointer', display: 'flex', flexDirection: 'column' }}
-            onClick={() => onSelectVenue(venue.slug || venue.id)}
-          >
-            <div style={{ position: 'relative', height: 180 }}>
-              <img
-                src={venue.photos?.[0] || 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=600&q=80'}
-                alt={venue.name}
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-              />
-              <div style={{ position: 'absolute', top: 12, left: 12, display: 'flex', gap: 6 }}>
-                <span className="badge-neon" style={{ borderRadius: 6, padding: '3px 8px', fontSize: 11, fontWeight: 700 }}>
-                  ★ {venue.rating || 4.9}
-                </span>
-                <span style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', color: '#fff', borderRadius: 6, padding: '3px 8px', fontSize: 11, fontWeight: 600 }}>
-                  {venue.city || 'Bangalore'}
-                </span>
-              </div>
-              <div style={{ position: 'absolute', bottom: 12, right: 12, background: 'rgba(0,0,0,0.8)', color: 'var(--accent-neon)', fontWeight: 800, fontSize: 14, padding: '4px 10px', borderRadius: 8 }}>
-                Live Slots Available
-              </div>
-            </div>
+      {/* Venues Grid */}
+      <div className="marketplace-grid">
+        {filteredVenues.map(venue => {
+          const uniqueLink = `${window.location.origin}/?venue=${venue.slug || venue.id}`;
+          const isCopied = copiedSlug === (venue.slug || venue.id);
 
-            <div style={{ padding: 20, flex: 1, display: 'flex', flexDirection: 'column' }}>
-              <h3 style={{ fontSize: 18, fontWeight: 800, color: '#fff', marginBottom: 6 }}>
-                {venue.name}
-              </h3>
-              <div style={{ fontSize: 13, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 14 }}>
-                <MapPin size={14} style={{ color: 'var(--accent-neon)', flexShrink: 0 }} />
-                <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{venue.address}</span>
-              </div>
+          return (
+            <div
+              key={venue.id}
+              className="nexus-card"
+              style={{
+                overflow: 'hidden',
+                display: 'flex',
+                flexDirection: 'column',
+                cursor: 'pointer',
+                border: '1px solid var(--border-card)'
+              }}
+              onClick={() => onSelectVenue(venue.slug || venue.id)}
+            >
+              {/* Image & Badges */}
+              <div style={{ position: 'relative', height: 185 }}>
+                <img
+                  src={venue.photos?.[0] || 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=600&q=80'}
+                  alt={venue.name}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                />
+                
+                {/* Distance & Rating Badges */}
+                <div style={{ position: 'absolute', top: 12, left: 12, display: 'flex', gap: 6 }}>
+                  {venue.distanceKm !== null ? (
+                    <span
+                      style={{
+                        background: '#047857',
+                        color: '#ffffff',
+                        fontWeight: 700,
+                        fontSize: 11.5,
+                        padding: '4px 10px',
+                        borderRadius: 6,
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 4
+                      }}
+                    >
+                      <MapPin size={12} /> {venue.distanceKm} km away
+                    </span>
+                  ) : (
+                    <span
+                      style={{
+                        background: 'rgba(15, 23, 42, 0.85)',
+                        backdropFilter: 'blur(4px)',
+                        color: '#94a3b8',
+                        fontWeight: 600,
+                        fontSize: 11.5,
+                        padding: '4px 8px',
+                        borderRadius: 6
+                      }}
+                    >
+                      {venue.city || 'Bangalore'}
+                    </span>
+                  )}
 
-              {/* Sports Offered Tags */}
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 18 }}>
-                {venue.sport_ids?.slice(0, 4).map(sp => (
                   <span
-                    key={sp}
                     style={{
-                      background: 'rgba(255, 255, 255, 0.05)',
-                      borderRadius: 6,
-                      padding: '3px 8px',
+                      background: 'rgba(15, 23, 42, 0.85)',
+                      backdropFilter: 'blur(4px)',
+                      color: '#fbbf24',
+                      fontWeight: 700,
                       fontSize: 11.5,
-                      color: 'var(--text-secondary)',
-                      textTransform: 'capitalize'
+                      padding: '4px 8px',
+                      borderRadius: 6,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 3
                     }}
                   >
-                    {sp}
+                    ★ {venue.rating || 4.8}
                   </span>
-                ))}
-                {venue.sport_ids?.length > 4 && (
-                  <span style={{ fontSize: 11.5, color: 'var(--text-muted)', alignSelf: 'center' }}>
-                    +{venue.sport_ids.length - 4} more
+                </div>
+
+                {/* Available Slots Today Badge */}
+                <div style={{ position: 'absolute', bottom: 10, right: 10 }}>
+                  <span
+                    style={{
+                      background: 'rgba(15, 23, 42, 0.9)',
+                      border: '1px solid rgba(16, 185, 129, 0.3)',
+                      color: '#34d399',
+                      fontWeight: 700,
+                      fontSize: 11.5,
+                      padding: '4px 9px',
+                      borderRadius: 6
+                    }}
+                  >
+                    {venue.today_available_slots_count || 0} Slots Available Today
                   </span>
-                )}
+                </div>
               </div>
 
-              <div style={{ marginTop: 'auto', paddingTop: 14, borderTop: '1px solid var(--border-card)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>HOURS</div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#fff' }}>{venue.open_time} - {venue.close_time}</div>
+              {/* Content Details */}
+              <div style={{ padding: '18px 20px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+                  <h3 style={{ fontSize: 17.5, fontWeight: 800, color: '#f8fafc', lineHeight: 1.3, margin: 0 }}>
+                    {venue.name}
+                  </h3>
+                  {/* Share / Copy Unique Link button */}
+                  <button
+                    onClick={(e) => handleCopyUniqueLink(e, venue)}
+                    title="Copy Unique Turf Booking URL"
+                    style={{
+                      background: isCopied ? '#10b981' : '#1e293b',
+                      color: isCopied ? '#022c22' : '#cbd5e1',
+                      border: '1px solid var(--border-card)',
+                      borderRadius: 6,
+                      padding: '5px 8px',
+                      fontSize: 11,
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      flexShrink: 0
+                    }}
+                  >
+                    {isCopied ? <Check size={12} /> : <Copy size={12} />}
+                    {isCopied ? 'Copied' : 'Turf Link'}
+                  </button>
                 </div>
-                <span className="btn-primary" style={{ padding: '7px 16px', fontSize: 13 }}>
-                  Book Slot <ChevronRight size={15} />
-                </span>
+
+                <div style={{ fontSize: 12.5, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 5, marginTop: 6, marginBottom: 12 }}>
+                  <MapPin size={13} style={{ color: 'var(--accent-neon)', flexShrink: 0 }} />
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{venue.address}</span>
+                </div>
+
+                {/* LIVE SLOTS PREVIEW & INDIVIDUAL PLAYER REGISTRATIONS */}
+                <div style={{ background: '#0b111e', borderRadius: 8, padding: '10px 12px', border: '1px solid var(--border-card)', marginBottom: 14 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
+                    <span>Live Slots Today & Pricing</span>
+                    <span style={{ color: '#34d399' }}>Owner-Set Rates</span>
+                  </div>
+
+                  {venue.live_slots && venue.live_slots.length > 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {venue.live_slots.slice(0, 3).map((slot, idx) => {
+                        const isPartialGame = slot.is_game && slot.registered_players > 0;
+                        return (
+                          <div
+                            key={idx}
+                            style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              background: isPartialGame ? 'rgba(245, 158, 11, 0.08)' : '#131b2e',
+                              border: isPartialGame ? '1px solid rgba(245, 158, 11, 0.25)' : '1px solid var(--border-card)',
+                              padding: '6px 10px',
+                              borderRadius: 6,
+                              fontSize: 12
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <Clock size={12} style={{ color: isPartialGame ? '#f59e0b' : '#10b981' }} />
+                              <span style={{ fontWeight: 600, color: '#f8fafc' }}>
+                                {slot.start_time} - {slot.end_time}
+                              </span>
+                              {isPartialGame ? (
+                                <span className="badge-amber" style={{ fontSize: 10, padding: '1px 6px' }}>
+                                  <Users size={10} /> {slot.registered_players}/{slot.capacity} players
+                                </span>
+                              ) : (
+                                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                                  {slot.court_name}
+                                </span>
+                              )}
+                            </div>
+
+                            <div style={{ fontWeight: 700, color: isPartialGame ? '#fbbf24' : '#34d399' }}>
+                              ₹{slot.price}
+                              <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 400 }}>
+                                {isPartialGame ? '/player' : '/slot'}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'center', padding: '6px 0' }}>
+                      All morning slots booked · Evening slots opening soon
+                    </div>
+                  )}
+                </div>
+
+                {/* Amenities pills */}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 14 }}>
+                  {venue.amenities?.slice(0, 3).map((am, i) => (
+                    <span
+                      key={i}
+                      style={{
+                        background: '#1e293b',
+                        borderRadius: 4,
+                        padding: '2px 7px',
+                        fontSize: 11,
+                        color: 'var(--text-secondary)'
+                      }}
+                    >
+                      {am}
+                    </span>
+                  ))}
+                  {venue.amenities?.length > 3 && (
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)', alignSelf: 'center' }}>
+                      +{venue.amenities.length - 3} more
+                    </span>
+                  )}
+                </div>
+
+                {/* Footer: Owner Price & Booking Action */}
+                <div style={{ marginTop: 'auto', paddingTop: 12, borderTop: '1px solid var(--border-card)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <div style={{ fontSize: 10.5, color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
+                      Starting From
+                    </div>
+                    <div style={{ fontSize: 16, fontWeight: 800, color: '#f8fafc' }}>
+                      ₹{venue.min_price || 800}
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 400 }}>/hr</span>
+                    </div>
+                  </div>
+
+                  <span className="btn-primary" style={{ padding: '8px 16px', fontSize: 12.5 }}>
+                    Select Slot <ChevronRight size={14} />
+                  </span>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

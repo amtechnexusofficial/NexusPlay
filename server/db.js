@@ -288,6 +288,14 @@ export function initDb() {
   try { db.exec("ALTER TABLE venues ADD COLUMN upi_id TEXT DEFAULT 'koramangala.sports@okaxis'"); } catch(e) {}
   try { db.exec("ALTER TABLE venues ADD COLUMN upi_name TEXT DEFAULT 'Nexus Central Arena Koramangala'"); } catch(e) {}
   try { db.exec("ALTER TABLE venues ADD COLUMN upi_qr_image TEXT"); } catch(e) {}
+  try { db.exec("ALTER TABLE venues ADD COLUMN gstin TEXT DEFAULT '29AABCN1234F1Z5'"); } catch(e) {}
+  try { db.exec("ALTER TABLE venues ADD COLUMN business_type TEXT DEFAULT 'Private Limited Company'"); } catch(e) {}
+  try { db.exec("ALTER TABLE venues ADD COLUMN pincode TEXT DEFAULT '560034'"); } catch(e) {}
+  try { db.exec("ALTER TABLE venues ADD COLUMN rules TEXT DEFAULT '1. Turf shoes or rubber studs only (No metal spikes).\n2. Arrive 10 minutes prior to your slot time.\n3. Zero food or chewing gum on the artificial grass.\n4. Free cancellation or reschedule up to 4 hours before slot start.'"); } catch(e) {}
+  try { db.exec("ALTER TABLE court_slots ADD COLUMN game_id TEXT"); } catch(e) {}
+  try { db.exec("ALTER TABLE court_slots ADD COLUMN full_inquiry_client TEXT"); } catch(e) {}
+  try { db.exec("ALTER TABLE court_slots ADD COLUMN full_inquiry_phone TEXT"); } catch(e) {}
+  try { db.exec("ALTER TABLE court_slots ADD COLUMN full_inquiry_notes TEXT"); } catch(e) {}
   try { db.exec("ALTER TABLE bookings ADD COLUMN upi_utr TEXT"); } catch(e) {}
   try { db.exec("ALTER TABLE bookings ADD COLUMN upi_verified_at DATETIME"); } catch(e) {}
   try { db.exec("ALTER TABLE bookings ADD COLUMN upi_verified_by TEXT"); } catch(e) {}
@@ -434,6 +442,131 @@ export function initDb() {
 
     // Generate upcoming 7 days of materialized slots
     generateSlotsForNextDays(venueId, 7);
+  }
+
+  // Ensure additional venues exist for nearby location discovery
+  try {
+    const vCount = db.prepare("SELECT count(*) as count FROM venues").get();
+    if (vCount.count < 3) {
+      const org = db.prepare("SELECT id FROM organizations LIMIT 1").get();
+      const orgId = org?.id || 'org_nexus_central';
+
+      // 1. Indiranagar venue
+      db.prepare(`
+        INSERT OR IGNORE INTO venues (id, organization_id, name, slug, description, address, city, lat, lng, phone, email, photos, amenities, sport_ids, open_time, close_time, rating, upi_id, upi_name)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        'ven_indiranagar', orgId, 'Indiranagar Elite Turf & Padel Arena', 'indiranagar-elite-turf',
+        'State of the art floodlit multi-sport facility in the heart of Indiranagar with panoramic rooftop cages and Padel courts.',
+        '100 Feet Road, HAL 2nd Stage, Indiranagar, Bengaluru, Karnataka 560038', 'Bengaluru',
+        12.9784, 77.6408, '+91 98451 22334', 'indiranagar@nexusarena.com',
+        JSON.stringify([
+          'https://images.unsplash.com/photo-1529900241452-94f4c281df69?auto=format&fit=crop&w=1200&q=80',
+          'https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=1200&q=80'
+        ]),
+        JSON.stringify(['FIFA Certified Turf', 'Italian Padel Glass Court', 'Changing Rooms', 'Juice Bar', 'Free Valet Parking']),
+        JSON.stringify(['football', 'padel', 'badminton']),
+        '06:00', '23:30', 4.9, 'indiranagar.turf@okaxis', 'Indiranagar Elite Sports Hub'
+      );
+
+      // Courts for Indiranagar
+      db.prepare(`
+        INSERT OR IGNORE INTO courts (id, organization_id, venue_id, name, sport_id, capacity, slot_duration_minutes, base_price, peak_price, weekend_price, peak_hours)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        'crt_indi_fb_1', orgId, 'ven_indiranagar', 'Indiranagar SkyTurf 7v7', 'football', 14, 60, 1400, 1900, 2200,
+        JSON.stringify(['18:00', '19:00', '20:00', '21:00'])
+      );
+      db.prepare(`
+        INSERT OR IGNORE INTO courts (id, organization_id, venue_id, name, sport_id, capacity, slot_duration_minutes, base_price, peak_price, weekend_price, peak_hours)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        'crt_indi_pdl_1', orgId, 'ven_indiranagar', 'Panoramic Padel Court 1', 'padel', 4, 60, 900, 1300, 1500,
+        JSON.stringify(['18:00', '19:00', '20:00', '21:00'])
+      );
+
+      // 2. HSR Layout venue
+      db.prepare(`
+        INSERT OR IGNORE INTO venues (id, organization_id, name, slug, description, address, city, lat, lng, phone, email, photos, amenities, sport_ids, open_time, close_time, rating, upi_id, upi_name)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        'ven_hsr', orgId, 'HSR Sector 2 Olympic Box Turf', 'hsr-olympic-box-turf',
+        'Top-rated enclosed box turf engineered for high-intensity 5v5 futsal and box cricket under championship-grade 400 Lux lights.',
+        '27th Main Rd, Sector 2, HSR Layout, Bengaluru, Karnataka 560102', 'Bengaluru',
+        12.9116, 77.6534, '+91 97400 99887', 'hsr@nexusarena.com',
+        JSON.stringify([
+          'https://images.unsplash.com/photo-1626224583764-f87db24ac4ea?auto=format&fit=crop&w=1200&q=80',
+          'https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=1200&q=80'
+        ]),
+        JSON.stringify(['High-Tension Enclosed Netting', 'LED Floodlights', 'Water Station', 'Bike Parking', 'Locker Room']),
+        JSON.stringify(['football', 'futsal', 'cricket']),
+        '06:00', '23:30', 4.8, 'hsrturf@okaxis', 'HSR Olympic Box Turf'
+      );
+
+      // Court for HSR
+      db.prepare(`
+        INSERT OR IGNORE INTO courts (id, organization_id, venue_id, name, sport_id, capacity, slot_duration_minutes, base_price, peak_price, weekend_price, peak_hours)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        'crt_hsr_box_1', orgId, 'ven_hsr', 'HSR Futsal & Cricket Box Pitch', 'futsal', 12, 60, 1100, 1500, 1700,
+        JSON.stringify(['18:00', '19:00', '20:00', '21:00'])
+      );
+
+      generateSlotsForNextDays('ven_indiranagar', 7);
+      generateSlotsForNextDays('ven_hsr', 7);
+    }
+  } catch(e) {
+    console.warn('[Seed Additional Venues Warning]:', e.message);
+  }
+
+  // Ensure the 6 of 8 players open game slot exists for today on Koramangala
+  try {
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const ven = db.prepare("SELECT * FROM venues WHERE id = 'ven_koramangala'").get();
+    if (ven) {
+      generateSlotsForNextDays(ven.id, 7);
+
+      const crt = db.prepare("SELECT * FROM courts WHERE venue_id = ? AND id = 'crt_fb_2'").get(ven.id);
+      if (crt) {
+        const slotId = `slot_${crt.id}_${todayStr}_1800`;
+        const gameId = `gm_futsal_6of8_${todayStr}`;
+        const existingGame = db.prepare("SELECT * FROM games WHERE id = ?").get(gameId);
+
+        if (!existingGame) {
+          db.prepare(`
+            INSERT OR REPLACE INTO games (
+              id, organization_id, venue_id, court_id, sport_id, court_slot_id,
+              organizer_user_id, organizer_name, organizer_phone, title, skill_level,
+              required_players, current_players, cost_per_player, date, start_time, end_time, status, rules
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?)
+          `).run(
+            gameId, ven.organization_id, ven.id, crt.id, 'futsal', slotId,
+            'usr_owner_demo', 'Vikram Rao (Nexus Host)', '+91 98765 43210',
+            'Evening 4v4 Fastcage Futsal Match', 'Intermediate',
+            8, 6, 250, todayStr, '18:00', '19:00',
+            'Non-marking turf shoes only. Bibs and match balls provided. Arrive 10 min early.'
+          );
+
+          const pNames = [
+            ['Vikram Rao (Host)', '+91 98765 43210'],
+            ['Rohan Sen', '+91 98765 00001'],
+            ['Kunal Singhal', '+91 98765 00002'],
+            ['Aditya Pillai', '+91 98765 00003'],
+            ['Deepak Nair', '+91 98765 00004'],
+            ['Siddharth Verma', '+91 98765 00005']
+          ];
+          const insP = db.prepare('INSERT OR REPLACE INTO game_participants (id, game_id, name, phone, payment_status, share_amount) VALUES (?, ?, ?, ?, ?, ?)');
+          pNames.forEach(([name, phone], i) => {
+            insP.run(`gpart_6of8_${todayStr}_${i + 1}`, gameId, name, phone, 'paid', 250);
+          });
+
+          // Link slot
+          db.prepare("UPDATE court_slots SET game_id = ?, price = 1600 WHERE id = ?").run(gameId, slotId);
+        }
+      }
+    }
+  } catch(e) {
+    console.warn('[Seed 6of8 Game Warning]:', e.message);
   }
 }
 
