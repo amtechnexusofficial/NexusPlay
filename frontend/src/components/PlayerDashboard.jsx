@@ -295,53 +295,77 @@ export function PlayerDashboard({ user, initialTab = 'bookings', onBookVenue, on
         </div>
       </div>
 
-      {/* Tabs Navigation */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px', borderBottom: '1px solid #e2e8f0', paddingBottom: '10px', overflowX: 'auto' }}>
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'nowrap' }}>
+      {/* Perfectly Aligned Responsive Tabs Navigation */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '22px', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px', gap: '12px', flexWrap: 'wrap' }}>
+        <div className="scroll-pills" style={{ display: 'flex', gap: '8px', overflowX: 'auto', flex: 1, minWidth: '280px', paddingBottom: '2px' }}>
           <button
             id="tab-my-bookings"
             onClick={() => setActiveTab('bookings')}
             style={{
-              padding: '8px 14px',
-              borderRadius: '8px',
-              border: 'none',
+              height: '40px',
+              padding: '0 16px',
+              borderRadius: '10px',
+              border: activeTab === 'bookings' ? '1px solid #059669' : '1px solid #cbd5e1',
               background: activeTab === 'bookings' ? '#059669' : '#ffffff',
-              color: activeTab === 'bookings' ? '#ffffff' : '#475569',
+              color: activeTab === 'bookings' ? '#ffffff' : '#334155',
               fontWeight: '700',
-              fontSize: '12.5px',
+              fontSize: '13px',
               cursor: 'pointer',
-              display: 'flex',
+              display: 'inline-flex',
               alignItems: 'center',
-              gap: '6px',
+              gap: '8px',
               whiteSpace: 'nowrap',
-              boxShadow: activeTab === 'bookings' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none'
+              boxShadow: activeTab === 'bookings' ? '0 2px 5px rgba(5,150,105,0.2)' : '0 1px 2px rgba(0,0,0,0.03)',
+              transition: 'all 0.15s ease'
             }}
           >
-            <Calendar size={14} />
-            <span>My Bookings ({bookings.length})</span>
+            <Calendar size={15} />
+            <span>My Bookings</span>
+            <span style={{
+              background: activeTab === 'bookings' ? 'rgba(255,255,255,0.25)' : '#f1f5f9',
+              color: activeTab === 'bookings' ? '#ffffff' : '#475569',
+              fontSize: '11px',
+              fontWeight: '800',
+              padding: '2px 7px',
+              borderRadius: '999px'
+            }}>
+              {bookings.length}
+            </span>
           </button>
 
           <button
             id="tab-my-games"
             onClick={() => setActiveTab('games')}
             style={{
-              padding: '8px 14px',
-              borderRadius: '8px',
-              border: 'none',
+              height: '40px',
+              padding: '0 16px',
+              borderRadius: '10px',
+              border: activeTab === 'games' ? '1px solid #059669' : '1px solid #cbd5e1',
               background: activeTab === 'games' ? '#059669' : '#ffffff',
-              color: activeTab === 'games' ? '#ffffff' : '#475569',
+              color: activeTab === 'games' ? '#ffffff' : '#334155',
               fontWeight: '700',
-              fontSize: '12.5px',
+              fontSize: '13px',
               cursor: 'pointer',
-              display: 'flex',
+              display: 'inline-flex',
               alignItems: 'center',
-              gap: '6px',
+              gap: '8px',
               whiteSpace: 'nowrap',
-              boxShadow: activeTab === 'games' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none'
+              boxShadow: activeTab === 'games' ? '0 2px 5px rgba(5,150,105,0.2)' : '0 1px 2px rgba(0,0,0,0.03)',
+              transition: 'all 0.15s ease'
             }}
           >
-            <Users size={14} />
-            <span>Joined Pickups ({games.length})</span>
+            <Users size={15} />
+            <span>Joined Pickups</span>
+            <span style={{
+              background: activeTab === 'games' ? 'rgba(255,255,255,0.25)' : '#f1f5f9',
+              color: activeTab === 'games' ? '#ffffff' : '#475569',
+              fontSize: '11px',
+              fontWeight: '800',
+              padding: '2px 7px',
+              borderRadius: '999px'
+            }}>
+              {games.length}
+            </span>
           </button>
 
           {/* Direct Requirement: Open Game Hosting inside Player Dashboard */}
@@ -349,22 +373,24 @@ export function PlayerDashboard({ user, initialTab = 'bookings', onBookVenue, on
             id="tab-host-game"
             onClick={() => setActiveTab('host_game')}
             style={{
-              padding: '8px 14px',
-              borderRadius: '8px',
-              border: activeTab === 'host_game' ? 'none' : '1px solid #bbf7d0',
-              background: activeTab === 'host_game' ? '#059669' : '#f0fdf4',
-              color: activeTab === 'host_game' ? '#ffffff' : '#059669',
+              height: '40px',
+              padding: '0 16px',
+              borderRadius: '10px',
+              border: activeTab === 'host_game' ? '1px solid #059669' : '1px solid #a7f3d0',
+              background: activeTab === 'host_game' ? '#059669' : '#ecfdf5',
+              color: activeTab === 'host_game' ? '#ffffff' : '#047857',
               fontWeight: '700',
-              fontSize: '12.5px',
+              fontSize: '13px',
               cursor: 'pointer',
-              display: 'flex',
+              display: 'inline-flex',
               alignItems: 'center',
-              gap: '6px',
+              gap: '8px',
               whiteSpace: 'nowrap',
-              boxShadow: activeTab === 'host_game' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none'
+              boxShadow: activeTab === 'host_game' ? '0 2px 5px rgba(5,150,105,0.2)' : '0 1px 2px rgba(0,0,0,0.03)',
+              transition: 'all 0.15s ease'
             }}
           >
-            <Plus size={14} />
+            <Plus size={15} />
             <span>Host Open Game</span>
           </button>
 
@@ -376,34 +402,37 @@ export function PlayerDashboard({ user, initialTab = 'bookings', onBookVenue, on
               fetchNotifications();
             }}
             style={{
-              padding: '8px 14px',
-              borderRadius: '8px',
-              border: 'none',
+              height: '40px',
+              padding: '0 16px',
+              borderRadius: '10px',
+              border: activeTab === 'whatsapp_alerts' ? '1px solid #059669' : '1px solid #cbd5e1',
               background: activeTab === 'whatsapp_alerts' ? '#059669' : '#ffffff',
-              color: activeTab === 'whatsapp_alerts' ? '#ffffff' : '#475569',
+              color: activeTab === 'whatsapp_alerts' ? '#ffffff' : '#334155',
               fontWeight: '700',
-              fontSize: '12.5px',
+              fontSize: '13px',
               cursor: 'pointer',
-              display: 'flex',
+              display: 'inline-flex',
               alignItems: 'center',
-              gap: '6px',
+              gap: '8px',
               whiteSpace: 'nowrap',
               position: 'relative',
-              boxShadow: activeTab === 'whatsapp_alerts' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none'
+              boxShadow: activeTab === 'whatsapp_alerts' ? '0 2px 5px rgba(5,150,105,0.2)' : '0 1px 2px rgba(0,0,0,0.03)',
+              transition: 'all 0.15s ease'
             }}
           >
-            <MessageSquare size={14} />
+            <MessageSquare size={15} />
             <span>WhatsApp Alerts & Refunds</span>
             {unreadRefundsCount > 0 && (
               <span style={{
                 background: '#22c55e',
                 color: '#ffffff',
-                fontSize: '10px',
+                fontSize: '11px',
                 fontWeight: '800',
-                padding: '1px 6px',
-                borderRadius: '999px'
+                padding: '2px 7px',
+                borderRadius: '999px',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
               }}>
-                {unreadRefundsCount}
+                {unreadRefundsCount} new
               </span>
             )}
           </button>
@@ -413,17 +442,23 @@ export function PlayerDashboard({ user, initialTab = 'bookings', onBookVenue, on
           onClick={fetchDashboard}
           disabled={isLoading}
           style={{
-            background: 'none',
-            border: 'none',
+            height: '36px',
+            padding: '0 12px',
+            background: '#ffffff',
+            border: '1px solid #cbd5e1',
+            borderRadius: '8px',
             color: '#64748b',
             fontSize: '12px',
-            fontWeight: '600',
+            fontWeight: '700',
             cursor: 'pointer',
-            display: 'flex',
+            display: 'inline-flex',
             alignItems: 'center',
-            gap: '4px',
-            whiteSpace: 'nowrap'
+            gap: '6px',
+            whiteSpace: 'nowrap',
+            transition: 'all 0.15s ease'
           }}
+          onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#94a3b8'; e.currentTarget.style.color = '#0f172a'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#cbd5e1'; e.currentTarget.style.color = '#64748b'; }}
         >
           <RefreshCw size={13} className={isLoading ? 'animate-spin' : ''} />
           <span>Refresh</span>

@@ -25,10 +25,22 @@ export default function App() {
   // Navigation views: 'marketplace', 'opengames', 'venue-page', 'player-dashboard', 'owner'
   const [activeView, setActiveView] = useState(() => {
     const params = new URLSearchParams(window.location.search);
+    let savedUser = null;
+    try {
+      const saved = localStorage.getItem('nexus_user');
+      savedUser = saved ? JSON.parse(saved) : null;
+    } catch (e) {}
+
     if (params.get('venue') || params.get('v')) return 'venue-page';
-    if (params.get('view') === 'owner') return 'owner';
+    if (params.get('view') === 'owner') {
+      if (savedUser?.role === 'player') return 'player-dashboard';
+      return 'owner';
+    }
+    if (params.get('view') === 'dashboard') {
+      if (savedUser?.role === 'owner') return 'owner';
+      return 'player-dashboard';
+    }
     if (params.get('view') === 'opengames') return 'opengames';
-    if (params.get('view') === 'dashboard') return 'player-dashboard';
     return 'marketplace';
   });
 
@@ -65,6 +77,19 @@ export default function App() {
   }, []);
 
   function navigateTo(view, venueSlug = activeVenueSlug) {
+    // Strict Role Separation: When logged in as player, owner view is blocked
+    if (view === 'owner' && currentUser?.role === 'player') {
+      setActiveView('player-dashboard');
+      window.history.pushState({}, '', '/?view=dashboard');
+      return;
+    }
+    // Strict Role Separation: When logged in as owner, player dashboard is blocked
+    if (view === 'player-dashboard' && currentUser?.role === 'owner') {
+      setActiveView('owner');
+      window.history.pushState({}, '', '/?view=owner');
+      return;
+    }
+
     setActiveView(view);
     if (view === 'venue-page') {
       setActiveVenueSlug(venueSlug);
@@ -87,9 +112,11 @@ export default function App() {
   function handleAuthSuccess(user, role, venue) {
     setCurrentUser(user);
     if (role === 'owner') {
-      navigateTo('owner');
+      setActiveView('owner');
+      window.history.pushState({}, '', '/?view=owner');
     } else {
-      navigateTo('player-dashboard');
+      setActiveView('player-dashboard');
+      window.history.pushState({}, '', '/?view=dashboard');
     }
   }
 
@@ -107,7 +134,6 @@ export default function App() {
   }
 
   function openOwnerAuth() {
-    // If already logged in as owner, navigate directly
     if (currentUser?.role === 'owner') {
       navigateTo('owner');
     } else {
@@ -476,7 +502,7 @@ export default function App() {
         </div>
       </header>
 
-      {/* Main Screen Views */}
+      {/* Main Screen Views with Strict Role Separation */}
       <main style={{ flex: 1, padding: '20px 0 80px' }}>
         {activeView === 'marketplace' && (
           <PlayerMarketplace 
@@ -502,25 +528,93 @@ export default function App() {
           />
         )}
 
+        {/* PLAYER PROFILE / DASHBOARD: GUARANTEED HIDDEN FOR OWNERS */}
         {activeView === 'player-dashboard' && (
-          <PlayerDashboard
-            user={currentUser}
-            onBookVenue={() => navigateTo('marketplace')}
-            onBrowseGames={() => navigateTo('opengames')}
-            onLogout={handleLogout}
-          />
+          currentUser && currentUser.role === 'owner' ? (
+            <div style={{ maxWidth: 540, margin: '60px auto', padding: '36px 24px', background: '#ffffff', borderRadius: 16, border: '1px solid #e2e8f0', textAlign: 'center', boxShadow: '0 4px 14px rgba(0,0,0,0.05)' }}>
+              <div style={{ width: 56, height: 56, borderRadius: '50%', background: '#eef2ff', color: '#4f46e5', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+                <Building2 size={28} />
+              </div>
+              <h2 style={{ fontSize: 20, fontWeight: 800, color: '#0f172a', marginBottom: 8 }}>Owner Account Active</h2>
+              <p style={{ color: '#64748b', fontSize: 14, lineHeight: 1.6, marginBottom: 24 }}>
+                You are currently signed in as an <strong>Arena Owner ({currentUser.name})</strong>. Player Profile is strictly separated and reserved for player accounts.
+              </p>
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+                <button
+                  id="btn-return-owner-hub"
+                  onClick={() => navigateTo('owner')}
+                  className="btn-primary"
+                  style={{ padding: '10px 20px', fontSize: 13 }}
+                >
+                  Return to Owner Hub
+                </button>
+                <button
+                  id="btn-switch-to-player"
+                  onClick={() => {
+                    handleLogout();
+                    openPlayerAuth();
+                  }}
+                  className="btn-secondary"
+                  style={{ padding: '10px 16px', fontSize: 13 }}
+                >
+                  Switch to Player Account
+                </button>
+              </div>
+            </div>
+          ) : (
+            <PlayerDashboard
+              user={currentUser}
+              onBookVenue={() => navigateTo('marketplace')}
+              onBrowseGames={() => navigateTo('opengames')}
+              onLogout={handleLogout}
+            />
+          )
         )}
 
+        {/* OWNER HUB / DASHBOARD: GUARANTEED HIDDEN FOR PLAYERS */}
         {activeView === 'owner' && (
-          <OwnerSaaSView
-            onNavigateToPublicPage={(slug) => {
-              navigateTo('venue-page', slug);
-            }}
-          />
+          currentUser && currentUser.role === 'player' ? (
+            <div style={{ maxWidth: 540, margin: '60px auto', padding: '36px 24px', background: '#ffffff', borderRadius: 16, border: '1px solid #e2e8f0', textAlign: 'center', boxShadow: '0 4px 14px rgba(0,0,0,0.05)' }}>
+              <div style={{ width: 56, height: 56, borderRadius: '50%', background: '#ecfdf5', color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+                <User size={28} />
+              </div>
+              <h2 style={{ fontSize: 20, fontWeight: 800, color: '#0f172a', marginBottom: 8 }}>Player Profile Active</h2>
+              <p style={{ color: '#64748b', fontSize: 14, lineHeight: 1.6, marginBottom: 24 }}>
+                You are currently signed in as a <strong>Player ({currentUser.name})</strong>. The Owner Dashboard is strictly separated and accessible only to arena managers.
+              </p>
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+                <button
+                  id="btn-return-player-dashboard"
+                  onClick={() => navigateTo('player-dashboard')}
+                  className="btn-primary"
+                  style={{ padding: '10px 20px', fontSize: 13 }}
+                >
+                  Return to Player Profile
+                </button>
+                <button
+                  id="btn-switch-to-owner"
+                  onClick={() => {
+                    handleLogout();
+                    openOwnerAuth();
+                  }}
+                  className="btn-secondary"
+                  style={{ padding: '10px 16px', fontSize: 13 }}
+                >
+                  Switch to Owner Account
+                </button>
+              </div>
+            </div>
+          ) : (
+            <OwnerSaaSView
+              onNavigateToPublicPage={(slug) => {
+                navigateTo('venue-page', slug);
+              }}
+            />
+          )
         )}
       </main>
 
-      {/* Native Mobile Bottom Navigation Bar */}
+      {/* Role-Tailored Mobile Bottom Navigation: Mutually Exclusive */}
       <nav id="mobile-bottom-navigation" className="mobile-bottom-bar">
         <button
           id="mobile-nav-turfs"
@@ -531,38 +625,97 @@ export default function App() {
           <span>Turfs</span>
         </button>
 
-        <button
-          id="mobile-nav-pickup"
-          className={`mobile-bottom-btn ${activeView === 'opengames' ? 'active' : ''}`}
-          onClick={() => navigateTo('opengames')}
-        >
-          <Trophy size={20} />
-          <span>Pickup</span>
-        </button>
+        {currentUser?.role === 'owner' ? (
+          <>
+            {/* Owner Mobile Navigation: NO Player Profile visible */}
+            <button
+              id="mobile-nav-owner"
+              className={`mobile-bottom-btn ${activeView === 'owner' ? 'active' : ''}`}
+              onClick={() => navigateTo('owner')}
+            >
+              <Building2 size={20} />
+              <span>Owner Hub</span>
+            </button>
 
-        <button
-          id="mobile-nav-dashboard"
-          className={`mobile-bottom-btn ${activeView === 'player-dashboard' ? 'active' : ''}`}
-          onClick={() => {
-            if (currentUser && currentUser.role === 'player') {
-              navigateTo('player-dashboard');
-            } else {
-              openPlayerAuth();
-            }
-          }}
-        >
-          <CalendarCheck size={20} />
-          <span>{currentUser ? 'My Bookings' : 'Player Login'}</span>
-        </button>
+            <button
+              id="mobile-nav-venue"
+              className={`mobile-bottom-btn ${activeView === 'venue-page' ? 'active' : ''}`}
+              onClick={() => navigateTo('venue-page')}
+            >
+              <Share2 size={20} />
+              <span>Direct Link</span>
+            </button>
 
-        <button
-          id="mobile-nav-owner"
-          className={`mobile-bottom-btn ${activeView === 'owner' ? 'active' : ''}`}
-          onClick={openOwnerAuth}
-        >
-          <Building2 size={20} />
-          <span>Owner Hub</span>
-        </button>
+            <button
+              id="mobile-nav-signout"
+              className="mobile-bottom-btn"
+              onClick={handleLogout}
+            >
+              <LogOut size={20} />
+              <span>Sign Out</span>
+            </button>
+          </>
+        ) : currentUser?.role === 'player' ? (
+          <>
+            {/* Player Mobile Navigation: NO Owner Dashboard visible */}
+            <button
+              id="mobile-nav-pickup"
+              className={`mobile-bottom-btn ${activeView === 'opengames' ? 'active' : ''}`}
+              onClick={() => navigateTo('opengames')}
+            >
+              <Trophy size={20} />
+              <span>Pickup</span>
+            </button>
+
+            <button
+              id="mobile-nav-player-profile"
+              className={`mobile-bottom-btn ${activeView === 'player-dashboard' ? 'active' : ''}`}
+              onClick={() => navigateTo('player-dashboard')}
+            >
+              <CalendarCheck size={20} />
+              <span>My Profile</span>
+            </button>
+
+            <button
+              id="mobile-nav-signout"
+              className="mobile-bottom-btn"
+              onClick={handleLogout}
+            >
+              <LogOut size={20} />
+              <span>Sign Out</span>
+            </button>
+          </>
+        ) : (
+          <>
+            {/* Guest / Unauthenticated Mobile Navigation */}
+            <button
+              id="mobile-nav-pickup"
+              className={`mobile-bottom-btn ${activeView === 'opengames' ? 'active' : ''}`}
+              onClick={() => navigateTo('opengames')}
+            >
+              <Trophy size={20} />
+              <span>Pickup</span>
+            </button>
+
+            <button
+              id="mobile-nav-dashboard"
+              className="mobile-bottom-btn"
+              onClick={openPlayerAuth}
+            >
+              <CalendarCheck size={20} />
+              <span>Player Login</span>
+            </button>
+
+            <button
+              id="mobile-nav-owner"
+              className={`mobile-bottom-btn ${activeView === 'owner' ? 'active' : ''}`}
+              onClick={openOwnerAuth}
+            >
+              <Building2 size={20} />
+              <span>Owner Portal</span>
+            </button>
+          </>
+        )}
       </nav>
 
       {/* Authentication Modal with Dedicated Player & Owner Screens */}

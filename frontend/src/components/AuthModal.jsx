@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   User, 
   Building2, 
@@ -13,7 +13,9 @@ import {
   Trophy, 
   ChevronRight,
   Zap,
-  CalendarCheck
+  CalendarCheck,
+  KeyRound,
+  Check
 } from 'lucide-react';
 import { api } from '../api';
 
@@ -29,12 +31,21 @@ export function AuthModal({ isOpen, onClose, initialRole = 'player', onAuthSucce
 
   // Owner Form State
   const [ownerEmail, setOwnerEmail] = useState('owner@nexusplay.com');
-  const [ownerPassword, setOwnerPassword] = useState('••••••••');
+  const [ownerPassword, setOwnerPassword] = useState('password123');
   const [ownerVenueId, setOwnerVenueId] = useState('ven_koramangala');
   
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+
+  // Sync role whenever modal is opened with specific intent
+  useEffect(() => {
+    if (isOpen) {
+      setActiveRole(initialRole || 'player');
+      setErrorMsg('');
+      setSuccessMsg('');
+    }
+  }, [isOpen, initialRole]);
 
   if (!isOpen) return null;
 
@@ -174,60 +185,64 @@ export function AuthModal({ isOpen, onClose, initialRole = 'player', onAuthSucce
             </button>
           </div>
 
-          {/* Distinct Segmented Control Tabs */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', background: '#e2e8f0', padding: '4px', borderRadius: '10px' }}>
+          {/* Distinct Symmetrical Segmented Control Tabs */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', background: '#f1f5f9', padding: '4px', borderRadius: '12px', border: '1px solid #e2e8f0', gap: '4px' }}>
             <button
               id="auth-role-player-tab"
+              type="button"
               onClick={() => { setActiveRole('player'); setErrorMsg(''); }}
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '8px',
-                padding: '8px 12px',
-                borderRadius: '8px',
-                border: 'none',
+                height: '42px',
+                padding: '0 12px',
+                borderRadius: '9px',
+                border: activeRole === 'player' ? '1px solid #cbd5e1' : '1px solid transparent',
                 background: activeRole === 'player' ? '#ffffff' : 'transparent',
                 color: activeRole === 'player' ? '#059669' : '#64748b',
-                fontWeight: activeRole === 'player' ? '700' : '600',
+                fontWeight: activeRole === 'player' ? '800' : '600',
                 fontSize: '13px',
                 cursor: 'pointer',
-                boxShadow: activeRole === 'player' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                boxShadow: activeRole === 'player' ? '0 1px 3px rgba(0,0,0,0.06)' : 'none',
                 transition: 'all 0.15s ease'
               }}
             >
               <User size={16} />
-              <span>Player Login</span>
+              <span>Player Profile</span>
             </button>
 
             <button
               id="auth-role-owner-tab"
+              type="button"
               onClick={() => { setActiveRole('owner'); setErrorMsg(''); }}
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '8px',
-                padding: '8px 12px',
-                borderRadius: '8px',
-                border: 'none',
+                height: '42px',
+                padding: '0 12px',
+                borderRadius: '9px',
+                border: activeRole === 'owner' ? '1px solid #cbd5e1' : '1px solid transparent',
                 background: activeRole === 'owner' ? '#ffffff' : 'transparent',
                 color: activeRole === 'owner' ? '#059669' : '#64748b',
-                fontWeight: activeRole === 'owner' ? '700' : '600',
+                fontWeight: activeRole === 'owner' ? '800' : '600',
                 fontSize: '13px',
                 cursor: 'pointer',
-                boxShadow: activeRole === 'owner' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                boxShadow: activeRole === 'owner' ? '0 1px 3px rgba(0,0,0,0.06)' : 'none',
                 transition: 'all 0.15s ease'
               }}
             >
               <Building2 size={16} />
-              <span>Arena Owner Portal</span>
+              <span>Arena Owner</span>
             </button>
           </div>
         </div>
 
         {/* Modal Body */}
-        <div style={{ padding: '24px' }}>
+        <div style={{ padding: '20px 24px' }}>
           {errorMsg && (
             <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', padding: '10px 14px', marginBottom: '16px', fontSize: '13px', color: '#b91c1c' }}>
               {errorMsg}
@@ -247,59 +262,142 @@ export function AuthModal({ isOpen, onClose, initialRole = 'player', onAuthSucce
           {activeRole === 'player' && (
             <div>
               {/* Quick 1-Click Demo Player Logins */}
-              <div style={{ marginBottom: '20px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '14px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px', fontSize: '12px', fontWeight: '700', color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  <Zap size={14} color="#059669" />
-                  <span>Instant Demo Player Login</span>
+              <div style={{ marginBottom: '18px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '14px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: '800', color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    <Zap size={14} color="#059669" />
+                    <span>Demo Player Credentials (1-Click Login)</span>
+                  </div>
+                  <span style={{ fontSize: '11px', background: '#ecfdf5', color: '#065f46', padding: '2px 8px', borderRadius: '999px', fontWeight: '700' }}>
+                    Instant
+                  </span>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   <button
                     id="quick-login-rohan"
                     type="button"
-                    onClick={() => handleQuickPlayer('Rohan Sen', '9876500001')}
+                    onClick={() => {
+                      setPlayerName('Rohan Sen');
+                      setPlayerPhone('9876500001');
+                      handleQuickPlayer('Rohan Sen', '9876500001');
+                    }}
                     disabled={isLoading}
                     style={{
                       background: '#ffffff',
                       border: '1px solid #cbd5e1',
-                      borderRadius: '8px',
-                      padding: '8px 10px',
-                      textAlign: 'left',
+                      borderRadius: '10px',
+                      padding: '10px 12px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
                       cursor: 'pointer',
-                      transition: 'all 0.15s ease'
+                      transition: 'all 0.15s ease',
+                      textAlign: 'left'
                     }}
                     onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#059669'; e.currentTarget.style.background = '#f0fdf4'; }}
                     onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#cbd5e1'; e.currentTarget.style.background = '#ffffff'; }}
                   >
-                    <div style={{ fontSize: '12.5px', fontWeight: '700', color: '#0f172a' }}>Rohan Sen</div>
-                    <div style={{ fontSize: '11px', color: '#64748b' }}>Football · 98765 00001</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#ecfdf5', color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '800', fontSize: '12px' }}>
+                        RS
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '13px', fontWeight: '700', color: '#0f172a' }}>Rohan Sen</div>
+                        <div style={{ fontSize: '11.5px', color: '#64748b' }}>Phone: <strong>98765 00001</strong> · Football (Striker)</div>
+                      </div>
+                    </div>
+                    <span style={{ fontSize: '12px', color: '#059669', fontWeight: '700', background: '#ecfdf5', padding: '4px 10px', borderRadius: '6px' }}>
+                      Sign In →
+                    </span>
                   </button>
 
                   <button
                     id="quick-login-kunal"
                     type="button"
-                    onClick={() => handleQuickPlayer('Kunal Singhal', '9876500002')}
+                    onClick={() => {
+                      setPlayerName('Kunal Singhal');
+                      setPlayerPhone('9876500002');
+                      handleQuickPlayer('Kunal Singhal', '9876500002');
+                    }}
                     disabled={isLoading}
                     style={{
                       background: '#ffffff',
                       border: '1px solid #cbd5e1',
-                      borderRadius: '8px',
-                      padding: '8px 10px',
-                      textAlign: 'left',
+                      borderRadius: '10px',
+                      padding: '10px 12px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
                       cursor: 'pointer',
-                      transition: 'all 0.15s ease'
+                      transition: 'all 0.15s ease',
+                      textAlign: 'left'
                     }}
                     onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#059669'; e.currentTarget.style.background = '#f0fdf4'; }}
                     onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#cbd5e1'; e.currentTarget.style.background = '#ffffff'; }}
                   >
-                    <div style={{ fontSize: '12.5px', fontWeight: '700', color: '#0f172a' }}>Kunal Singhal</div>
-                    <div style={{ fontSize: '11px', color: '#64748b' }}>Badminton · 98765 00002</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#eef2ff', color: '#4f46e5', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '800', fontSize: '12px' }}>
+                        KS
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '13px', fontWeight: '700', color: '#0f172a' }}>Kunal Singhal</div>
+                        <div style={{ fontSize: '11.5px', color: '#64748b' }}>Phone: <strong>98765 00002</strong> · Badminton All-Rounder</div>
+                      </div>
+                    </div>
+                    <span style={{ fontSize: '12px', color: '#4f46e5', fontWeight: '700', background: '#eef2ff', padding: '4px 10px', borderRadius: '6px' }}>
+                      Sign In →
+                    </span>
                   </button>
+
+                  <button
+                    id="quick-login-vikram-player"
+                    type="button"
+                    onClick={() => {
+                      setPlayerName('Vikram Rao');
+                      setPlayerPhone('9876543210');
+                      handleQuickPlayer('Vikram Rao', '9876543210');
+                    }}
+                    disabled={isLoading}
+                    style={{
+                      background: '#ffffff',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: '10px',
+                      padding: '10px 12px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                      textAlign: 'left'
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#059669'; e.currentTarget.style.background = '#f0fdf4'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#cbd5e1'; e.currentTarget.style.background = '#ffffff'; }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#fffbeb', color: '#b45309', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '800', fontSize: '12px' }}>
+                        VR
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '13px', fontWeight: '700', color: '#0f172a' }}>Vikram Rao</div>
+                        <div style={{ fontSize: '11.5px', color: '#64748b' }}>Phone: <strong>98765 43210</strong> · Futsal & Match Host</div>
+                      </div>
+                    </div>
+                    <span style={{ fontSize: '12px', color: '#b45309', fontWeight: '700', background: '#fffbeb', padding: '4px 10px', borderRadius: '6px' }}>
+                      Sign In →
+                    </span>
+                  </button>
+                </div>
+
+                <div style={{ marginTop: '10px', padding: '8px 10px', background: '#ffffff', borderRadius: '8px', border: '1px dashed #cbd5e1', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11.5px', color: '#475569' }}>
+                  <KeyRound size={14} color="#059669" />
+                  <span><strong>Credentials:</strong> Phone <code>98765 00001</code> / <code>98765 00002</code> / <code>98765 43210</code> (no password needed)</span>
                 </div>
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '16px 0', color: '#94a3b8', fontSize: '12px' }}>
                 <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
-                <span>OR SIGN IN WITH MOBILE</span>
+                <span>OR SIGN IN WITH CUSTOM NUMBER</span>
                 <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
               </div>
 
@@ -396,38 +494,94 @@ export function AuthModal({ isOpen, onClose, initialRole = 'player', onAuthSucce
           {activeRole === 'owner' && (
             <div>
               {/* Quick 1-Click Demo Owner Logins */}
-              <div style={{ marginBottom: '20px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '14px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px', fontSize: '12px', fontWeight: '700', color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  <Building2 size={14} color="#059669" />
-                  <span>Instant Arena Owner Access</span>
+              <div style={{ marginBottom: '18px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '14px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: '800', color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    <Building2 size={14} color="#059669" />
+                    <span>Demo Owner Credentials (1-Click Login)</span>
+                  </div>
+                  <span style={{ fontSize: '11px', background: '#eef2ff', color: '#3730a3', padding: '2px 8px', borderRadius: '999px', fontWeight: '700' }}>
+                    Full SaaS
+                  </span>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px' }}>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   <button
                     id="quick-login-owner-nexus"
                     type="button"
-                    onClick={() => handleQuickOwner('owner@nexusplay.com', 'ven_koramangala')}
+                    onClick={() => {
+                      setOwnerEmail('owner@nexusplay.com');
+                      setOwnerPassword('password123');
+                      setOwnerVenueId('ven_koramangala');
+                      handleQuickOwner('owner@nexusplay.com', 'ven_koramangala');
+                    }}
                     disabled={isLoading}
                     style={{
                       background: '#ffffff',
                       border: '1px solid #cbd5e1',
-                      borderRadius: '8px',
+                      borderRadius: '10px',
                       padding: '10px 12px',
-                      textAlign: 'left',
-                      cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
-                      transition: 'all 0.15s ease'
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                      textAlign: 'left'
                     }}
                     onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#059669'; e.currentTarget.style.background = '#f0fdf4'; }}
                     onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#cbd5e1'; e.currentTarget.style.background = '#ffffff'; }}
                   >
                     <div>
                       <div style={{ fontSize: '13px', fontWeight: '700', color: '#0f172a' }}>Nexus Central Arena Koramangala</div>
-                      <div style={{ fontSize: '11.5px', color: '#64748b' }}>Owner: Vikramaditya Rao · 4 Courts · UPI Configured</div>
+                      <div style={{ fontSize: '11.5px', color: '#64748b' }}>
+                        Email: <strong>owner@nexusplay.com</strong> · Pass: <strong>password123</strong>
+                      </div>
                     </div>
-                    <ChevronRight size={16} color="#059669" />
+                    <span style={{ fontSize: '12px', color: '#059669', fontWeight: '700', background: '#ecfdf5', padding: '4px 10px', borderRadius: '6px', whiteSpace: 'nowrap' }}>
+                      Enter Hub →
+                    </span>
                   </button>
+
+                  <button
+                    id="quick-login-owner-whitefield"
+                    type="button"
+                    onClick={() => {
+                      setOwnerEmail('whitefield@nexusplay.com');
+                      setOwnerPassword('password123');
+                      setOwnerVenueId('ven_whitefield');
+                      handleQuickOwner('whitefield@nexusplay.com', 'ven_whitefield');
+                    }}
+                    disabled={isLoading}
+                    style={{
+                      background: '#ffffff',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: '10px',
+                      padding: '10px 12px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                      textAlign: 'left'
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#059669'; e.currentTarget.style.background = '#f0fdf4'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#cbd5e1'; e.currentTarget.style.background = '#ffffff'; }}
+                  >
+                    <div>
+                      <div style={{ fontSize: '13px', fontWeight: '700', color: '#0f172a' }}>Whitefield Smash & Turf Arena</div>
+                      <div style={{ fontSize: '11.5px', color: '#64748b' }}>
+                        Email: <strong>whitefield@nexusplay.com</strong> · Pass: <strong>password123</strong>
+                      </div>
+                    </div>
+                    <span style={{ fontSize: '12px', color: '#4f46e5', fontWeight: '700', background: '#eef2ff', padding: '4px 10px', borderRadius: '6px', whiteSpace: 'nowrap' }}>
+                      Enter Hub →
+                    </span>
+                  </button>
+                </div>
+
+                <div style={{ marginTop: '10px', padding: '8px 10px', background: '#ffffff', borderRadius: '8px', border: '1px dashed #cbd5e1', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11.5px', color: '#475569' }}>
+                  <KeyRound size={14} color="#059669" />
+                  <span><strong>Credentials:</strong> <code>owner@nexusplay.com</code> / <code>password123</code> (Venue: Nexus Central)</span>
                 </div>
               </div>
 
@@ -484,7 +638,7 @@ export function AuthModal({ isOpen, onClose, initialRole = 'player', onAuthSucce
                       id="owner-password-input"
                       type="password"
                       className="nexus-input"
-                      placeholder="••••••••"
+                      placeholder="password123"
                       value={ownerPassword}
                       onChange={(e) => setOwnerPassword(e.target.value)}
                       style={{ width: '100%', paddingLeft: '38px' }}
@@ -517,7 +671,7 @@ export function AuthModal({ isOpen, onClose, initialRole = 'player', onAuthSucce
                   onClick={() => { setActiveRole('player'); setErrorMsg(''); }}
                   style={{ background: 'none', border: 'none', color: '#059669', fontWeight: '700', cursor: 'pointer', padding: 0 }}
                 >
-                  Switch to Player Sign In →
+                  Switch to Player Profile →
                 </button>
               </div>
             </div>

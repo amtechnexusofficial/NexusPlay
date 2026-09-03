@@ -519,65 +519,48 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
       )}
 
       {/* NAVIGATION TABS (TOUCH-FRIENDLY HORIZONTAL SCROLL) */}
-      <div className="scroll-pills" style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: 10, marginBottom: 20 }}>
+      <div className="scroll-pills" style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: 12, marginBottom: 22, display: 'flex', gap: 8, overflowX: 'auto' }}>
         <button
           onClick={() => setActiveTab('live_slots')}
           style={{
+            height: 40,
             background: activeTab === 'live_slots' ? '#059669' : '#ffffff',
             color: activeTab === 'live_slots' ? '#ffffff' : '#334155',
             border: activeTab === 'live_slots' ? '1px solid #059669' : '1px solid #cbd5e1',
-            borderRadius: 8,
-            padding: '8px 16px',
+            borderRadius: 10,
+            padding: '0 16px',
             fontWeight: 700,
             fontSize: 13,
             cursor: 'pointer',
-            display: 'flex',
+            display: 'inline-flex',
             alignItems: 'center',
             gap: 7,
             whiteSpace: 'nowrap',
-            boxShadow: '0 1px 2px rgba(0,0,0,0.04)'
+            boxShadow: activeTab === 'live_slots' ? '0 2px 5px rgba(5,150,105,0.2)' : '0 1px 2px rgba(0,0,0,0.03)',
+            transition: 'all 0.15s ease'
           }}
         >
           <Calendar size={15} /> Live Slots & Calendar
         </button>
 
         <button
-          onClick={() => setActiveTab('business_setup')}
-          style={{
-            background: activeTab === 'business_setup' ? '#059669' : '#ffffff',
-            color: activeTab === 'business_setup' ? '#ffffff' : '#334155',
-            border: activeTab === 'business_setup' ? '1px solid #059669' : '1px solid #cbd5e1',
-            borderRadius: 8,
-            padding: '8px 16px',
-            fontWeight: 700,
-            fontSize: 13,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 7,
-            whiteSpace: 'nowrap',
-            boxShadow: '0 1px 2px rgba(0,0,0,0.04)'
-          }}
-        >
-          <Building size={15} /> Business Setup
-        </button>
-
-        <button
           onClick={() => setActiveTab('dashboard')}
           style={{
+            height: 40,
             background: activeTab === 'dashboard' ? '#059669' : '#ffffff',
             color: activeTab === 'dashboard' ? '#ffffff' : '#334155',
             border: activeTab === 'dashboard' ? '1px solid #059669' : '1px solid #cbd5e1',
-            borderRadius: 8,
-            padding: '8px 16px',
+            borderRadius: 10,
+            padding: '0 16px',
             fontWeight: 700,
             fontSize: 13,
             cursor: 'pointer',
-            display: 'flex',
+            display: 'inline-flex',
             alignItems: 'center',
             gap: 7,
             whiteSpace: 'nowrap',
-            boxShadow: '0 1px 2px rgba(0,0,0,0.04)'
+            boxShadow: activeTab === 'dashboard' ? '0 2px 5px rgba(5,150,105,0.2)' : '0 1px 2px rgba(0,0,0,0.03)',
+            transition: 'all 0.15s ease'
           }}
         >
           <LayoutDashboard size={15} /> Overview & Analytics
@@ -586,25 +569,34 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
         <button
           onClick={() => setActiveTab('upi_verification')}
           style={{
+            height: 40,
             background: activeTab === 'upi_verification' ? '#059669' : '#ffffff',
             color: activeTab === 'upi_verification' ? '#ffffff' : '#334155',
             border: activeTab === 'upi_verification' ? '1px solid #059669' : '1px solid #cbd5e1',
-            borderRadius: 8,
-            padding: '8px 16px',
+            borderRadius: 10,
+            padding: '0 16px',
             fontWeight: 700,
             fontSize: 13,
             cursor: 'pointer',
-            display: 'flex',
+            display: 'inline-flex',
             alignItems: 'center',
             gap: 7,
             position: 'relative',
             whiteSpace: 'nowrap',
-            boxShadow: '0 1px 2px rgba(0,0,0,0.04)'
+            boxShadow: activeTab === 'upi_verification' ? '0 2px 5px rgba(5,150,105,0.2)' : '0 1px 2px rgba(0,0,0,0.03)',
+            transition: 'all 0.15s ease'
           }}
         >
           <ShieldCheck size={15} /> UPI Direct Audit
           {pendingUpiBookings.length > 0 && (
-            <span style={{ background: '#f59e0b', color: '#000', fontSize: 10, fontWeight: 800, padding: '1px 6px', borderRadius: 999 }}>
+            <span style={{ 
+              background: activeTab === 'upi_verification' ? '#ffffff' : '#f59e0b', 
+              color: activeTab === 'upi_verification' ? '#059669' : '#000', 
+              fontSize: 10, 
+              fontWeight: 800, 
+              padding: '1px 6px', 
+              borderRadius: 999 
+            }}>
               {pendingUpiBookings.length}
             </span>
           )}
@@ -613,19 +605,21 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
         <button
           onClick={() => setActiveTab('courts')}
           style={{
+            height: 40,
             background: activeTab === 'courts' ? '#059669' : '#ffffff',
             color: activeTab === 'courts' ? '#ffffff' : '#334155',
             border: activeTab === 'courts' ? '1px solid #059669' : '1px solid #cbd5e1',
-            borderRadius: 8,
-            padding: '8px 16px',
+            borderRadius: 10,
+            padding: '0 16px',
             fontWeight: 700,
             fontSize: 13,
             cursor: 'pointer',
-            display: 'flex',
+            display: 'inline-flex',
             alignItems: 'center',
             gap: 7,
             whiteSpace: 'nowrap',
-            boxShadow: '0 1px 2px rgba(0,0,0,0.04)'
+            boxShadow: activeTab === 'courts' ? '0 2px 5px rgba(5,150,105,0.2)' : '0 1px 2px rgba(0,0,0,0.03)',
+            transition: 'all 0.15s ease'
           }}
         >
           <Settings size={15} /> Courts & Rates
@@ -634,22 +628,47 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
         <button
           onClick={() => setActiveTab('crm')}
           style={{
+            height: 40,
             background: activeTab === 'crm' ? '#059669' : '#ffffff',
             color: activeTab === 'crm' ? '#ffffff' : '#334155',
             border: activeTab === 'crm' ? '1px solid #059669' : '1px solid #cbd5e1',
-            borderRadius: 8,
-            padding: '8px 16px',
+            borderRadius: 10,
+            padding: '0 16px',
             fontWeight: 700,
             fontSize: 13,
             cursor: 'pointer',
-            display: 'flex',
+            display: 'inline-flex',
             alignItems: 'center',
             gap: 7,
             whiteSpace: 'nowrap',
-            boxShadow: '0 1px 2px rgba(0,0,0,0.04)'
+            boxShadow: activeTab === 'crm' ? '0 2px 5px rgba(5,150,105,0.2)' : '0 1px 2px rgba(0,0,0,0.03)',
+            transition: 'all 0.15s ease'
           }}
         >
           <Users size={15} /> Customer CRM
+        </button>
+
+        <button
+          onClick={() => setActiveTab('business_setup')}
+          style={{
+            height: 40,
+            background: activeTab === 'business_setup' ? '#059669' : '#ffffff',
+            color: activeTab === 'business_setup' ? '#ffffff' : '#334155',
+            border: activeTab === 'business_setup' ? '1px solid #059669' : '1px solid #cbd5e1',
+            borderRadius: 10,
+            padding: '0 16px',
+            fontWeight: 700,
+            fontSize: 13,
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 7,
+            whiteSpace: 'nowrap',
+            boxShadow: activeTab === 'business_setup' ? '0 2px 5px rgba(5,150,105,0.2)' : '0 1px 2px rgba(0,0,0,0.03)',
+            transition: 'all 0.15s ease'
+          }}
+        >
+          <Building size={15} /> Business Setup
         </button>
       </div>
 
