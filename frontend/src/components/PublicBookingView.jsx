@@ -186,9 +186,11 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
 
   if (!venue) {
     return (
-      <div style={{ padding: 40, textAlign: 'center', color: '#fff' }}>
-        <h2>Venue not found</h2>
-        <button className="btn-secondary" onClick={onBack} style={{ marginTop: 16 }}>Return to Marketplace</button>
+      <div style={{ maxWidth: 420, margin: '80px auto', padding: '36px 28px', textAlign: 'center', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 16, boxShadow: '0 4px 14px rgba(0,0,0,0.05)' }}>
+        <AlertCircle size={32} color="#dc2626" style={{ margin: '0 auto 12px' }} />
+        <h2 style={{ fontSize: 18, fontWeight: 800, color: '#0f172a', marginBottom: 6 }}>Venue not found</h2>
+        <p style={{ fontSize: 13.5, color: '#64748b', marginBottom: 20 }}>This turf may have been removed or the link is incorrect.</p>
+        <button className="btn-primary" onClick={onBack}>Return to Marketplace</button>
       </div>
     );
   }

@@ -1,10 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api.js';
-import {
-  Search, MapPin, Calendar, Clock, Star,
-  Shield, Compass, Sparkles, Filter, ChevronRight,
-  Navigation, Check, Copy, Share2, Users, Flame, ArrowUpDown
-} from 'lucide-react';
+import { Search, MapPin, Sparkles, ChevronRight, Navigation, Check, Copy } from 'lucide-react';
 
 // Haversine distance calculation in kilometers
 function calculateDistanceKm(lat1, lon1, lat2, lon2) {
@@ -144,9 +140,6 @@ export default function PlayerMarketplace({ onSelectVenue }) {
     if (sortBy === 'slots_desc') {
       return (b.today_available_slots_count || 0) - (a.today_available_slots_count || 0);
     }
-    if (sortBy === 'rating') {
-      return (b.rating || 0) - (a.rating || 0);
-    }
     return 0;
   });
 
@@ -260,7 +253,6 @@ export default function PlayerMarketplace({ onSelectVenue }) {
               <option value="distance">Sort: Nearest to Me</option>
               <option value="slots_desc">Sort: Most Live Slots Today</option>
               <option value="price_asc">Sort: Price (Lowest First)</option>
-              <option value="rating">Sort: Highest Rated</option>
             </select>
           </div>
         </div>
@@ -339,7 +331,7 @@ export default function PlayerMarketplace({ onSelectVenue }) {
                   style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                 />
                 
-                {/* Distance & Rating Badges */}
+                {/* Distance / area badge */}
                 <div style={{ position: 'absolute', top: 12, left: 12, display: 'flex', gap: 6 }}>
                   {venue.distanceKm !== null ? (
                     <span
@@ -350,7 +342,7 @@ export default function PlayerMarketplace({ onSelectVenue }) {
                         fontSize: 11.5,
                         padding: '4px 10px',
                         borderRadius: 6,
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.35)',
                         display: 'inline-flex',
                         alignItems: 'center',
                         gap: 4
@@ -361,9 +353,9 @@ export default function PlayerMarketplace({ onSelectVenue }) {
                   ) : (
                     <span
                       style={{
-                        background: 'rgba(15, 23, 42, 0.85)',
+                        background: 'rgba(15, 23, 42, 0.75)',
                         backdropFilter: 'blur(4px)',
-                        color: '#94a3b8',
+                        color: '#e2e8f0',
                         fontWeight: 600,
                         fontSize: 11.5,
                         padding: '4px 8px',
@@ -373,39 +365,24 @@ export default function PlayerMarketplace({ onSelectVenue }) {
                       {venue.city || 'Bangalore'}
                     </span>
                   )}
-
-                  <span
-                    style={{
-                      background: 'rgba(15, 23, 42, 0.85)',
-                      backdropFilter: 'blur(4px)',
-                      color: '#fbbf24',
-                      fontWeight: 700,
-                      fontSize: 11.5,
-                      padding: '4px 8px',
-                      borderRadius: 6,
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 3
-                    }}
-                  >
-                    ★ {venue.rating || 4.8}
-                  </span>
                 </div>
 
-                {/* Available Slots Today Badge */}
+                {/* Available slots today — real count, not a preview list */}
                 <div style={{ position: 'absolute', bottom: 10, right: 10 }}>
                   <span
                     style={{
-                      background: 'rgba(15, 23, 42, 0.9)',
-                      border: '1px solid rgba(16, 185, 129, 0.3)',
-                      color: '#34d399',
+                      background: 'rgba(15, 23, 42, 0.88)',
+                      border: '1px solid rgba(16, 185, 129, 0.35)',
+                      color: venue.today_available_slots_count > 0 ? '#34d399' : '#94a3b8',
                       fontWeight: 700,
                       fontSize: 11.5,
                       padding: '4px 9px',
                       borderRadius: 6
                     }}
                   >
-                    {venue.today_available_slots_count || 0} Slots Available Today
+                    {venue.today_available_slots_count > 0
+                      ? `${venue.today_available_slots_count} slots open today`
+                      : 'Check availability'}
                   </span>
                 </div>
               </div>
@@ -443,64 +420,6 @@ export default function PlayerMarketplace({ onSelectVenue }) {
                 <div style={{ fontSize: 12.5, color: '#64748b', display: 'flex', alignItems: 'center', gap: 5, marginTop: 6, marginBottom: 12 }}>
                   <MapPin size={13} style={{ color: '#059669', flexShrink: 0 }} />
                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{venue.address}</span>
-                </div>
-
-                {/* LIVE SLOTS PREVIEW & INDIVIDUAL PLAYER REGISTRATIONS */}
-                <div style={{ background: '#f8fafc', borderRadius: 8, padding: '10px 12px', border: '1px solid #e2e8f0', marginBottom: 14 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
-                    <span>Live Slots Today & Pricing</span>
-                    <span style={{ color: '#059669' }}>Owner-Set Rates</span>
-                  </div>
-
-                  {venue.live_slots && venue.live_slots.length > 0 ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      {venue.live_slots.slice(0, 3).map((slot, idx) => {
-                        const isPartialGame = slot.is_game && slot.registered_players > 0;
-                        return (
-                          <div
-                            key={idx}
-                            style={{
-                              display: 'flex',
-                              justifyContent: 'space-between',
-                              alignItems: 'center',
-                              background: isPartialGame ? '#fffbeb' : '#ffffff',
-                              border: isPartialGame ? '1px solid #fde68a' : '1px solid #e2e8f0',
-                              padding: '6px 10px',
-                              borderRadius: 6,
-                              fontSize: 12
-                            }}
-                          >
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                              <Clock size={12} style={{ color: isPartialGame ? '#d97706' : '#059669' }} />
-                              <span style={{ fontWeight: 600, color: '#0f172a' }}>
-                                {slot.start_time} - {slot.end_time}
-                              </span>
-                              {isPartialGame ? (
-                                <span className="badge-amber" style={{ fontSize: 10, padding: '1px 6px' }}>
-                                  <Users size={10} /> {slot.registered_players}/{slot.capacity} players
-                                </span>
-                              ) : (
-                                <span style={{ fontSize: 11, color: '#64748b' }}>
-                                  {slot.court_name}
-                                </span>
-                              )}
-                            </div>
-
-                            <div style={{ fontWeight: 700, color: isPartialGame ? '#b45309' : '#059669' }}>
-                              ₹{slot.price}
-                              <span style={{ fontSize: 10, color: '#64748b', fontWeight: 400 }}>
-                                {isPartialGame ? '/player' : '/slot'}
-                              </span>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div style={{ fontSize: 12, color: '#64748b', textAlign: 'center', padding: '6px 0' }}>
-                      All morning slots booked · Evening slots opening soon
-                    </div>
-                  )}
                 </div>
 
                 {/* Amenities pills */}

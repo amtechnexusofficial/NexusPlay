@@ -6,7 +6,7 @@ import {
   TrendingUp, Activity, Lock, Unlock, Phone, RefreshCw,
   Building, Settings, QrCode, Copy, ShieldCheck, CheckCircle2,
   FileText, Check, ExternalLink, MapPin, Share2, Flame,
-  Tag, AlertCircle, Edit3, Save, Navigation, Sparkles
+  Tag, AlertCircle, Edit3, Save, Navigation, Sparkles, Trophy
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -948,7 +948,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 20 }}>
             <div className="nexus-card" style={{ padding: '12px 14px', borderLeft: '3px solid #10b981' }}>
               <div style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Available Open</div>
-              <div style={{ fontSize: 22, fontWeight: 800, color: '#34d399', marginTop: 2 }}>
+              <div style={{ fontSize: 22, fontWeight: 800, color: '#059669', marginTop: 2 }}>
                 {displaySlots.filter(s => s.status === 'open' && !s.game).length}
               </div>
             </div>
@@ -962,14 +962,14 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
 
             <div className="nexus-card" style={{ padding: '12px 14px', borderLeft: '3px solid #6366f1' }}>
               <div style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Confirmed Bookings</div>
-              <div style={{ fontSize: 22, fontWeight: 800, color: '#a5b4fc', marginTop: 2 }}>
+              <div style={{ fontSize: 22, fontWeight: 800, color: '#4f46e5', marginTop: 2 }}>
                 {displaySlots.filter(s => s.status === 'booked').length}
               </div>
             </div>
 
             <div className="nexus-card" style={{ padding: '12px 14px', borderLeft: '3px solid #64748b' }}>
               <div style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Maintenance Blocked</div>
-              <div style={{ fontSize: 22, fontWeight: 800, color: '#cbd5e1', marginTop: 2 }}>
+              <div style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', marginTop: 2 }}>
                 {displaySlots.filter(s => s.status === 'blocked' || s.status === 'maintenance').length}
               </div>
             </div>
@@ -983,7 +983,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
           ) : displaySlots.length === 0 ? (
             <div className="nexus-card" style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
               <Calendar size={32} style={{ margin: '0 auto 10px', color: '#64748b' }} />
-              <div style={{ fontSize: 15, fontWeight: 700, color: '#f8fafc' }}>No slots scheduled for this date</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: '#0f172a' }}>No slots scheduled for this date</div>
               <div style={{ fontSize: 12.5, marginTop: 4 }}>Slots are automatically generated according to court operating hours.</div>
             </div>
           ) : slotViewMode === 'cards' ? (
@@ -1007,12 +1007,12 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                     style={{
                       padding: 16,
                       background: isPartiallyFilled
-                        ? 'linear-gradient(180deg, #111a2e 0%, #0d1422 100%)'
+                        ? '#fffbeb'
                         : isBooked
-                        ? 'linear-gradient(180deg, #121528 0%, #0d1120 100%)'
+                        ? '#eef2ff'
                         : isBlocked
-                        ? '#090d16'
-                        : '#0d1422',
+                        ? '#f1f5f9'
+                        : '#ffffff',
                       border: isPartiallyFilled
                         ? '1px solid rgba(245, 158, 11, 0.4)'
                         : isBooked
@@ -1031,7 +1031,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                     <div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, marginBottom: 8 }}>
                         <div>
-                          <div style={{ fontSize: 16, fontWeight: 800, color: '#fff', letterSpacing: '-0.01em' }}>
+                          <div style={{ fontSize: 16, fontWeight: 800, color: '#0f172a', letterSpacing: '-0.01em' }}>
                             {slot.start_time} - {slot.end_time}
                           </div>
                           <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
@@ -1042,7 +1042,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                         {/* Price Badge with quick edit */}
                         <div style={{ textAlign: 'right' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'flex-end' }}>
-                            <span style={{ fontSize: 16, fontWeight: 800, color: '#34d399' }}>
+                            <span style={{ fontSize: 16, fontWeight: 800, color: '#059669' }}>
                               ₹{slot.price}
                             </span>
                             <button
@@ -1073,7 +1073,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                           </div>
 
                           {/* Visual Progress Bar */}
-                          <div style={{ background: '#1e293b', borderRadius: 999, height: 6, overflow: 'hidden', marginBottom: 6 }}>
+                          <div style={{ background: '#fde8c4', borderRadius: 999, height: 6, overflow: 'hidden', marginBottom: 6 }}>
                             <div
                               style={{
                                 width: `${Math.min(100, (registeredCount / requiredCount) * 100)}%`,
@@ -1084,7 +1084,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                             />
                           </div>
 
-                          <div style={{ fontSize: 11.5, color: '#cbd5e1' }}>
+                          <div style={{ fontSize: 11.5, color: '#78350f' }}>
                             {slot.game.title || 'Pickup Match'} · Paid ₹{registeredCount * (slot.game.cost_per_player || 250)}
                           </div>
 
@@ -1092,7 +1092,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                           {slot.game.participants && slot.game.participants.length > 0 && (
                             <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6 }}>
                               {slot.game.participants.map((p, idx) => (
-                                <span key={idx} style={{ background: '#1e293b', color: '#cbd5e1', fontSize: 10, padding: '2px 6px', borderRadius: 4 }}>
+                                <span key={idx} style={{ background: '#fff', color: '#92400e', border: '1px solid #fde68a', fontSize: 10, padding: '2px 6px', borderRadius: 4 }}>
                                   {p.name.split(' ')[0]}
                                 </span>
                               ))}
@@ -1106,7 +1106,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                               <CheckCircle size={11} /> {slot.booking?.source === 'full_time_inquiry' ? 'Full Turf Inquiry' : 'Confirmed Booking'}
                             </span>
                           </div>
-                          <div style={{ fontWeight: 700, color: '#fff', fontSize: 13 }}>
+                          <div style={{ fontWeight: 700, color: '#0f172a', fontSize: 13 }}>
                             {slot.full_inquiry_client || slot.booking?.customer_name || 'Booked Client'}
                           </div>
                           <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
@@ -1257,7 +1257,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                               setBlockStartTime(slot.start_time);
                               setShowBlockModal(true);
                             }}
-                            style={{ background: '#1e293b', border: '1px solid var(--border-card)', color: '#94a3b8', borderRadius: 6, padding: '7px 10px', fontSize: 11.5, cursor: 'pointer' }}
+                            style={{ background: '#f1f5f9', border: '1px solid var(--border-card)', color: '#475569', borderRadius: 6, padding: '7px 10px', fontSize: 11.5, cursor: 'pointer' }}
                           >
                             Block
                           </button>
@@ -1289,7 +1289,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 13 }}>
                   <thead>
-                    <tr style={{ background: '#0b111e', borderBottom: '1px solid var(--border-card)', color: 'var(--text-muted)', fontSize: 11.5 }}>
+                    <tr style={{ background: '#f8fafc', borderBottom: '1px solid var(--border-card)', color: 'var(--text-muted)', fontSize: 11.5 }}>
                       <th style={{ padding: '12px 16px', fontWeight: 600 }}>TIME & COURT</th>
                       <th style={{ padding: '12px 16px', fontWeight: 600 }}>STATUS</th>
                       <th style={{ padding: '12px 16px', fontWeight: 600 }}>PLAYER / CLIENT DETAILS</th>
@@ -1316,7 +1316,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                         >
                           {/* Time & Court */}
                           <td style={{ padding: '12px 16px' }}>
-                            <div style={{ fontWeight: 700, color: '#f8fafc' }}>
+                            <div style={{ fontWeight: 700, color: '#0f172a' }}>
                               {slot.start_time} - {slot.end_time}
                             </div>
                             <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
@@ -1354,7 +1354,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                           <td style={{ padding: '12px 16px' }}>
                             {isPartiallyFilled ? (
                               <div>
-                                <div style={{ fontWeight: 700, color: '#f8fafc', fontSize: 12.5 }}>
+                                <div style={{ fontWeight: 700, color: '#0f172a', fontSize: 12.5 }}>
                                   {slot.game.title || 'Open Game'}
                                 </div>
                                 <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 2 }}>
@@ -1363,7 +1363,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                               </div>
                             ) : isBooked ? (
                               <div>
-                                <div style={{ fontWeight: 600, color: '#f8fafc' }}>
+                                <div style={{ fontWeight: 600, color: '#0f172a' }}>
                                   {slot.full_inquiry_client || slot.booking?.customer_name || 'Booked Customer'}
                                 </div>
                                 <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
@@ -1384,7 +1384,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                           {/* Owner Price */}
                           <td style={{ padding: '12px 16px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                              <strong style={{ fontSize: 14, color: '#34d399' }}>
+                              <strong style={{ fontSize: 14, color: '#059669' }}>
                                 ₹{slot.price}
                               </strong>
                               <button
@@ -1465,7 +1465,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                                       setBlockStartTime(slot.start_time);
                                       setShowBlockModal(true);
                                     }}
-                                    style={{ background: '#1e293b', border: '1px solid var(--border-card)', color: '#94a3b8', borderRadius: 6, padding: '4px 8px', fontSize: 11, cursor: 'pointer' }}
+                                    style={{ background: '#f1f5f9', border: '1px solid var(--border-card)', color: '#475569', borderRadius: 6, padding: '4px 8px', fontSize: 11, cursor: 'pointer' }}
                                   >
                                     Block
                                   </button>
@@ -1504,7 +1504,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
         <div className="animate-fade-in">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 14, marginBottom: 20 }}>
             <div>
-              <h2 className="font-display" style={{ fontSize: 22, fontWeight: 800, color: '#fff', margin: 0 }}>
+              <h2 className="font-display" style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', margin: 0 }}>
                 Venue & Business Configuration
               </h2>
               <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: '4px 0 0 0' }}>
@@ -1513,7 +1513,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
             </div>
             
             {bizSuccessMsg && (
-              <div style={{ background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(16, 185, 129, 0.3)', color: '#34d399', padding: '8px 14px', borderRadius: 8, fontSize: 12.5, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{ background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(16, 185, 129, 0.3)', color: '#059669', padding: '8px 14px', borderRadius: 8, fontSize: 12.5, display: 'flex', alignItems: 'center', gap: 6 }}>
                 <CheckCircle2 size={15} /> {bizSuccessMsg}
               </div>
             )}
@@ -1524,7 +1524,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
               
               {/* Card 1: Business Identity & Legal Details */}
               <div className="nexus-card" style={{ padding: 22 }}>
-                <h3 style={{ fontSize: 15, fontWeight: 700, color: '#f8fafc', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <h3 style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
                   <Building size={16} style={{ color: '#10b981' }} />
                   Business & Legal Registration
                 </h3>
@@ -1621,7 +1621,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
 
               {/* Card 2: Physical Address & Geolocation Coordinates */}
               <div className="nexus-card" style={{ padding: 22 }}>
-                <h3 style={{ fontSize: 15, fontWeight: 700, color: '#f8fafc', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <h3 style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
                   <MapPin size={16} style={{ color: '#10b981' }} />
                   Address & GPS Geolocation
                 </h3>
@@ -1697,7 +1697,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                     </div>
                   </div>
 
-                  <div style={{ fontSize: 11.5, color: 'var(--text-muted)', background: '#0b111e', padding: 8, borderRadius: 6 }}>
+                  <div style={{ fontSize: 11.5, color: 'var(--text-muted)', background: '#f8fafc', padding: 8, borderRadius: 6 }}>
                     Coordinates enable customer proximity calculation when nearby players search for turfs.
                   </div>
                 </div>
@@ -1705,7 +1705,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
 
               {/* Card 3: Operating Hours & Direct UPI Details */}
               <div className="nexus-card" style={{ padding: 22 }}>
-                <h3 style={{ fontSize: 15, fontWeight: 700, color: '#f8fafc', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <h3 style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
                   <Clock size={16} style={{ color: '#10b981' }} />
                   Operating Hours & Direct UPI Settlement
                 </h3>
@@ -1770,7 +1770,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
 
               {/* Card 4: Ground Rules & Cancellation Policy */}
               <div className="nexus-card" style={{ padding: 22 }}>
-                <h3 style={{ fontSize: 15, fontWeight: 700, color: '#f8fafc', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <h3 style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
                   <FileText size={16} style={{ color: '#10b981' }} />
                   House Rules & Cancellation Policy
                 </h3>
@@ -1818,17 +1818,17 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginBottom: 24 }}>
             <div className="nexus-card" style={{ padding: 20 }}>
               <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Total Revenue</div>
-              <div className="font-display" style={{ fontSize: 26, fontWeight: 800, color: '#f8fafc', marginTop: 6 }}>
+              <div className="font-display" style={{ fontSize: 26, fontWeight: 800, color: '#0f172a', marginTop: 6 }}>
                 ₹{analytics?.totalRevenue?.toLocaleString() || '48,500'}
               </div>
-              <div style={{ fontSize: 11.5, color: '#34d399', marginTop: 4 }}>
+              <div style={{ fontSize: 11.5, color: '#059669', marginTop: 4 }}>
                 100% Direct-to-bank settlement
               </div>
             </div>
 
             <div className="nexus-card" style={{ padding: 20 }}>
               <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Slots Booked</div>
-              <div className="font-display" style={{ fontSize: 26, fontWeight: 800, color: '#f8fafc', marginTop: 6 }}>
+              <div className="font-display" style={{ fontSize: 26, fontWeight: 800, color: '#0f172a', marginTop: 6 }}>
                 {analytics?.totalBookings || bookings.length || '38'}
               </div>
               <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 4 }}>
@@ -1838,7 +1838,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
 
             <div className="nexus-card" style={{ padding: 20 }}>
               <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Repeat Customer Rate</div>
-              <div className="font-display" style={{ fontSize: 26, fontWeight: 800, color: '#34d399', marginTop: 6 }}>
+              <div className="font-display" style={{ fontSize: 26, fontWeight: 800, color: '#059669', marginTop: 6 }}>
                 64%
               </div>
               <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 4 }}>
@@ -1859,15 +1859,15 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
 
           {/* Recent Bookings Table */}
           <div className="nexus-card" style={{ overflow: 'hidden' }}>
-            <div style={{ padding: '14px 18px', background: '#0e1424', borderBottom: '1px solid var(--border-card)' }}>
-              <h3 style={{ fontSize: 15, fontWeight: 700, color: '#f8fafc', margin: 0 }}>
+            <div style={{ padding: '14px 18px', background: '#f8fafc', borderBottom: '1px solid var(--border-card)' }}>
+              <h3 style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', margin: 0 }}>
                 Recent Bookings & Slot Reservations
               </h3>
             </div>
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 13 }}>
                 <thead>
-                  <tr style={{ background: '#0b111e', borderBottom: '1px solid var(--border-card)', color: 'var(--text-muted)', fontSize: 11.5 }}>
+                  <tr style={{ background: '#f8fafc', borderBottom: '1px solid var(--border-card)', color: 'var(--text-muted)', fontSize: 11.5 }}>
                     <th style={{ padding: '12px 16px' }}>DATE / TIME</th>
                     <th style={{ padding: '12px 16px' }}>COURT</th>
                     <th style={{ padding: '12px 16px' }}>CUSTOMER</th>
@@ -1882,17 +1882,17 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                     const needsCashCollection = isActive && (b.payment_status === 'pending' || b.payment_status === 'cash') && b.payment_status !== 'paid';
                     return (
                       <tr key={b.id} style={{ borderBottom: '1px solid var(--border-card)' }}>
-                        <td style={{ padding: '12px 16px', fontWeight: 600, color: '#f8fafc' }}>
+                        <td style={{ padding: '12px 16px', fontWeight: 600, color: '#0f172a' }}>
                           {b.date} · {b.start_time} - {b.end_time}
                         </td>
                         <td style={{ padding: '12px 16px', color: 'var(--text-secondary)' }}>
                           {b.court_name || 'Pro Turf'}
                         </td>
                         <td style={{ padding: '12px 16px' }}>
-                          <div style={{ fontWeight: 600, color: '#fff' }}>{b.customer_name || 'Guest'}</div>
+                          <div style={{ fontWeight: 600, color: '#0f172a' }}>{b.customer_name || 'Guest'}</div>
                           <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{b.customer_phone}</div>
                         </td>
-                        <td style={{ padding: '12px 16px', fontWeight: 700, color: '#34d399' }}>
+                        <td style={{ padding: '12px 16px', fontWeight: 700, color: '#059669' }}>
                           ₹{b.total_amount}
                         </td>
                         <td style={{ padding: '12px 16px' }}>
@@ -1907,7 +1907,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                                 <button
                                   onClick={() => handleMarkCashPaid(b)}
                                   title="Mark cash payment received"
-                                  style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', color: '#34d399', borderRadius: 6, padding: '5px 9px', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+                                  style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', color: '#059669', borderRadius: 6, padding: '5px 9px', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
                                 >
                                   Mark Paid
                                 </button>
@@ -1915,7 +1915,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                               <button
                                 onClick={() => handleOpenReschedule(b)}
                                 title="Reschedule to a new date/time"
-                                style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.3)', color: '#a5b4fc', borderRadius: 6, padding: '5px 9px', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+                                style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.3)', color: '#4f46e5', borderRadius: 6, padding: '5px 9px', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
                               >
                                 Reschedule
                               </button>
@@ -1948,7 +1948,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
         <div className="animate-fade-in">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
             <div>
-              <h2 className="font-display" style={{ fontSize: 22, fontWeight: 800, color: '#fff', margin: 0 }}>
+              <h2 className="font-display" style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', margin: 0 }}>
                 Direct UPI Bank Settlement & UTR Audit Queue
               </h2>
               <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: '4px 0 0 0' }}>
@@ -1960,7 +1960,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
           {pendingUpiBookings.length === 0 ? (
             <div className="nexus-card" style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
               <CheckCircle size={36} style={{ color: '#10b981', margin: '0 auto 10px' }} />
-              <div style={{ fontSize: 16, fontWeight: 700, color: '#f8fafc' }}>All Caught Up!</div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: '#0f172a' }}>All Caught Up!</div>
               <div style={{ fontSize: 13, marginTop: 4 }}>No pending UPI payments awaiting verification.</div>
             </div>
           ) : (
@@ -1969,18 +1969,18 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                 <div key={b.id} className="nexus-card" style={{ padding: 18, borderLeft: '3px solid #f59e0b' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div>
-                      <div style={{ fontWeight: 700, color: '#f8fafc' }}>{b.customer_name || 'Player'}</div>
+                      <div style={{ fontWeight: 700, color: '#0f172a' }}>{b.customer_name || 'Player'}</div>
                       <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{b.customer_phone}</div>
                     </div>
-                    <div style={{ fontSize: 16, fontWeight: 800, color: '#34d399' }}>
+                    <div style={{ fontSize: 16, fontWeight: 800, color: '#059669' }}>
                       ₹{b.total_amount}
                     </div>
                   </div>
 
-                  <div style={{ background: '#0b111e', padding: '8px 10px', borderRadius: 6, margin: '12px 0', fontSize: 12 }}>
+                  <div style={{ background: '#f8fafc', padding: '8px 10px', borderRadius: 6, margin: '12px 0', fontSize: 12 }}>
                     <div>Slot: <strong>{b.date} · {b.start_time} - {b.end_time}</strong></div>
                     <div>Court: <strong>{b.court_name}</strong></div>
-                    <div style={{ color: '#93c5fd', fontFamily: 'monospace', marginTop: 2 }}>
+                    <div style={{ color: '#2563eb', fontFamily: 'monospace', marginTop: 2 }}>
                       UTR: {b.upi_utr || 'Pending submission'}
                     </div>
                   </div>
@@ -2014,7 +2014,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
         <div className="animate-fade-in">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
             <div>
-              <h2 className="font-display" style={{ fontSize: 22, fontWeight: 800, color: '#fff', margin: 0 }}>
+              <h2 className="font-display" style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', margin: 0 }}>
                 Court Inventory & Hourly Rates
               </h2>
               <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: '4px 0 0 0' }}>
@@ -2029,15 +2029,15 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 18 }}>
             {selectedVenue.courts?.map(c => (
               <div key={c.id} className="nexus-card" style={{ padding: 20 }}>
-                <h3 style={{ fontSize: 17, fontWeight: 800, color: '#f8fafc', margin: 0 }}>{c.name}</h3>
-                <div style={{ fontSize: 12, color: '#34d399', textTransform: 'capitalize', fontWeight: 600, marginTop: 2, marginBottom: 14 }}>
+                <h3 style={{ fontSize: 17, fontWeight: 800, color: '#0f172a', margin: 0 }}>{c.name}</h3>
+                <div style={{ fontSize: 12, color: '#059669', textTransform: 'capitalize', fontWeight: 600, marginTop: 2, marginBottom: 14 }}>
                   Sport: {c.sport_id} · Capacity: {c.capacity} Players
                 </div>
 
-                <div style={{ background: '#0b111e', padding: 12, borderRadius: 8, border: '1px solid var(--border-card)', marginBottom: 14 }}>
+                <div style={{ background: '#f8fafc', padding: 12, borderRadius: 8, border: '1px solid var(--border-card)', marginBottom: 14 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, marginBottom: 5 }}>
                     <span style={{ color: 'var(--text-secondary)' }}>Base Hourly Rate:</span>
-                    <strong style={{ color: '#fff' }}>₹{c.base_price}</strong>
+                    <strong style={{ color: '#0f172a' }}>₹{c.base_price}</strong>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, marginBottom: 5 }}>
                     <span style={{ color: 'var(--text-secondary)' }}>Peak Hours (18:00 - 22:00):</span>
@@ -2045,7 +2045,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5 }}>
                     <span style={{ color: 'var(--text-secondary)' }}>Weekend Rate:</span>
-                    <strong style={{ color: '#34d399' }}>₹{c.weekend_price || c.base_price}</strong>
+                    <strong style={{ color: '#059669' }}>₹{c.weekend_price || c.base_price}</strong>
                   </div>
                 </div>
 
@@ -2064,7 +2064,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
       {activeTab === 'crm' && (
         <div className="animate-fade-in">
           <div style={{ marginBottom: 18 }}>
-            <h2 className="font-display" style={{ fontSize: 22, fontWeight: 800, color: '#fff', margin: 0 }}>
+            <h2 className="font-display" style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', margin: 0 }}>
               Customer Relationship Management (CRM)
             </h2>
             <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: '4px 0 0 0' }}>
@@ -2076,7 +2076,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 13 }}>
                 <thead>
-                  <tr style={{ background: '#0b111e', borderBottom: '1px solid var(--border-card)', color: 'var(--text-muted)', fontSize: 11.5 }}>
+                  <tr style={{ background: '#f8fafc', borderBottom: '1px solid var(--border-card)', color: 'var(--text-muted)', fontSize: 11.5 }}>
                     <th style={{ padding: '12px 16px' }}>NAME</th>
                     <th style={{ padding: '12px 16px' }}>PHONE</th>
                     <th style={{ padding: '12px 16px' }}>BOOKINGS</th>
@@ -2087,16 +2087,16 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                 <tbody>
                   {customers.map(c => (
                     <tr key={c.id} style={{ borderBottom: '1px solid var(--border-card)' }}>
-                      <td style={{ padding: '12px 16px', fontWeight: 600, color: '#f8fafc' }}>
+                      <td style={{ padding: '12px 16px', fontWeight: 600, color: '#0f172a' }}>
                         {c.name || 'Player'}
                       </td>
                       <td style={{ padding: '12px 16px', color: 'var(--text-secondary)' }}>
                         {c.phone}
                       </td>
-                      <td style={{ padding: '12px 16px', color: '#f8fafc' }}>
+                      <td style={{ padding: '12px 16px', color: '#0f172a' }}>
                         {c.booking_count} bookings
                       </td>
-                      <td style={{ padding: '12px 16px', fontWeight: 700, color: '#34d399' }}>
+                      <td style={{ padding: '12px 16px', fontWeight: 700, color: '#059669' }}>
                         ₹{c.total_spend?.toLocaleString()}
                       </td>
                       <td style={{ padding: '12px 16px', color: 'var(--text-muted)', fontSize: 12 }}>
@@ -2116,16 +2116,16 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
       {/* ========================================================================= */}
       {showInquiryModal && inquirySlot && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 20 }}>
-          <div className="nexus-card animate-fade-in" style={{ maxWidth: 520, width: '100%', padding: 26, background: '#111726', border: '1px solid rgba(99, 102, 241, 0.4)' }}>
+          <div className="nexus-card animate-fade-in" style={{ maxWidth: 520, width: '100%', padding: 26, background: '#ffffff', border: '1px solid rgba(99, 102, 241, 0.4)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
               <div style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(99, 102, 241, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#818cf8' }}>
                 <Sparkles size={20} />
               </div>
               <div>
-                <h3 className="font-display" style={{ fontSize: 18, fontWeight: 800, color: '#f8fafc', margin: 0 }}>
+                <h3 className="font-display" style={{ fontSize: 18, fontWeight: 800, color: '#0f172a', margin: 0 }}>
                   Accept Full-Time Inquiry
                 </h3>
-                <div style={{ fontSize: 12, color: '#a5b4fc' }}>
+                <div style={{ fontSize: 12, color: '#4f46e5' }}>
                   Slot: {inquirySlot.date} · {inquirySlot.start_time} - {inquirySlot.end_time} ({inquirySlot.court_name})
                 </div>
               </div>
@@ -2248,8 +2248,8 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
       {/* MODAL: EDIT SLOT PRICE */}
       {editingPriceSlot && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 20 }}>
-          <div className="nexus-card animate-fade-in" style={{ maxWidth: 380, width: '100%', padding: 22, background: '#111726' }}>
-            <h3 style={{ fontSize: 16, fontWeight: 700, color: '#f8fafc', marginBottom: 4 }}>
+          <div className="nexus-card animate-fade-in" style={{ maxWidth: 380, width: '100%', padding: 22, background: '#ffffff' }}>
+            <h3 style={{ fontSize: 16, fontWeight: 700, color: '#0f172a', marginBottom: 4 }}>
               Set Slot Price
             </h3>
             <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 14 }}>
@@ -2287,8 +2287,8 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
       {/* MODAL: RESCHEDULE BOOKING */}
       {showRescheduleModal && rescheduleBooking && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 20 }}>
-          <div className="nexus-card animate-fade-in" style={{ maxWidth: 380, width: '100%', padding: 22, background: '#111726' }}>
-            <h3 style={{ fontSize: 16, fontWeight: 700, color: '#f8fafc', marginBottom: 4 }}>
+          <div className="nexus-card animate-fade-in" style={{ maxWidth: 380, width: '100%', padding: 22, background: '#ffffff' }}>
+            <h3 style={{ fontSize: 16, fontWeight: 700, color: '#0f172a', marginBottom: 4 }}>
               Reschedule Booking
             </h3>
             <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 14 }}>
@@ -2350,8 +2350,8 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
       {/* MODAL: WALK-IN BOOKING */}
       {showWalkInModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 20 }}>
-          <div className="nexus-card animate-fade-in" style={{ maxWidth: 460, width: '100%', padding: 24, background: '#111726' }}>
-            <h3 style={{ fontSize: 18, fontWeight: 800, color: '#f8fafc', marginBottom: 6 }}>
+          <div className="nexus-card animate-fade-in" style={{ maxWidth: 460, width: '100%', padding: 24, background: '#ffffff' }}>
+            <h3 style={{ fontSize: 18, fontWeight: 800, color: '#0f172a', marginBottom: 6 }}>
               New Walk-in Booking
             </h3>
             <p style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginBottom: 16 }}>
@@ -2451,8 +2451,8 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
       {/* MODAL: BLOCK SLOT */}
       {showBlockModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 20 }}>
-          <div className="nexus-card animate-fade-in" style={{ maxWidth: 440, width: '100%', padding: 24, background: '#111726' }}>
-            <h3 style={{ fontSize: 18, fontWeight: 800, color: '#f8fafc', marginBottom: 6 }}>
+          <div className="nexus-card animate-fade-in" style={{ maxWidth: 440, width: '100%', padding: 24, background: '#ffffff' }}>
+            <h3 style={{ fontSize: 18, fontWeight: 800, color: '#0f172a', marginBottom: 6 }}>
               Block Slot for Maintenance
             </h3>
             <p style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginBottom: 16 }}>
@@ -2514,8 +2514,8 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
       {/* MODAL: ADD COURT */}
       {showCourtModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 20 }}>
-          <div className="nexus-card animate-fade-in" style={{ maxWidth: 460, width: '100%', padding: 24, background: '#111726' }}>
-            <h3 style={{ fontSize: 18, fontWeight: 800, color: '#f8fafc', marginBottom: 6 }}>
+          <div className="nexus-card animate-fade-in" style={{ maxWidth: 460, width: '100%', padding: 24, background: '#ffffff' }}>
+            <h3 style={{ fontSize: 18, fontWeight: 800, color: '#0f172a', marginBottom: 6 }}>
               Add Court / Pitch
             </h3>
 
@@ -2635,8 +2635,8 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
       {/* MODAL: TURF QR CODE */}
       {showQrModal && selectedVenue && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 20 }}>
-          <div className="nexus-card animate-fade-in" style={{ maxWidth: 360, width: '100%', padding: 26, background: '#111726', textAlign: 'center' }}>
-            <h3 style={{ fontSize: 18, fontWeight: 800, color: '#f8fafc', marginBottom: 4 }}>
+          <div className="nexus-card animate-fade-in" style={{ maxWidth: 360, width: '100%', padding: 26, background: '#ffffff', textAlign: 'center' }}>
+            <h3 style={{ fontSize: 18, fontWeight: 800, color: '#0f172a', marginBottom: 4 }}>
               {selectedVenue.name}
             </h3>
             <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 18 }}>
@@ -2651,7 +2651,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
               />
             </div>
 
-            <div style={{ fontSize: 11.5, color: '#93c5fd', fontFamily: 'monospace', wordBreak: 'break-all', marginBottom: 16 }}>
+            <div style={{ fontSize: 11.5, color: '#2563eb', fontFamily: 'monospace', wordBreak: 'break-all', marginBottom: 16 }}>
               {uniqueTurfUrl}
             </div>
 
@@ -2665,12 +2665,12 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
       {/* MODAL: OWNER HOST OPEN GAME ON COURT SLOT */}
       {showOwnerHostModal && ownerHostSlot && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 20 }}>
-          <div className="nexus-card animate-fade-in" style={{ maxWidth: 480, width: '100%', padding: 24, background: '#111726' }}>
+          <div className="nexus-card animate-fade-in" style={{ maxWidth: 480, width: '100%', padding: 24, background: '#ffffff' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-              <div style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(16, 185, 129, 0.2)', color: '#34d399', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(16, 185, 129, 0.2)', color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <Trophy size={18} />
               </div>
-              <h3 style={{ fontSize: 18, fontWeight: 800, color: '#f8fafc', margin: 0 }}>
+              <h3 style={{ fontSize: 18, fontWeight: 800, color: '#0f172a', margin: 0 }}>
                 Host Open Game on Slot
               </h3>
             </div>

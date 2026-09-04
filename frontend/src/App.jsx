@@ -212,7 +212,7 @@ export default function App() {
               <div className="font-display" style={{ fontSize: 19, fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: 1.1 }}>
                 NEXUS<span style={{ color: '#059669' }}>PLAY</span>
               </div>
-              <div style={{ fontSize: 10, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              <div className="header-tagline" style={{ fontSize: 10, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                 Sports Operating System & Arena Network
               </div>
             </div>
@@ -341,8 +341,11 @@ export default function App() {
             )}
           </nav>
 
-          {/* Right Action Controls: Separate Player & Owner Access */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {/* Right Action Controls: Separate Player & Owner Access.
+              Full row on desktop; the mobile bottom bar already covers
+              sign-in / dashboard / logout, so mobile just gets a compact
+              avatar for at-a-glance identity. */}
+          <div className="header-actions-full" style={{ alignItems: 'center', gap: 10 }}>
             {/* Logged in as Player */}
             {currentUser && currentUser.role === 'player' && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -515,6 +518,36 @@ export default function App() {
                   <span>Owner Portal</span>
                 </button>
               </>
+            )}
+          </div>
+
+          {/* Compact mobile-only identity: avatar if signed in, single
+              icon button to open sign-in if not. The bottom nav bar
+              handles the actual navigation/logout on mobile. */}
+          <div className="header-actions-mobile" style={{ alignItems: 'center' }}>
+            {currentUser ? (
+              <button
+                onClick={() => navigateTo(currentUser.role === 'owner' ? 'owner' : 'player-dashboard')}
+                aria-label={`Open ${currentUser.role === 'owner' ? 'Owner Hub' : 'Player Dashboard'}`}
+                style={{
+                  width: 40, height: 40, borderRadius: '50%',
+                  background: currentUser.role === 'owner' ? '#4f46e5' : '#059669',
+                  color: '#ffffff', border: 'none', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 14, fontWeight: 800
+                }}
+              >
+                {currentUser.role === 'owner' ? <Building2 size={17} /> : (currentUser.name ? currentUser.name.charAt(0).toUpperCase() : 'P')}
+              </button>
+            ) : (
+              <button
+                onClick={openPlayerAuth}
+                aria-label="Sign in"
+                className="btn-secondary"
+                style={{ width: 40, height: 40, minHeight: 40, padding: 0, borderRadius: '50%' }}
+              >
+                <User size={17} color="#059669" />
+              </button>
             )}
           </div>
         </div>
@@ -745,7 +778,7 @@ export default function App() {
       />
 
       {/* Footer */}
-      <footer style={{ background: '#ffffff', borderTop: '1px solid #e2e8f0', padding: '24px 20px', textAlign: 'center', fontSize: 13, color: '#64748b' }}>
+      <footer className="app-footer" style={{ background: '#ffffff', borderTop: '1px solid #e2e8f0', textAlign: 'center', fontSize: 13, color: '#64748b' }}>
         <div style={{ maxWidth: 800, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
           <div style={{ fontWeight: 700, color: '#0f172a' }}>
             NexusPlay Sports Operating System & Venue Network
