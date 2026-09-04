@@ -9,11 +9,13 @@
     "build": "echo 'Ready'"
   },
   "dependencies": {
+    "@neondatabase/serverless": "^0.10.4",
     "@vitejs/plugin-react": "^6.1.1",
     "bcryptjs": "^3.0.3",
     "better-sqlite3": "^13.0.3",
     "cors": "^2.8.6",
     "express": "^5.2.1",
+    "hono": "^4.6.9",
     "jsonwebtoken": "^9.0.3",
     "lucide-react": "^1.39.0",
     "react": "^19.2.8",

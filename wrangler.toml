@@ -1,0 +1,44 @@
+name = "nexusplay"
+main = "backend/src/index.js"
+compatibility_date = "2024-11-01"
+compatibility_flags = ["nodejs_compat"]
+
+# This file mirrors backend/wrangler.toml. It exists because the
+# Cloudflare Workers Build runs `npx wrangler versions upload` with the
+# repo root as its working directory (not backend/), so Wrangler needs a
+# config here to find the entry point. Keep both files in sync — the
+# `main` path is the only difference between them.
+
+# Runs every minute. Currently a no-op placeholder (see index.js
+# `scheduled`) — Phase 3 (booking flow) wires this up to sweep expired
+# booking holds back to open slots.
+[triggers]
+crons = ["* * * * *"]
+
+# Venue/court photo + branding uploads live in this R2 bucket. Create it
+# once with:
+#   wrangler r2 bucket create nexusplay-media
+[[r2_buckets]]
+binding = "MEDIA"
+bucket_name = "nexusplay-media"
+
+# DATABASE_URL and JWT_SECRET are SECRETS, not vars — never commit them.
+# Set them with:
+#   wrangler secret put DATABASE_URL
+#   wrangler secret put JWT_SECRET      # any long random string
+#
+# For local dev, put them in a .dev.vars file (gitignored):
+#   DATABASE_URL=postgres://...
+#   JWT_SECRET=some-long-random-string
+#   DEV_MODE=true   # returns the OTP code in the API response so you can test without SMS
+
+[vars]
+# DEV_MODE must stay OFF in this file (the deployed/production config).
+# When "true", the OTP API response includes the raw code — fine for local
+# dev with no SMS provider, but a full auth bypass if left on in prod:
+# anyone could log in as any phone number. Turn it on only in a local
+# .dev.vars file (gitignored), never here.
+DEV_MODE = "false"
+# Comma-separated list of allowed frontend origins, e.g.:
+# ALLOWED_ORIGIN = "https://nexusplay.pages.dev,https://your-custom-domain.com"
+ALLOWED_ORIGIN = ""
