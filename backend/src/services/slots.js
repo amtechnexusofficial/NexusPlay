@@ -109,3 +109,97 @@ export async function getSlotOrThrow(sql, slotId) {
   if (!slot) throw httpError(404, "Slot not found");
   return slot;
 }
+
+// ===========================================================================
+// Owner slot management (block/unblock/price) — every mutation is scoped
+// to the caller's organization so an owner can never touch another
+// tenant's slot by guessing an id.
+// ===========================================================================
+
+export async function blockSlot(sql, organizationId, { slotId, courtId, venueId, date, startTime, endTime, reason = "Maintenance" }) {
+  if (slotId) {
+    const [updated] = await sql`
+      update court_slots set status = 'blocked', block_reason = ${reason}
+      where id = ${slotId} and organization_id = ${organizationId}
+      returning *
+    `;
+    if (!updated) throw httpError(404, "Slot not found");
+    return updated;
+  }
+
+  if (courtId && venueId && date && startTime) {
+    const [court] = await sql`select id from courts where id = ${courtId} and organization_id = ${organizationId}`;
+    if (!court) throw httpError(404, "Court not found");
+    const [row] = await sql`
+      insert into court_slots (court_id, venue_id, organization_id, date, start_time, end_time, price, status, block_reason)
+      values (${courtId}, ${venueId}, ${organizationId}, ${date}, ${startTime}, ${endTime || startTime}, 0, 'blocked', ${reason})
+      on conflict (court_id, date, start_time) do update set status = 'blocked', block_reason = ${reason}
+      returning *
+    `;
+    return row;
+  }
+
+  throw httpError(400, "slotId, or courtId+venueId+date+startTime, is required");
+}
+
+// The dashboard's "Unblock" button sends courtId+date+startTime (it never
+// looked up the slot id), so accept either that or a direct slotId.
+export async function unblockSlot(sql, organizationId, { slotId, courtId, date, startTime }) {
+  const [updated] = slotId
+    ? await sql`
+        update court_slots set status = 'open', block_reason = null
+        where id = ${slotId} and organization_id = ${organizationId} and status = 'blocked'
+        returning *
+      `
+    : await sql`
+        update court_slots set status = 'open', block_reason = null
+        where court_id = ${courtId} and date = ${date} and start_time = ${startTime}
+          and organization_id = ${organizationId} and status = 'blocked'
+        returning *
+      `;
+  if (!updated) throw httpError(404, "Blocked slot not found");
+  return updated;
+}
+
+export async function updateSlotPrice(sql, organizationId, slotId, price) {
+  if (!Number.isFinite(price) || price < 0) throw httpError(400, "A valid price is required");
+  const [updated] = await sql`
+    update court_slots set price = ${price}
+    where id = ${slotId} and organization_id = ${organizationId}
+    returning *
+  `;
+  if (!updated) throw httpError(404, "Slot not found");
+  return updated;
+}
+
+// Owner's interactive day view: the slot grid for one venue/date, each
+// slot enriched with its booking (if any). Ensures the grid exists first.
+export async function listLiveSlots(sql, organizationId, venueId, date) {
+  const targetDate = date || dateStr(new Date());
+  await generateSlotsForNextDays(sql, venueId, 7);
+
+  const slots = await sql`
+    select cs.*, c.name as court_name, sp.slug as sport_id, c.capacity as court_capacity,
+           c.base_price, c.peak_price, c.weekend_price
+    from court_slots cs
+    join courts c on cs.court_id = c.id
+    join sports sp on c.sport_id = sp.id
+    where cs.organization_id = ${organizationId} and cs.venue_id = ${venueId} and cs.date = ${targetDate}
+    order by c.name asc, cs.start_time asc
+  `;
+
+  const bookings = await sql`
+    select b.id, b.court_slot_id, b.customer_id, b.total_amount, b.amount_paid, b.status, b.payment_status,
+           b.source, b.notes, c.name as customer_name, c.phone as customer_phone
+    from bookings b
+    join court_slots cs on b.court_slot_id = cs.id
+    left join customers c on b.customer_id = c.id
+    where b.organization_id = ${organizationId} and b.venue_id = ${venueId} and cs.date = ${targetDate}
+  `;
+  const bookingBySlot = {};
+  for (const b of bookings) {
+    if (b.court_slot_id) bookingBySlot[b.court_slot_id] = b;
+  }
+
+  return { date: targetDate, venueId, slots: slots.map((s) => ({ ...s, booking: bookingBySlot[s.id] || null })) };
+}

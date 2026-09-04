@@ -28,8 +28,11 @@ export async function createCourt(sql, organizationId, venueId, input) {
   for (const field of ["name", "sportId", "basePrice"]) {
     if (input[field] === undefined || input[field] === null) throw httpError(400, `${field} is required`);
   }
-  const [sport] = await sql`select id from sports where id = ${input.sportId}`;
+  // Accepts either a real sport id (uuid) or its slug (e.g. 'football') —
+  // the owner dashboard's Add Court form still uses hardcoded slugs.
+  const [sport] = await sql`select id from sports where id::text = ${input.sportId} or slug = ${input.sportId}`;
   if (!sport) throw httpError(400, "Invalid sportId");
+  input = { ...input, sportId: sport.id };
 
   const [court] = await sql`
     insert into courts (

@@ -21,8 +21,20 @@ import {
   updateCourt,
   deleteCourt,
 } from "./services/courts.js";
-import { listSlots } from "./services/slots.js";
+import { listSlots, blockSlot, unblockSlot, updateSlotPrice, listLiveSlots } from "./services/slots.js";
 import { holdSlot, confirmBooking, releaseHold, sweepExpiredHolds } from "./services/bookings.js";
+import {
+  getContext,
+  getAnalytics,
+  listBookings,
+  createWalkIn,
+  updateBookingAction,
+  listCustomers,
+  listPendingUpi,
+  verifyUpiPayment,
+  updateVenueProfile,
+  getVenueProfile,
+} from "./services/owner.js";
 
 const app = new Hono();
 
@@ -174,6 +186,99 @@ app.patch("/api/venues/:venueId", ...ownerAuth, async (c) => {
 app.delete("/api/venues/:venueId", ...ownerAuth, async (c) => {
   const sql = getDb(c.env);
   return c.json(await deleteVenue(sql, c.get("organizationId"), c.req.param("venueId")));
+});
+
+// ===========================================================================
+// Owner dashboard: daily operations (bookings, walk-ins, slot management,
+// CRM, UPI verification, business profile). Everything here is scoped to
+// the caller's organizationId via ownerAuth — an owner can only ever see
+// or touch their own tenant's data.
+// ===========================================================================
+
+app.get("/api/owner/context", ...ownerAuth, async (c) => {
+  const sql = getDb(c.env);
+  return c.json(await getContext(sql, c.get("organizationId"), c.get("user")));
+});
+
+app.get("/api/owner/analytics", ...ownerAuth, async (c) => {
+  const sql = getDb(c.env);
+  return c.json(await getAnalytics(sql, c.get("organizationId"), c.req.query("venueId") || undefined));
+});
+
+app.get("/api/owner/bookings", ...ownerAuth, async (c) => {
+  const sql = getDb(c.env);
+  const venueId = c.req.query("venueId") || undefined;
+  const date = c.req.query("date") || undefined;
+  return c.json(await listBookings(sql, c.get("organizationId"), { venueId, date }));
+});
+
+app.post("/api/owner/walk-in", ...ownerAuth, async (c) => {
+  const result = await createWalkIn(c.env, c.get("organizationId"), await c.req.json());
+  return c.json({ success: true, ...result });
+});
+
+app.patch("/api/owner/bookings/:bookingId", ...ownerAuth, async (c) => {
+  const result = await updateBookingAction(c.env, c.get("organizationId"), c.req.param("bookingId"), await c.req.json());
+  return c.json({ success: true, ...result });
+});
+
+app.post("/api/owner/slots/block", ...ownerAuth, async (c) => {
+  const sql = getDb(c.env);
+  const slot = await blockSlot(sql, c.get("organizationId"), await c.req.json());
+  return c.json({ success: true, slot });
+});
+
+app.post("/api/owner/slots/unblock", ...ownerAuth, async (c) => {
+  const sql = getDb(c.env);
+  const slot = await unblockSlot(sql, c.get("organizationId"), await c.req.json());
+  return c.json({ success: true, slot });
+});
+
+app.patch("/api/owner/slots/:slotId/price", ...ownerAuth, async (c) => {
+  const sql = getDb(c.env);
+  const { price } = await c.req.json();
+  const slot = await updateSlotPrice(sql, c.get("organizationId"), c.req.param("slotId"), Number(price));
+  return c.json({ success: true, slot });
+});
+
+app.get("/api/owner/live-slots", ...ownerAuth, async (c) => {
+  const sql = getDb(c.env);
+  const venueId = c.req.query("venueId");
+  if (!venueId) throw httpError(400, "venueId is required");
+  return c.json(await listLiveSlots(sql, c.get("organizationId"), venueId, c.req.query("date") || undefined));
+});
+
+app.get("/api/owner/crm", ...ownerAuth, async (c) => {
+  const sql = getDb(c.env);
+  return c.json(await listCustomers(sql, c.get("organizationId")));
+});
+
+app.post("/api/owner/courts", ...ownerAuth, async (c) => {
+  const sql = getDb(c.env);
+  const body = await c.req.json();
+  const court = await createCourt(sql, c.get("organizationId"), body.venueId, body);
+  return c.json({ success: true, courtId: court.id, court }, 201);
+});
+
+app.get("/api/owner/venues/:id", ...ownerAuth, async (c) => {
+  const sql = getDb(c.env);
+  return c.json(await getVenueProfile(sql, c.get("organizationId"), c.req.param("id")));
+});
+
+app.put("/api/owner/venues/:id", ...ownerAuth, async (c) => {
+  const sql = getDb(c.env);
+  const venue = await updateVenueProfile(sql, c.get("organizationId"), c.req.param("id"), await c.req.json());
+  return c.json({ success: true, venue });
+});
+
+app.get("/api/owner/upi-pending", ...ownerAuth, async (c) => {
+  const sql = getDb(c.env);
+  return c.json(await listPendingUpi(sql, c.get("organizationId"), c.req.query("venueId") || undefined));
+});
+
+app.post("/api/owner/bookings/:bookingId/verify-upi", ...ownerAuth, async (c) => {
+  const result = await verifyUpiPayment(c.env, c.get("organizationId"), c.req.param("bookingId"), await c.req.json());
+  return c.json({ success: true, ...result });
 });
 
 // ===========================================================================

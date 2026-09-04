@@ -1,0 +1,325 @@
+import { httpError } from "../errors.js";
+import { withTransaction } from "../db.js";
+import { getVenueForOrg, updateVenue } from "./venues.js";
+import { listCourtsForVenue } from "./courts.js";
+import { findOrCreateCustomerInTx, recordCustomerBookingInTx } from "./customers.js";
+
+// ===========================================================================
+// Dashboard shell: venues + org info for the SaaS shell to bootstrap with.
+// ===========================================================================
+
+export async function getContext(sql, organizationId, user) {
+  const [organization] = await sql`select id, name from organizations where id = ${organizationId}`;
+  const venues = await sql`select * from venues where organization_id = ${organizationId} order by created_at desc`;
+
+  // The dashboard shell (court dropdowns in the block/walk-in modals) reads
+  // selectedVenue.courts directly, so embed each venue's courts here rather
+  // than making the UI fetch them separately per venue.
+  const venuesWithCourts = await Promise.all(
+    venues.map(async (v) => ({
+      ...v,
+      courts: await sql`select * from courts where venue_id = ${v.id} and status = 'active' order by created_at`,
+    }))
+  );
+
+  return { user, organization, venues: venuesWithCourts };
+}
+
+// ===========================================================================
+// Analytics
+// ===========================================================================
+
+export async function getAnalytics(sql, organizationId, venueId) {
+  // Always qualified with the `b` alias so it's unambiguous once joined
+  // against courts/court_slots, which also have their own venue_id.
+  const venueClause = venueId ? sql`and b.venue_id = ${venueId}` : sql``;
+
+  const [today] = await sql`
+    select coalesce(sum(amount_paid), 0)::int as revenue, count(*)::int as bookings
+    from bookings b
+    where organization_id = ${organizationId} and status in ('confirmed', 'completed')
+      and created_at::date = current_date ${venueClause}
+  `;
+  const [week] = await sql`
+    select coalesce(sum(amount_paid), 0)::int as revenue, count(*)::int as bookings
+    from bookings b
+    where organization_id = ${organizationId} and status in ('confirmed', 'completed')
+      and created_at >= now() - interval '7 days' ${venueClause}
+  `;
+  const [month] = await sql`
+    select coalesce(sum(amount_paid), 0)::int as revenue, count(*)::int as bookings
+    from bookings b
+    where organization_id = ${organizationId} and status in ('confirmed', 'completed')
+      and created_at >= now() - interval '30 days' ${venueClause}
+  `;
+  const [total] = await sql`
+    select coalesce(sum(amount_paid), 0)::int as revenue, count(*)::int as bookings
+    from bookings b
+    where organization_id = ${organizationId} and status in ('confirmed', 'completed') ${venueClause}
+  `;
+
+  const [occupancy] = await sql`
+    select
+      count(*) filter (where status = 'booked')::int as booked,
+      count(*)::int as total
+    from court_slots
+    where organization_id = ${organizationId} and date = current_date ${venueId ? sql`and venue_id = ${venueId}` : sql``}
+  `;
+  const occupancyRate = occupancy.total > 0 ? Math.round((occupancy.booked / occupancy.total) * 100) : 0;
+
+  const revenueByCourt = await sql`
+    select c.id as court_id, c.name as court_name, coalesce(sum(b.amount_paid), 0)::int as revenue, count(b.id)::int as bookings
+    from bookings b join courts c on b.court_id = c.id
+    where b.organization_id = ${organizationId} and b.status in ('confirmed', 'completed') ${venueClause}
+    group by c.id, c.name order by revenue desc
+  `;
+
+  const revenueBySport = await sql`
+    select s.name as sport, coalesce(sum(b.amount_paid), 0)::int as revenue, count(b.id)::int as bookings
+    from bookings b join courts c on b.court_id = c.id join sports s on c.sport_id = s.id
+    where b.organization_id = ${organizationId} and b.status in ('confirmed', 'completed') ${venueClause}
+    group by s.name order by revenue desc
+  `;
+
+  const peakHours = await sql`
+    select cs.start_time, count(*)::int as bookings
+    from bookings b join court_slots cs on b.court_slot_id = cs.id
+    where b.organization_id = ${organizationId} and b.status in ('confirmed', 'completed') ${venueClause}
+    group by cs.start_time order by bookings desc limit 3
+  `;
+
+  return {
+    todayRevenue: today.revenue,
+    todayBookings: today.bookings,
+    weeklyRevenue: week.revenue,
+    weeklyBookings: week.bookings,
+    monthlyRevenue: month.revenue,
+    monthlyBookings: month.bookings,
+    totalRevenue: total.revenue,
+    totalBookings: total.bookings,
+    occupancyRate,
+    revenueByCourt,
+    revenueBySport,
+    peakHours: peakHours.map((p) => p.start_time),
+  };
+}
+
+// ===========================================================================
+// Bookings list, walk-ins, cancel/reschedule/cash
+// ===========================================================================
+
+export async function listBookings(sql, organizationId, { venueId, date } = {}) {
+  const venueClause = venueId ? sql`and b.venue_id = ${venueId}` : sql``;
+  const dateClause = date ? sql`and cs.date = ${date}` : sql``;
+  // Booking date/time live on court_slots, not bookings — a booking is one
+  // slot, so this join is 1:1 (safe against fan-out).
+  return sql`
+    select b.*, cs.date, cs.start_time, cs.end_time,
+           c.name as customer_name, c.phone as customer_phone,
+           crt.name as court_name, v.name as venue_name
+    from bookings b
+    join court_slots cs on b.court_slot_id = cs.id
+    left join customers c on b.customer_id = c.id
+    left join courts crt on b.court_id = crt.id
+    left join venues v on b.venue_id = v.id
+    where b.organization_id = ${organizationId} ${venueClause} ${dateClause}
+    order by cs.date desc, cs.start_time desc
+    limit 200
+  `;
+}
+
+// Fast owner-side booking: court + slot are confirmed immediately, no hold
+// step, payment is recorded as already collected (cash or pre-arranged).
+export async function createWalkIn(env, organizationId, input) {
+  const { venueId, courtId, date, startTime, endTime, customerName, customerPhone, totalAmount, paymentMode = "cash" } = input;
+  if (!venueId || !courtId || !date || !startTime || !customerPhone || totalAmount === undefined) {
+    throw httpError(400, "venueId, courtId, date, startTime, customerPhone and totalAmount are required");
+  }
+
+  return withTransaction(env, async (client) => {
+    const { rows: venueRows } = await client.query("select * from venues where id = $1 and organization_id = $2", [venueId, organizationId]);
+    if (!venueRows[0]) throw httpError(404, "Venue not found");
+
+    let { rows: slotRows } = await client.query(
+      "select * from court_slots where court_id = $1 and date = $2 and start_time = $3 for update",
+      [courtId, date, startTime]
+    );
+    let slot = slotRows[0];
+
+    if (slot) {
+      if (slot.status === "booked") throw httpError(409, "This slot is already booked");
+      await client.query("update court_slots set status = 'booked', hold_expires_at = null where id = $1", [slot.id]);
+    } else {
+      const { rows } = await client.query(
+        `insert into court_slots (court_id, venue_id, organization_id, date, start_time, end_time, price, status)
+         values ($1, $2, $3, $4, $5, $6, $7, 'booked') returning *`,
+        [courtId, venueId, organizationId, date, startTime, endTime || startTime, totalAmount]
+      );
+      slot = rows[0];
+    }
+
+    const customer = await findOrCreateCustomerInTx(client, organizationId, { name: customerName, phone: customerPhone });
+
+    const { rows: bookingRows } = await client.query(
+      `insert into bookings (organization_id, venue_id, court_id, court_slot_id, customer_id, source, status, payment_status, total_amount, amount_paid, notes)
+       values ($1, $2, $3, $4, $5, 'walk_in', 'confirmed', $6, $7, $7, $8) returning *`,
+      [organizationId, venueId, courtId, slot.id, customer.id, paymentMode === "cash" ? "cash" : "paid", totalAmount, `Walk-in booking for ${customerName || "Customer"}`]
+    );
+
+    await client.query(
+      `insert into payments (organization_id, booking_id, provider, amount, status, method)
+       values ($1, $2, 'cash', $3, 'captured', $4)`,
+      [organizationId, bookingRows[0].id, totalAmount, paymentMode]
+    );
+
+    await recordCustomerBookingInTx(client, customer.id, totalAmount);
+
+    return { bookingId: bookingRows[0].id, booking: bookingRows[0] };
+  });
+}
+
+// action: 'mark_cash_paid' | 'cancel' | 'reschedule'
+export async function updateBookingAction(env, organizationId, bookingId, { action, newDate, newStartTime, newEndTime }) {
+  return withTransaction(env, async (client) => {
+    const { rows } = await client.query("select * from bookings where id = $1 and organization_id = $2 for update", [bookingId, organizationId]);
+    const booking = rows[0];
+    if (!booking) throw httpError(404, "Booking not found");
+
+    if (action === "mark_cash_paid") {
+      const { rows: updated } = await client.query(
+        "update bookings set payment_status = 'cash', status = 'confirmed', amount_paid = total_amount, updated_at = now() where id = $1 returning *",
+        [bookingId]
+      );
+      return { booking: updated[0], message: "Cash payment marked as received" };
+    }
+
+    if (action === "cancel") {
+      const { rows: updated } = await client.query(
+        "update bookings set status = 'cancelled', payment_status = 'refunded', notes = 'Cancelled by owner', updated_at = now() where id = $1 returning *",
+        [bookingId]
+      );
+      if (booking.court_slot_id) {
+        await client.query("update court_slots set status = 'open', hold_expires_at = null where id = $1", [booking.court_slot_id]);
+      }
+      return { booking: updated[0], message: "Booking cancelled and slot reopened" };
+    }
+
+    if (action === "reschedule") {
+      if (!newDate || !newStartTime) throw httpError(400, "newDate and newStartTime are required");
+      const { rows: updated } = await client.query(
+        "update bookings set date = $1, start_time = $2, end_time = $3, notes = 'Rescheduled by owner', updated_at = now() where id = $4 returning *",
+        [newDate, newStartTime, newEndTime || booking.end_time, bookingId]
+      );
+      return { booking: updated[0], message: "Booking rescheduled" };
+    }
+
+    throw httpError(400, "Invalid action");
+  });
+}
+
+// ===========================================================================
+// Customer CRM
+// ===========================================================================
+
+export async function listCustomers(sql, organizationId) {
+  return sql`
+    select *, total_bookings as booking_count, last_booking_at as last_booking_date
+    from customers where organization_id = ${organizationId} order by total_spend desc
+  `;
+}
+
+// ===========================================================================
+// UPI verification queue
+// ===========================================================================
+
+export async function listPendingUpi(sql, organizationId, venueId) {
+  const venueClause = venueId ? sql`and b.venue_id = ${venueId}` : sql``;
+  return sql`
+    select b.*, cs.date, cs.start_time, cs.end_time,
+           c.name as customer_name, c.phone as customer_phone, c.email as customer_email,
+           crt.name as court_name, v.name as venue_name, v.upi_id as venue_upi_id, v.upi_name as venue_upi_name
+    from bookings b
+    join court_slots cs on b.court_slot_id = cs.id
+    left join customers c on b.customer_id = c.id
+    left join courts crt on b.court_id = crt.id
+    left join venues v on b.venue_id = v.id
+    where b.organization_id = ${organizationId} and b.payment_status = 'pending_verification' ${venueClause}
+    order by b.created_at desc
+  `;
+}
+
+export async function verifyUpiPayment(env, organizationId, bookingId, { action = "verify_credit", notes = "" }) {
+  return withTransaction(env, async (client) => {
+    const { rows } = await client.query("select * from bookings where id = $1 and organization_id = $2 for update", [bookingId, organizationId]);
+    const booking = rows[0];
+    if (!booking) throw httpError(404, "Booking not found");
+
+    if (action === "verify_credit") {
+      const { rows: updated } = await client.query(
+        `update bookings set payment_status = 'paid', status = 'confirmed', amount_paid = total_amount,
+           notes = coalesce(notes || ' | ', '') || 'Bank credit verified by owner', updated_at = now()
+         where id = $1 returning *`,
+        [bookingId]
+      );
+      await client.query("update payments set status = 'captured' where booking_id = $1", [bookingId]);
+      // Customer CRM stats (total_spend/total_bookings) were already
+      // incremented when the booking was confirmed in bookings.js — this
+      // step only flips the verification status, it doesn't re-count.
+      return { status: "paid", booking: updated[0], message: "UPI payment verified and credited to venue" };
+    }
+
+    if (action === "reject") {
+      const { rows: updated } = await client.query(
+        "update bookings set payment_status = 'failed', status = 'cancelled', notes = $2, updated_at = now() where id = $1 returning *",
+        [bookingId, notes || "Payment not received in owner UPI bank account"]
+      );
+      if (booking.court_slot_id) {
+        await client.query("update court_slots set status = 'open', hold_expires_at = null where id = $1", [booking.court_slot_id]);
+      }
+      await client.query("update payments set status = 'failed' where booking_id = $1", [bookingId]);
+      return { status: "rejected", booking: updated[0], message: "Booking rejected and slot released back to open" };
+    }
+
+    throw httpError(400, "Invalid verification action");
+  });
+}
+
+// ===========================================================================
+// Business profile save (translates the dashboard's snake_case payload)
+// ===========================================================================
+
+export async function updateVenueProfile(sql, organizationId, venueId, body) {
+  const venue = await updateVenue(sql, organizationId, venueId, {
+    name: body.name,
+    description: body.description,
+    address: body.address,
+    city: body.city,
+    pincode: body.pincode,
+    gstin: body.gstin,
+    businessType: body.business_type,
+    rules: body.rules,
+    lat: body.lat,
+    lng: body.lng,
+    phone: body.phone,
+    email: body.email,
+    amenities: body.amenities,
+    openTime: body.open_time ?? body.openTime,
+    closeTime: body.close_time ?? body.closeTime,
+    upiId: body.upi_id,
+    upiName: body.upi_name,
+    upiQrImage: body.upi_qr_image,
+  });
+
+  if (body.organization_name) {
+    await sql`update organizations set name = ${body.organization_name} where id = ${organizationId}`;
+  }
+
+  return venue;
+}
+
+export async function getVenueProfile(sql, organizationId, venueId) {
+  const venue = await getVenueForOrg(sql, organizationId, venueId);
+  const [organization] = await sql`select name from organizations where id = ${organizationId}`;
+  const courts = await listCourtsForVenue(sql, organizationId, venueId);
+  return { ...venue, organization_name: organization?.name || "", courts };
+}

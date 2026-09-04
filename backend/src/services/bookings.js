@@ -100,9 +100,9 @@ export async function confirmBooking(env, { bookingId, paymentProvider = "upi", 
     await client.query("update court_slots set status = 'booked', hold_expires_at = null where id = $1", [booking.court_slot_id]);
 
     const { rows: updatedRows } = await client.query(
-      `update bookings set status = 'confirmed', payment_status = $1, amount_paid = $2, notes = $3, hold_expires_at = null, updated_at = now()
-       where id = $4 returning *`,
-      [paymentStatus, amountPaid, notes, bookingId]
+      `update bookings set status = 'confirmed', payment_status = $1, amount_paid = $2, notes = $3, upi_utr = $4, hold_expires_at = null, updated_at = now()
+       where id = $5 returning *`,
+      [paymentStatus, amountPaid, notes, cleanUtr || null, bookingId]
     );
 
     await client.query(

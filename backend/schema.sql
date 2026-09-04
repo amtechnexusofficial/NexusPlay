@@ -354,3 +354,16 @@ alter table bookings add constraint bookings_payment_status_check
 alter table payments drop constraint if exists payments_provider_check;
 alter table payments add constraint payments_provider_check
   check (provider in ('razorpay', 'stripe', 'cash', 'upi'));
+
+-- ===========================================================================
+-- Migration: owner dashboard business-profile fields (Phase 2).
+-- ===========================================================================
+
+alter table venues add column if not exists city text;
+alter table venues add column if not exists pincode text;
+alter table venues add column if not exists gstin text;
+alter table venues add column if not exists business_type text;
+alter table venues add column if not exists rules text;
+
+alter table court_slots add column if not exists block_reason text;
+alter table bookings add column if not exists upi_utr text;
