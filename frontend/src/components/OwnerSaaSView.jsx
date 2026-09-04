@@ -97,6 +97,14 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
   const [showQrModal, setShowQrModal] = useState(false);
   const [slotViewMode, setSlotViewMode] = useState('cards'); // 'cards' or 'table'
 
+  // Reschedule booking modal
+  const [showRescheduleModal, setShowRescheduleModal] = useState(false);
+  const [rescheduleBooking, setRescheduleBooking] = useState(null);
+  const [rescheduleDate, setRescheduleDate] = useState('');
+  const [rescheduleStartTime, setRescheduleStartTime] = useState('');
+  const [rescheduleEndTime, setRescheduleEndTime] = useState('');
+  const [submittingReschedule, setSubmittingReschedule] = useState(false);
+
   // Load Initial Data
   async function loadData(targetVenueId = null) {
     try {
@@ -404,6 +412,62 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
       alert('❌ Booking rejected and slot released back to open.');
     } catch (err) {
       alert('Rejection failed: ' + err.message);
+    }
+  }
+
+  async function refreshBookings() {
+    if (selectedVenue) {
+      const bData = await api.getOwnerBookings({ venueId: selectedVenue.id }).catch(() => null);
+      if (bData) setBookings(bData);
+    }
+  }
+
+  async function handleCancelBooking(booking) {
+    if (!window.confirm(`Cancel the booking for ${booking.customer_name || 'this customer'} on ${booking.date} at ${booking.start_time}? The slot will reopen for other players.`)) return;
+    try {
+      await api.updateBookingAction(booking.id, { action: 'cancel' });
+      await refreshBookings();
+      if (selectedVenue) loadLiveSlots(selectedVenue.id, calendarDate);
+    } catch (err) {
+      alert('Failed to cancel booking: ' + err.message);
+    }
+  }
+
+  async function handleMarkCashPaid(booking) {
+    try {
+      await api.updateBookingAction(booking.id, { action: 'mark_cash_paid' });
+      await refreshBookings();
+    } catch (err) {
+      alert('Failed to mark cash payment: ' + err.message);
+    }
+  }
+
+  function handleOpenReschedule(booking) {
+    setRescheduleBooking(booking);
+    setRescheduleDate(booking.date);
+    setRescheduleStartTime(booking.start_time);
+    setRescheduleEndTime(booking.end_time);
+    setShowRescheduleModal(true);
+  }
+
+  async function handleRescheduleSubmit(e) {
+    e.preventDefault();
+    if (!rescheduleBooking) return;
+    setSubmittingReschedule(true);
+    try {
+      await api.updateBookingAction(rescheduleBooking.id, {
+        action: 'reschedule',
+        newDate: rescheduleDate,
+        newStartTime: rescheduleStartTime,
+        newEndTime: rescheduleEndTime
+      });
+      setShowRescheduleModal(false);
+      await refreshBookings();
+      if (selectedVenue) loadLiveSlots(selectedVenue.id, calendarDate);
+    } catch (err) {
+      alert('Failed to reschedule booking: ' + err.message);
+    } finally {
+      setSubmittingReschedule(false);
     }
   }
 
@@ -1809,31 +1873,67 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                     <th style={{ padding: '12px 16px' }}>CUSTOMER</th>
                     <th style={{ padding: '12px 16px' }}>AMOUNT</th>
                     <th style={{ padding: '12px 16px' }}>STATUS</th>
+                    <th style={{ padding: '12px 16px' }}>ACTIONS</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {bookings.slice(0, 10).map(b => (
-                    <tr key={b.id} style={{ borderBottom: '1px solid var(--border-card)' }}>
-                      <td style={{ padding: '12px 16px', fontWeight: 600, color: '#f8fafc' }}>
-                        {b.date} · {b.start_time} - {b.end_time}
-                      </td>
-                      <td style={{ padding: '12px 16px', color: 'var(--text-secondary)' }}>
-                        {b.court_name || 'Pro Turf'}
-                      </td>
-                      <td style={{ padding: '12px 16px' }}>
-                        <div style={{ fontWeight: 600, color: '#fff' }}>{b.customer_name || 'Guest'}</div>
-                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{b.customer_phone}</div>
-                      </td>
-                      <td style={{ padding: '12px 16px', fontWeight: 700, color: '#34d399' }}>
-                        ₹{b.total_amount}
-                      </td>
-                      <td style={{ padding: '12px 16px' }}>
-                        <span className={b.status === 'confirmed' ? 'badge-emerald' : 'badge-slate'} style={{ fontSize: 11 }}>
-                          {b.status} {b.payment_mode === 'upi' ? '· UPI' : ''}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
+                  {bookings.slice(0, 10).map(b => {
+                    const isActive = b.status === 'confirmed' || b.status === 'pending_payment';
+                    const needsCashCollection = isActive && (b.payment_status === 'pending' || b.payment_status === 'cash') && b.payment_status !== 'paid';
+                    return (
+                      <tr key={b.id} style={{ borderBottom: '1px solid var(--border-card)' }}>
+                        <td style={{ padding: '12px 16px', fontWeight: 600, color: '#f8fafc' }}>
+                          {b.date} · {b.start_time} - {b.end_time}
+                        </td>
+                        <td style={{ padding: '12px 16px', color: 'var(--text-secondary)' }}>
+                          {b.court_name || 'Pro Turf'}
+                        </td>
+                        <td style={{ padding: '12px 16px' }}>
+                          <div style={{ fontWeight: 600, color: '#fff' }}>{b.customer_name || 'Guest'}</div>
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{b.customer_phone}</div>
+                        </td>
+                        <td style={{ padding: '12px 16px', fontWeight: 700, color: '#34d399' }}>
+                          ₹{b.total_amount}
+                        </td>
+                        <td style={{ padding: '12px 16px' }}>
+                          <span className={b.status === 'confirmed' ? 'badge-emerald' : 'badge-slate'} style={{ fontSize: 11 }}>
+                            {b.status} {b.payment_mode === 'upi' ? '· UPI' : ''}
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px 16px' }}>
+                          {isActive ? (
+                            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                              {needsCashCollection && (
+                                <button
+                                  onClick={() => handleMarkCashPaid(b)}
+                                  title="Mark cash payment received"
+                                  style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', color: '#34d399', borderRadius: 6, padding: '5px 9px', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+                                >
+                                  Mark Paid
+                                </button>
+                              )}
+                              <button
+                                onClick={() => handleOpenReschedule(b)}
+                                title="Reschedule to a new date/time"
+                                style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.3)', color: '#a5b4fc', borderRadius: 6, padding: '5px 9px', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+                              >
+                                Reschedule
+                              </button>
+                              <button
+                                onClick={() => handleCancelBooking(b)}
+                                title="Cancel booking and reopen slot"
+                                style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#f87171', borderRadius: 6, padding: '5px 9px', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          ) : (
+                            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>—</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -2177,6 +2277,69 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                 </button>
                 <button type="submit" className="btn-primary" style={{ flex: 1 }}>
                   Save Price
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: RESCHEDULE BOOKING */}
+      {showRescheduleModal && rescheduleBooking && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 20 }}>
+          <div className="nexus-card animate-fade-in" style={{ maxWidth: 380, width: '100%', padding: 22, background: '#111726' }}>
+            <h3 style={{ fontSize: 16, fontWeight: 700, color: '#f8fafc', marginBottom: 4 }}>
+              Reschedule Booking
+            </h3>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 14 }}>
+              {rescheduleBooking.customer_name || 'Guest'} · was {rescheduleBooking.date} · {rescheduleBooking.start_time} - {rescheduleBooking.end_time}
+            </div>
+
+            <form onSubmit={handleRescheduleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>NEW DATE</label>
+                <input
+                  type="date"
+                  required
+                  className="nexus-input"
+                  style={{ width: '100%' }}
+                  value={rescheduleDate}
+                  onChange={e => setRescheduleDate(e.target.value)}
+                />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>START TIME</label>
+                  <input
+                    type="time"
+                    required
+                    className="nexus-input"
+                    style={{ width: '100%' }}
+                    value={rescheduleStartTime}
+                    onChange={e => setRescheduleStartTime(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>END TIME</label>
+                  <input
+                    type="time"
+                    className="nexus-input"
+                    style={{ width: '100%' }}
+                    value={rescheduleEndTime}
+                    onChange={e => setRescheduleEndTime(e.target.value)}
+                  />
+                </div>
+              </div>
+              <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: 0 }}>
+                If the new slot is already booked, this will be rejected — no double-booking.
+              </p>
+
+              <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+                <button type="button" className="btn-secondary" style={{ flex: 1 }} onClick={() => setShowRescheduleModal(false)} disabled={submittingReschedule}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn-primary" style={{ flex: 1 }} disabled={submittingReschedule}>
+                  {submittingReschedule ? 'Saving…' : 'Confirm Reschedule'}
                 </button>
               </div>
             </form>

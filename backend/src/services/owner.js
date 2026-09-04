@@ -206,11 +206,48 @@ export async function updateBookingAction(env, organizationId, bookingId, { acti
 
     if (action === "reschedule") {
       if (!newDate || !newStartTime) throw httpError(400, "newDate and newStartTime are required");
-      const { rows: updated } = await client.query(
-        "update bookings set date = $1, start_time = $2, end_time = $3, notes = 'Rescheduled by owner', updated_at = now() where id = $4 returning *",
-        [newDate, newStartTime, newEndTime || booking.end_time, bookingId]
+      if (!booking.court_slot_id) throw httpError(409, "This booking has no slot to reschedule");
+
+      const { rows: oldSlotRows } = await client.query("select * from court_slots where id = $1", [booking.court_slot_id]);
+      const oldSlot = oldSlotRows[0];
+      const endTime = newEndTime || oldSlot?.end_time || newStartTime;
+
+      // Lock the target slot (creating it if the grid hasn't been generated
+      // that far out yet) so a concurrent booking on the same court/time
+      // can't collide with this reschedule.
+      const { rows: targetRows } = await client.query(
+        "select * from court_slots where court_id = $1 and date = $2 and start_time = $3 for update",
+        [booking.court_id, newDate, newStartTime]
       );
-      return { booking: updated[0], message: "Booking rescheduled" };
+      let targetSlot = targetRows[0];
+
+      if (targetSlot) {
+        const isSameSlot = targetSlot.id === booking.court_slot_id;
+        if (!isSameSlot && targetSlot.status !== "open") {
+          throw httpError(409, "The requested new slot is not available");
+        }
+      } else {
+        const { rows: created } = await client.query(
+          `insert into court_slots (court_id, venue_id, organization_id, date, start_time, end_time, price, status)
+           values ($1, $2, $3, $4, $5, $6, $7, 'open') returning *`,
+          [booking.court_id, booking.venue_id, organizationId, newDate, newStartTime, endTime, oldSlot?.price ?? booking.total_amount]
+        );
+        targetSlot = created[0];
+      }
+
+      await client.query("update court_slots set status = 'booked', hold_expires_at = null where id = $1", [targetSlot.id]);
+      if (oldSlot && oldSlot.id !== targetSlot.id) {
+        await client.query("update court_slots set status = 'open', hold_expires_at = null where id = $1", [oldSlot.id]);
+      }
+
+      const { rows: updated } = await client.query(
+        "update bookings set court_slot_id = $1, notes = 'Rescheduled by owner', updated_at = now() where id = $2 returning *",
+        [targetSlot.id, bookingId]
+      );
+      return {
+        booking: { ...updated[0], date: newDate, start_time: newStartTime, end_time: endTime },
+        message: "Booking rescheduled",
+      };
     }
 
     throw httpError(400, "Invalid action");
