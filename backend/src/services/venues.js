@@ -41,7 +41,9 @@ export async function getVenueForOrg(sql, organizationId, venueId) {
 export async function getPublicVenue(sql, slugOrId) {
   const [venue] = await sql`
     select id, name, slug, description, address, lat, lng, phone, email,
-           photos, amenities, sport_ids, open_time, close_time
+           photos, amenities, sport_ids, open_time, close_time,
+           (select round(avg(rating), 1) from reviews where venue_id = venues.id)::float as avg_rating,
+           (select count(*)::int from reviews where venue_id = venues.id) as review_count
     from venues
     where (slug = ${slugOrId} or id::text = ${slugOrId}) and status = 'active'
   `;
@@ -51,7 +53,9 @@ export async function getPublicVenue(sql, slugOrId) {
 
 // min_price and today_available_slots_count are what the marketplace's
 // "Sort by price" / "live availability" actually read — without them the
-// UI silently sorts every venue as free with zero slots.
+// UI silently sorts every venue as free with zero slots. avg_rating/
+// review_count are real now (services/reviews.js) — null until a venue
+// has at least one review, which the UI treats as "not yet rated".
 export async function listPublicVenues(sql, { sportId, search } = {}) {
   const sportClause = sportId ? sql`and ${sportId} = any(v.sport_ids)` : sql``;
   const searchClause = search
@@ -61,7 +65,9 @@ export async function listPublicVenues(sql, { sportId, search } = {}) {
   return sql`
     select v.id, v.name, v.slug, v.description, v.address, v.city, v.lat, v.lng, v.photos, v.sport_ids,
            (select min(c.base_price) from courts c where c.venue_id = v.id and c.status = 'active') as min_price,
-           (select count(*)::int from court_slots cs where cs.venue_id = v.id and cs.date = current_date and cs.status = 'open') as today_available_slots_count
+           (select count(*)::int from court_slots cs where cs.venue_id = v.id and cs.date = current_date and cs.status = 'open') as today_available_slots_count,
+           (select round(avg(rating), 1) from reviews where venue_id = v.id)::float as avg_rating,
+           (select count(*)::int from reviews where venue_id = v.id) as review_count
     from venues v
     where v.status = 'active' ${sportClause} ${searchClause}
     order by v.created_at desc

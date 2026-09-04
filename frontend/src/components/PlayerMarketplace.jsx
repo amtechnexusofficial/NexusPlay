@@ -365,6 +365,25 @@ export default function PlayerMarketplace({ onSelectVenue }) {
                       {venue.city || 'Bangalore'}
                     </span>
                   )}
+
+                  {venue.review_count > 0 && (
+                    <span
+                      style={{
+                        background: 'rgba(15, 23, 42, 0.75)',
+                        backdropFilter: 'blur(4px)',
+                        color: '#fbbf24',
+                        fontWeight: 700,
+                        fontSize: 11.5,
+                        padding: '4px 8px',
+                        borderRadius: 6,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 3
+                      }}
+                    >
+                      ★ {venue.avg_rating} <span style={{ color: '#cbd5e1', fontWeight: 500 }}>({venue.review_count})</span>
+                    </span>
+                  )}
                 </div>
 
                 {/* Available slots today — real count, not a preview list */}

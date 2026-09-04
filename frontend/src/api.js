@@ -301,6 +301,24 @@ export const api = {
     return res.json();
   },
 
+  // Reviews
+  async getVenueReviews(slugOrId) {
+    const res = await fetch(`${API_BASE}/public/venues/${slugOrId}/reviews`);
+    if (!res.ok) return [];
+    return res.json();
+  },
+
+  async submitReview(data) {
+    const res = await fetch(`${API_BASE}/reviews`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error || 'Failed to submit review');
+    return body;
+  },
+
   // Authentication & Sessions
   // Player + owner can both sign in with phone + OTP (one identity, one
   // role per phone number); owner also has a second front door via

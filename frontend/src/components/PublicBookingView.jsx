@@ -4,7 +4,7 @@ import {
   Calendar, Clock, MapPin, Phone, ShieldCheck, ChevronRight,
   Share2, Users, ArrowLeft, CheckCircle, AlertCircle, CreditCard,
   Banknote, Split, Sparkles, Trophy, Lock, QrCode, Copy, CheckCircle2,
-  ExternalLink, RefreshCw
+  ExternalLink, RefreshCw, Star
 } from 'lucide-react';
 
 export default function PublicBookingView({ slug = 'nexus-central-koramangala', onBack, currentUser }) {
@@ -44,6 +44,47 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
   const [confirmedBooking, setConfirmedBooking] = useState(null);
   const [errorMsg, setErrorMsg] = useState('');
 
+  // Reviews — only a customer with a booking at this venue can submit one
+  // (enforced server-side); the form is always shown, the error surfaces
+  // if that check fails.
+  const [reviews, setReviews] = useState([]);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState('');
+  const [submittingReview, setSubmittingReview] = useState(false);
+  const [reviewError, setReviewError] = useState('');
+  const [reviewSuccess, setReviewSuccess] = useState('');
+
+  async function loadReviews(venueSlug) {
+    const data = await api.getVenueReviews(venueSlug).catch(() => []);
+    setReviews(data);
+  }
+
+  async function handleSubmitReview(e) {
+    e.preventDefault();
+    if (!customerPhone || customerPhone.trim().length < 10) {
+      setReviewError('Enter the phone number you booked with.');
+      return;
+    }
+    setReviewError('');
+    setReviewSuccess('');
+    setSubmittingReview(true);
+    try {
+      await api.submitReview({
+        venueId: venue.id,
+        customerPhone: customerPhone.trim(),
+        rating: reviewRating,
+        comment: reviewComment.trim()
+      });
+      setReviewSuccess('Thanks for your review!');
+      setReviewComment('');
+      loadReviews(slug);
+    } catch (err) {
+      setReviewError(err.message || 'Failed to submit review');
+    } finally {
+      setSubmittingReview(false);
+    }
+  }
+
   // Load venue details
   useEffect(() => {
     async function load() {
@@ -57,6 +98,7 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
         if (data.courts?.length > 0) {
           setSelectedCourt(data.courts[0]);
         }
+        loadReviews(slug);
       } catch (err) {
         setErrorMsg('Failed to load venue: ' + err.message);
       } finally {
@@ -210,9 +252,11 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
           <ArrowLeft size={16} /> Back to Venues
         </button>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span className="badge-neon" style={{ padding: '5px 12px', borderRadius: 999, fontSize: 12, fontWeight: 700 }}>
-            ★ {venue.rating || 4.9} SuperVenue
-          </span>
+          {venue.review_count > 0 && (
+            <span className="badge-neon" style={{ padding: '5px 12px', borderRadius: 999, fontSize: 12, fontWeight: 700 }}>
+              ★ {venue.avg_rating} ({venue.review_count} review{venue.review_count === 1 ? '' : 's'})
+            </span>
+          )}
           <button
             onClick={() => {
               if (navigator.clipboard) {
@@ -894,6 +938,111 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
           </div>
         </div>
       )}
+
+      <div className="card" style={{ marginTop: 28, padding: '22px 20px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, marginBottom: 18 }}>
+          <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: '#0f172a' }}>Reviews</h3>
+          {venue.review_count > 0 ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13.5, color: '#0f172a', fontWeight: 600 }}>
+              <Star size={16} fill="#f59e0b" color="#f59e0b" />
+              {venue.avg_rating} <span style={{ color: '#64748b', fontWeight: 500 }}>({venue.review_count} review{venue.review_count === 1 ? '' : 's'})</span>
+            </div>
+          ) : (
+            <span style={{ fontSize: 13, color: '#94a3b8' }}>No reviews yet</span>
+          )}
+        </div>
+
+        {reviews.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 22 }}>
+            {reviews.map((r) => (
+              <div key={r.id} style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: 14 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 4 }}>
+                  <span style={{ fontWeight: 600, fontSize: 13.5, color: '#0f172a' }}>{r.customer_name || 'Player'}</span>
+                  <span style={{ fontSize: 11.5, color: '#94a3b8' }}>{new Date(r.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                </div>
+                <div style={{ display: 'flex', gap: 2, marginBottom: 6 }}>
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <Star key={n} size={13} fill={n <= r.rating ? '#f59e0b' : 'none'} color={n <= r.rating ? '#f59e0b' : '#cbd5e1'} />
+                  ))}
+                </div>
+                {r.comment && <div style={{ fontSize: 13, color: '#475569', lineHeight: 1.5 }}>{r.comment}</div>}
+              </div>
+            ))}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmitReview} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: 16 }}>
+          <div style={{ fontSize: 13.5, fontWeight: 600, color: '#0f172a', marginBottom: 10 }}>Played here? Leave a review</div>
+
+          <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
+            {[1, 2, 3, 4, 5].map((n) => (
+              <button
+                key={n}
+                type="button"
+                onClick={() => setReviewRating(n)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2 }}
+                aria-label={`Rate ${n} star${n === 1 ? '' : 's'}`}
+              >
+                <Star size={22} fill={n <= reviewRating ? '#f59e0b' : 'none'} color={n <= reviewRating ? '#f59e0b' : '#cbd5e1'} />
+              </button>
+            ))}
+          </div>
+
+          <textarea
+            value={reviewComment}
+            onChange={(e) => setReviewComment(e.target.value)}
+            placeholder="Share your experience (optional)"
+            rows={3}
+            style={{
+              width: '100%',
+              border: '1px solid #e2e8f0',
+              borderRadius: 8,
+              padding: '10px 12px',
+              fontSize: 13.5,
+              fontFamily: 'inherit',
+              resize: 'vertical',
+              marginBottom: 10,
+              background: '#fff',
+              color: '#0f172a'
+            }}
+          />
+
+          {!customerPhone && (
+            <input
+              type="tel"
+              value={customerPhone}
+              onChange={(e) => setCustomerPhone(e.target.value)}
+              placeholder="Phone number used for booking"
+              style={{
+                width: '100%',
+                border: '1px solid #e2e8f0',
+                borderRadius: 8,
+                padding: '10px 12px',
+                fontSize: 13.5,
+                marginBottom: 10,
+                background: '#fff',
+                color: '#0f172a'
+              }}
+            />
+          )}
+
+          {reviewError && (
+            <div style={{ color: '#dc2626', fontSize: 12.5, marginBottom: 10 }}>{reviewError}</div>
+          )}
+          {reviewSuccess && (
+            <div style={{ color: '#059669', fontSize: 12.5, marginBottom: 10 }}>{reviewSuccess}</div>
+          )}
+
+          <button
+            type="submit"
+            className="btn-primary"
+            disabled={submittingReview}
+            style={{ padding: '9px 18px', fontSize: 13.5 }}
+          >
+            {submittingReview ? 'Submitting...' : 'Submit Review'}
+          </button>
+        </form>
+      </div>
     </div>
   );
 }

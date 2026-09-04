@@ -40,6 +40,7 @@ import {
 } from "./services/owner.js";
 import { listGames, createGame, joinGame, requestFullSlot } from "./services/games.js";
 import { getPlayerDashboard, listPlayerNotifications } from "./services/players.js";
+import { createReview, listReviewsForVenue } from "./services/reviews.js";
 
 const app = new Hono();
 
@@ -131,6 +132,18 @@ app.get("/api/public/venues/:slug", async (c) => {
   const venue = await getPublicVenue(sql, c.req.param("slug"));
   const courts = await listPublicCourtsForVenue(sql, venue.id);
   return c.json({ ...venue, courts });
+});
+
+app.get("/api/public/venues/:slug/reviews", async (c) => {
+  const sql = getDb(c.env);
+  const venue = await getPublicVenue(sql, c.req.param("slug"));
+  return c.json(await listReviewsForVenue(sql, venue.id));
+});
+
+app.post("/api/reviews", async (c) => {
+  const sql = getDb(c.env);
+  const review = await createReview(sql, await c.req.json());
+  return c.json({ success: true, review }, 201);
 });
 
 app.get("/api/public/venues/:slug/slots", async (c) => {
