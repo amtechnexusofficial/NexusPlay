@@ -5,6 +5,21 @@
 // a proxy, but will 404 in production if the env var isn't set.
 const API_BASE = `${(import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')}/api`;
 
+// Owner-scoped routes require a bearer token (see backend's requireAuth) —
+// this was previously missing from every owner.* call below, which meant
+// they'd all 401 against a real deployed backend.
+function authHeaders() {
+  const token = localStorage.getItem('nexus_token');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+// Admin sessions are deliberately kept out of the player/owner token —
+// a separate login, a separate stored credential.
+function adminAuthHeaders() {
+  const token = localStorage.getItem('nexus_admin_token');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 export const api = {
   // Catalog & Marketplace
   async getSports() {
@@ -129,21 +144,21 @@ export const api = {
 
   // Venue Owner SaaS
   async getOwnerContext() {
-    const res = await fetch(`${API_BASE}/owner/context`);
+    const res = await fetch(`${API_BASE}/owner/context`, { headers: authHeaders() });
     if (!res.ok) throw new Error('Failed to get owner context');
     return res.json();
   },
 
   async getOwnerAnalytics(venueId) {
     const q = venueId ? `?venueId=${venueId}` : '';
-    const res = await fetch(`${API_BASE}/owner/analytics${q}`);
+    const res = await fetch(`${API_BASE}/owner/analytics${q}`, { headers: authHeaders() });
     if (!res.ok) throw new Error('Failed to fetch analytics');
     return res.json();
   },
 
   async getOwnerBookings(params = {}) {
     const q = new URLSearchParams(params).toString();
-    const res = await fetch(`${API_BASE}/owner/bookings?${q}`);
+    const res = await fetch(`${API_BASE}/owner/bookings?${q}`, { headers: authHeaders() });
     if (!res.ok) throw new Error('Failed to fetch bookings');
     return res.json();
   },
@@ -151,7 +166,7 @@ export const api = {
   async createWalkInBooking(data) {
     const res = await fetch(`${API_BASE}/owner/walk-in`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify(data)
     });
     const body = await res.json();
@@ -162,7 +177,7 @@ export const api = {
   async updateBookingAction(bookingId, data) {
     const res = await fetch(`${API_BASE}/owner/bookings/${bookingId}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify(data)
     });
     const body = await res.json();
@@ -173,7 +188,7 @@ export const api = {
   async blockSlot(data) {
     const res = await fetch(`${API_BASE}/owner/slots/block`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify(data)
     });
     return res.json();
@@ -182,14 +197,14 @@ export const api = {
   async unblockSlot(data) {
     const res = await fetch(`${API_BASE}/owner/slots/unblock`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify(data)
     });
     return res.json();
   },
 
   async getCustomers() {
-    const res = await fetch(`${API_BASE}/owner/crm`);
+    const res = await fetch(`${API_BASE}/owner/crm`, { headers: authHeaders() });
     if (!res.ok) throw new Error('Failed to load CRM data');
     return res.json();
   },
@@ -197,14 +212,14 @@ export const api = {
   async createCourt(data) {
     const res = await fetch(`${API_BASE}/owner/courts`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify(data)
     });
     return res.json();
   },
 
   async getOwnerVenueDetails(venueId) {
-    const res = await fetch(`${API_BASE}/owner/venues/${venueId}`);
+    const res = await fetch(`${API_BASE}/owner/venues/${venueId}`, { headers: authHeaders() });
     if (!res.ok) throw new Error('Failed to fetch venue details');
     return res.json();
   },
@@ -212,7 +227,7 @@ export const api = {
   async updateVenueProfile(venueId, data) {
     const res = await fetch(`${API_BASE}/owner/venues/${venueId}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify(data)
     });
     const body = await res.json();
@@ -222,7 +237,7 @@ export const api = {
 
   async getOwnerLiveSlots(venueId, date) {
     const q = new URLSearchParams({ venueId, date: date || '' }).toString();
-    const res = await fetch(`${API_BASE}/owner/live-slots?${q}`);
+    const res = await fetch(`${API_BASE}/owner/live-slots?${q}`, { headers: authHeaders() });
     if (!res.ok) throw new Error('Failed to fetch live slots');
     return res.json();
   },
@@ -230,7 +245,7 @@ export const api = {
   async convertSlotToFullInquiry(slotId, data) {
     const res = await fetch(`${API_BASE}/owner/slots/${slotId}/convert-full-inquiry`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify(data)
     });
     const body = await res.json();
@@ -241,7 +256,7 @@ export const api = {
   async declineSlotInquiry(slotId) {
     const res = await fetch(`${API_BASE}/owner/slots/${slotId}/decline-full-inquiry`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' }
+      headers: authHeaders()
     });
     const body = await res.json();
     if (!res.ok) throw new Error(body.error || 'Failed to decline slot inquiry');
@@ -251,7 +266,7 @@ export const api = {
   async updateSlotPrice(slotId, price) {
     const res = await fetch(`${API_BASE}/owner/slots/${slotId}/price`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify({ price })
     });
     const body = await res.json();
@@ -262,7 +277,7 @@ export const api = {
   // Owner Direct UPI Verification & Credit Audit
   async getPendingUpiBookings(venueId) {
     const q = venueId ? `?venueId=${venueId}` : '';
-    const res = await fetch(`${API_BASE}/owner/upi-pending${q}`);
+    const res = await fetch(`${API_BASE}/owner/upi-pending${q}`, { headers: authHeaders() });
     if (!res.ok) throw new Error('Failed to fetch pending UPI payments');
     return res.json();
   },
@@ -270,7 +285,7 @@ export const api = {
   async verifyUpiPayment(bookingId, { action = 'verify_credit', notes = '' }) {
     const res = await fetch(`${API_BASE}/owner/bookings/${bookingId}/verify-upi`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify({ action, notes })
     });
     const body = await res.json();
@@ -279,7 +294,7 @@ export const api = {
   },
 
   async getVenueUpiSettings(venueId) {
-    const res = await fetch(`${API_BASE}/owner/venues/${venueId}/upi-settings`);
+    const res = await fetch(`${API_BASE}/owner/venues/${venueId}/upi-settings`, { headers: authHeaders() });
     if (!res.ok) throw new Error('Failed to fetch UPI settings');
     return res.json();
   },
@@ -287,7 +302,7 @@ export const api = {
   async updateVenueUpiSettings(venueId, data) {
     const res = await fetch(`${API_BASE}/owner/venues/${venueId}/upi-settings`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify(data)
     });
     const body = await res.json();
@@ -391,5 +406,41 @@ export const api = {
     const res = await fetch(`${API_BASE}/player/notifications?${params.toString()}`);
     if (!res.ok) return [];
     return res.json();
+  },
+
+  // Admin (amtechnexus platform operators) — separate credential and
+  // token from player/owner sessions, see auth.js's adminLogin().
+  async adminLogin({ email, password }) {
+    const res = await fetch(`${API_BASE}/auth/admin-login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error || 'Admin login failed');
+    return body;
+  },
+
+  async getAdminStats() {
+    const res = await fetch(`${API_BASE}/admin/stats`, { headers: adminAuthHeaders() });
+    if (!res.ok) throw new Error('Failed to load platform stats');
+    return res.json();
+  },
+
+  async getAdminVenues() {
+    const res = await fetch(`${API_BASE}/admin/venues`, { headers: adminAuthHeaders() });
+    if (!res.ok) throw new Error('Failed to load venues');
+    return res.json();
+  },
+
+  async setAdminVenueStatus(venueId, status) {
+    const res = await fetch(`${API_BASE}/admin/venues/${venueId}/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...adminAuthHeaders() },
+      body: JSON.stringify({ status })
+    });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error || 'Failed to update venue status');
+    return body;
   }
 };

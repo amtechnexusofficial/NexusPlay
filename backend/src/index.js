@@ -41,6 +41,7 @@ import {
 import { listGames, createGame, joinGame, requestFullSlot } from "./services/games.js";
 import { getPlayerDashboard, listPlayerNotifications } from "./services/players.js";
 import { createReview, listReviewsForVenue } from "./services/reviews.js";
+import { getPlatformStats, listAllVenuesForAdmin, setVenueStatusForAdmin } from "./services/admin.js";
 
 const app = new Hono();
 
@@ -393,6 +394,31 @@ app.patch("/api/courts/:courtId", ...ownerAuth, async (c) => {
 app.delete("/api/courts/:courtId", ...ownerAuth, async (c) => {
   const sql = getDb(c.env);
   return c.json(await deleteCourt(sql, c.get("organizationId"), c.req.param("courtId")));
+});
+
+// ===========================================================================
+// Admin (amtechnexus platform operators only — role 'admin', provisioned
+// manually via backend/scripts/create-admin.mjs, no public sign-up).
+// Cross-tenant by design: no requireOrg() here, unlike every owner route.
+// ===========================================================================
+
+const adminAuth = requireAuth("admin");
+
+app.get("/api/admin/stats", adminAuth, async (c) => {
+  const sql = getDb(c.env);
+  return c.json(await getPlatformStats(sql));
+});
+
+app.get("/api/admin/venues", adminAuth, async (c) => {
+  const sql = getDb(c.env);
+  return c.json(await listAllVenuesForAdmin(sql));
+});
+
+app.patch("/api/admin/venues/:id/status", adminAuth, async (c) => {
+  const sql = getDb(c.env);
+  const { status } = await c.req.json();
+  const venue = await setVenueStatusForAdmin(sql, c.req.param("id"), status);
+  return c.json({ success: true, venue });
 });
 
 // ===========================================================================

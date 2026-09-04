@@ -6,6 +6,7 @@ import OwnerSaaSView from './components/OwnerSaaSView.jsx';
 import { PlayerDashboard } from './components/PlayerDashboard.jsx';
 import { AuthModal } from './components/AuthModal.jsx';
 import SplitPaymentView from './components/SplitPaymentView.jsx';
+import AdminView from './components/AdminView.jsx';
 import {
   Trophy, 
   Compass, 
@@ -54,6 +55,10 @@ export default function App() {
   // the normal app chrome, since whoever opens it may not be signed in
   // or care about the rest of the marketplace.
   const [paymentToken] = useState(() => new URLSearchParams(window.location.search).get('pay'));
+
+  // amtechnexus platform admin (?admin=1) — entirely separate surface,
+  // not linked from any nav, own login/session. See AdminView.jsx.
+  const [isAdminRoute] = useState(() => new URLSearchParams(window.location.search).get('admin') === '1');
 
   // User Auth Session State
   const [currentUser, setCurrentUser] = useState(() => {
@@ -160,6 +165,10 @@ export default function App() {
     );
   }
 
+  if (isAdminRoute) {
+    return <AdminView />;
+  }
+
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg-dark)' }}>
       {/* Global Brand Header - Modern Clean White Layout */}
@@ -218,10 +227,13 @@ export default function App() {
             </div>
           </div>
 
-          {/* Desktop Navigation Switcher */}
-          <nav 
+          {/* Desktop Navigation Switcher — hidden on a venue's own direct
+              booking page: that page is meant to read as this business's
+              page, not a stop inside the wider marketplace. */}
+          {activeView !== 'venue-page' && (
+          <nav
             id="desktop-main-navigation"
-            className="desktop-nav" 
+            className="desktop-nav"
             style={{ background: '#f8fafc', padding: 4, borderRadius: 10, border: '1px solid #e2e8f0', gap: 3 }}
           >
             <button
@@ -340,11 +352,37 @@ export default function App() {
               </button>
             )}
           </nav>
+          )}
+
+          {/* On a venue's direct page, the only nav action is a quiet way
+              back out to the full marketplace — everything else about the
+              app shell (sign-in, owner portal, other tabs) stays hidden. */}
+          {activeView === 'venue-page' && (
+            <button
+              onClick={() => navigateTo('marketplace')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                background: 'none',
+                border: '1px solid #e2e8f0',
+                borderRadius: 8,
+                padding: '7px 14px',
+                fontSize: 12.5,
+                fontWeight: 600,
+                color: '#64748b',
+                cursor: 'pointer'
+              }}
+            >
+              <Compass size={14} /> Explore other venues on NexusPlay
+            </button>
+          )}
 
           {/* Right Action Controls: Separate Player & Owner Access.
               Full row on desktop; the mobile bottom bar already covers
               sign-in / dashboard / logout, so mobile just gets a compact
               avatar for at-a-glance identity. */}
+          {activeView !== 'venue-page' && (
           <div className="header-actions-full" style={{ alignItems: 'center', gap: 10 }}>
             {/* Logged in as Player */}
             {currentUser && currentUser.role === 'player' && (
@@ -520,10 +558,14 @@ export default function App() {
               </>
             )}
           </div>
+          )}
 
           {/* Compact mobile-only identity: avatar if signed in, single
               icon button to open sign-in if not. The bottom nav bar
-              handles the actual navigation/logout on mobile. */}
+              handles the actual navigation/logout on mobile. Hidden on a
+              venue's direct page — that page has no app-shell identity
+              controls at all, just the "explore other venues" link above. */}
+          {activeView !== 'venue-page' && (
           <div className="header-actions-mobile" style={{ alignItems: 'center' }}>
             {currentUser ? (
               <button
@@ -550,6 +592,7 @@ export default function App() {
               </button>
             )}
           </div>
+          )}
         </div>
       </header>
 
@@ -665,7 +708,23 @@ export default function App() {
         )}
       </main>
 
+      {/* On a venue's direct page, mobile gets the same quiet "explore
+          other venues" exit instead of the full tab bar. */}
+      {activeView === 'venue-page' && (
+        <div className="mobile-bottom-bar" style={{ justifyContent: 'center' }}>
+          <button
+            onClick={() => navigateTo('marketplace')}
+            className="mobile-bottom-btn"
+            style={{ flex: 'none', padding: '0 20px' }}
+          >
+            <Compass size={20} />
+            <span>Explore other venues</span>
+          </button>
+        </div>
+      )}
+
       {/* Role-Tailored Mobile Bottom Navigation: Mutually Exclusive */}
+      {activeView !== 'venue-page' && (
       <nav id="mobile-bottom-navigation" className="mobile-bottom-bar">
         <button
           id="mobile-nav-turfs"
@@ -768,6 +827,7 @@ export default function App() {
           </>
         )}
       </nav>
+      )}
 
       {/* Authentication Modal with Dedicated Player & Owner Screens */}
       <AuthModal

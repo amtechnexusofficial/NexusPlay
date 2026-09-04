@@ -46,6 +46,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
   const [newPriceValue, setNewPriceValue] = useState(1200);
 
   // Business Setup Form State
+  const [directLinkCopied, setDirectLinkCopied] = useState(false);
   const [bizName, setBizName] = useState('');
   const [bizOrgName, setBizOrgName] = useState('');
   const [bizAddress, setBizAddress] = useState('');
@@ -1518,6 +1519,44 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
               </div>
             )}
           </div>
+
+          {selectedVenue?.slug && (
+            <div className="nexus-card" style={{ padding: 22, marginBottom: 20, display: 'flex', flexWrap: 'wrap', gap: 20, alignItems: 'center' }}>
+              <img
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(`${window.location.origin}/?venue=${selectedVenue.slug}`)}`}
+                alt="Direct booking QR code"
+                width={110}
+                height={110}
+                style={{ borderRadius: 8, border: '1px solid #e2e8f0', flexShrink: 0 }}
+              />
+              <div style={{ flex: 1, minWidth: 220 }}>
+                <h3 style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <QrCode size={16} style={{ color: '#10b981' }} /> Your Direct Booking Link
+                </h3>
+                <p style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginBottom: 10, lineHeight: 1.5 }}>
+                  Print this QR at your venue or share the link on your own profile page — it opens straight to {selectedVenue.name}'s booking page, not the full marketplace.
+                </p>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <code style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 6, padding: '6px 10px', fontSize: 11.5, color: '#334155', wordBreak: 'break-all' }}>
+                    {window.location.origin}/?venue={selectedVenue.slug}
+                  </code>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(`${window.location.origin}/?venue=${selectedVenue.slug}`);
+                      setDirectLinkCopied(true);
+                      setTimeout(() => setDirectLinkCopied(false), 2000);
+                    }}
+                    className="btn-secondary"
+                    style={{ padding: '6px 12px', fontSize: 12 }}
+                  >
+                    {directLinkCopied ? <CheckCircle2 size={13} /> : <Copy size={13} />}
+                    {directLinkCopied ? 'Copied' : 'Copy Link'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           <form onSubmit={handleSaveBusinessDetails}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 20 }}>
