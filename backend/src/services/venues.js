@@ -49,26 +49,22 @@ export async function getPublicVenue(sql, slugOrId) {
   return venue;
 }
 
+// min_price and today_available_slots_count are what the marketplace's
+// "Sort by price" / "live availability" actually read — without them the
+// UI silently sorts every venue as free with zero slots.
 export async function listPublicVenues(sql, { sportId, search } = {}) {
-  if (sportId) {
-    return sql`
-      select id, name, slug, description, address, lat, lng, photos, sport_ids
-      from venues
-      where status = 'active' and ${sportId} = any(sport_ids)
-      order by created_at desc
-    `;
-  }
-  if (search) {
-    return sql`
-      select id, name, slug, description, address, lat, lng, photos, sport_ids
-      from venues
-      where status = 'active' and (name ilike ${"%" + search + "%"} or address ilike ${"%" + search + "%"})
-      order by created_at desc
-    `;
-  }
+  const sportClause = sportId ? sql`and ${sportId} = any(v.sport_ids)` : sql``;
+  const searchClause = search
+    ? sql`and (v.name ilike ${"%" + search + "%"} or v.address ilike ${"%" + search + "%"} or v.city ilike ${"%" + search + "%"})`
+    : sql``;
+
   return sql`
-    select id, name, slug, description, address, lat, lng, photos, sport_ids
-    from venues where status = 'active' order by created_at desc
+    select v.id, v.name, v.slug, v.description, v.address, v.city, v.lat, v.lng, v.photos, v.sport_ids,
+           (select min(c.base_price) from courts c where c.venue_id = v.id and c.status = 'active') as min_price,
+           (select count(*)::int from court_slots cs where cs.venue_id = v.id and cs.date = current_date and cs.status = 'open') as today_available_slots_count
+    from venues v
+    where v.status = 'active' ${sportClause} ${searchClause}
+    order by v.created_at desc
   `;
 }
 

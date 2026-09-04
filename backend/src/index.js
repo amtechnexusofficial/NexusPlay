@@ -38,6 +38,7 @@ import {
   declineSlotInquiry,
 } from "./services/owner.js";
 import { listGames, createGame, joinGame, requestFullSlot } from "./services/games.js";
+import { getPlayerDashboard, listPlayerNotifications } from "./services/players.js";
 
 const app = new Hono();
 
@@ -137,6 +138,22 @@ app.get("/api/public/venues/:slug/slots", async (c) => {
   const date = c.req.query("date") || undefined;
   const courtId = c.req.query("courtId") || undefined;
   return c.json(await listSlots(sql, venue.id, { date, courtId }));
+});
+
+// ===========================================================================
+// Player: own dashboard (bookings/games across every venue they've used —
+// see services/players.js for why this joins through customers.phone
+// rather than a single organization-scoped customer id)
+// ===========================================================================
+
+app.get("/api/player/dashboard", async (c) => {
+  const sql = getDb(c.env);
+  return c.json(await getPlayerDashboard(sql, c.req.query("phone")));
+});
+
+app.get("/api/player/notifications", async (c) => {
+  const sql = getDb(c.env);
+  return c.json(await listPlayerNotifications(sql, c.req.query("phone")));
 });
 
 // ===========================================================================
