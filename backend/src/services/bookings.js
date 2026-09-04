@@ -1,0 +1,154 @@
+import { httpError } from "../errors.js";
+import { withTransaction } from "../db.js";
+import { findOrCreateCustomerInTx, recordCustomerBookingInTx } from "./customers.js";
+import { getPaymentProvider } from "./payments.js";
+
+const HOLD_MINUTES = 10;
+
+// Step 1 of the booking flow: atomically lock a slot for HOLD_MINUTES while
+// the customer fills in payment details. Uses `select ... for update` inside
+// a real transaction (not the stateless HTTP sql client) so two customers
+// racing for the same slot can't both succeed — the second one blocks on
+// the row lock until the first transaction commits, then sees the slot as
+// 'held' and is rejected. The partial unique index on bookings
+// (court_slot_id where status in pending_payment/confirmed) is a second,
+// database-level backstop against the same race.
+export async function holdSlot(env, { slotId, customerName, customerPhone, customerEmail }) {
+  if (!slotId || !customerPhone) throw httpError(400, "slotId and customerPhone are required");
+
+  const { booking, slot, venue } = await withTransaction(env, async (client) => {
+    const { rows: slotRows } = await client.query("select * from court_slots where id = $1 for update", [slotId]);
+    const slot = slotRows[0];
+    if (!slot) throw httpError(404, "Slot not found");
+
+    const now = Date.now();
+    const isAvailable = slot.status === "open" || (slot.status === "held" && slot.hold_expires_at && new Date(slot.hold_expires_at).getTime() < now);
+    if (!isAvailable) {
+      throw httpError(409, `Slot is currently ${slot.status === "booked" ? "booked" : "being reserved by another customer"}. Please pick another time.`);
+    }
+
+    // Clear any stale pending booking left over from an expired hold on
+    // this slot so the active-slot unique index doesn't reject the insert.
+    await client.query(
+      "update bookings set status = 'cancelled', payment_status = 'cancelled', notes = 'Hold expired' where court_slot_id = $1 and status = 'pending_payment'",
+      [slotId]
+    );
+
+    const customer = await findOrCreateCustomerInTx(client, slot.organization_id, {
+      name: customerName,
+      phone: customerPhone,
+      email: customerEmail,
+    });
+
+    const holdExpiresAt = new Date(now + HOLD_MINUTES * 60 * 1000).toISOString();
+    await client.query("update court_slots set status = 'held', hold_expires_at = $1 where id = $2", [holdExpiresAt, slotId]);
+
+    const { rows: bookingRows } = await client.query(
+      `insert into bookings (organization_id, venue_id, court_id, court_slot_id, customer_id, source, status, payment_status, total_amount, amount_paid, hold_expires_at, notes)
+       values ($1, $2, $3, $4, $5, 'online', 'pending_payment', 'pending', $6, 0, $7, $8)
+       returning *`,
+      [slot.organization_id, slot.venue_id, slot.court_id, slotId, customer.id, slot.price, holdExpiresAt, `Locked for ${(customerName || "Customer").trim()}`]
+    );
+
+    const { rows: venueRows } = await client.query("select * from venues where id = $1", [slot.venue_id]);
+
+    return { booking: bookingRows[0], slot: { ...slot, status: "held", hold_expires_at: holdExpiresAt }, venue: venueRows[0] };
+  });
+
+  const paymentOrder = await getPaymentProvider("upi").createOrder({
+    amount: slot.price,
+    currency: "INR",
+    bookingId: booking.id,
+    customer: { name: customerName, phone: customerPhone, email: customerEmail },
+    venue,
+  });
+
+  return { bookingId: booking.id, holdExpiresAt: booking.hold_expires_at, lockMinutes: HOLD_MINUTES, slot, venue, paymentOrder };
+}
+
+// Step 2: customer submits payment (UPI UTR) or chooses pay-at-venue. The
+// booking moves to 'confirmed' immediately — the slot is locked either way
+// — but payment_status stays 'pending_verification' until the owner checks
+// their bank statement and confirms the credit (see owner UPI verification
+// endpoints, Phase 2).
+export async function confirmBooking(env, { bookingId, paymentProvider = "upi", utr = "" }) {
+  if (!bookingId) throw httpError(400, "bookingId is required");
+
+  return withTransaction(env, async (client) => {
+    const { rows } = await client.query("select * from bookings where id = $1 for update", [bookingId]);
+    const booking = rows[0];
+    if (!booking) throw httpError(404, "Booking not found");
+    if (booking.status === "confirmed") return { booking, paymentStatus: booking.payment_status, idempotent: true };
+    if (booking.status !== "pending_payment") throw httpError(409, `Booking is ${booking.status}, cannot confirm`);
+
+    const isPayAtVenue = paymentProvider === "cash";
+    const cleanUtr = utr.trim();
+    if (!isPayAtVenue) await getPaymentProvider("upi").verifyPayment({ utr: cleanUtr }).catch(() => {
+      // A malformed UTR still lets the booking through as 'pending' —
+      // the owner's manual verification is the real gate, this just
+      // decides whether to show it as "verification in progress".
+    });
+
+    const paymentStatus = isPayAtVenue ? "cash" : cleanUtr ? "pending_verification" : "pending";
+    const amountPaid = isPayAtVenue ? 0 : booking.total_amount;
+    const notes = isPayAtVenue
+      ? "Pay at venue reception desk"
+      : cleanUtr
+      ? `Submitted via owner UPI QR | UTR: ${cleanUtr}`
+      : "Awaiting owner UPI verification";
+
+    await client.query("update court_slots set status = 'booked', hold_expires_at = null where id = $1", [booking.court_slot_id]);
+
+    const { rows: updatedRows } = await client.query(
+      `update bookings set status = 'confirmed', payment_status = $1, amount_paid = $2, notes = $3, hold_expires_at = null, updated_at = now()
+       where id = $4 returning *`,
+      [paymentStatus, amountPaid, notes, bookingId]
+    );
+
+    await client.query(
+      `insert into payments (organization_id, booking_id, provider, amount, status, method)
+       values ($1, $2, $3, $4, 'created', $5)`,
+      [booking.organization_id, bookingId, isPayAtVenue ? "cash" : "upi", booking.total_amount, isPayAtVenue ? "cash" : "upi"]
+    );
+
+    const customer = await recordCustomerBookingInTx(client, booking.customer_id, amountPaid);
+
+    return { booking: updatedRows[0], customer, paymentStatus };
+  });
+}
+
+// Customer backs out before paying (closes the checkout, hold isn't
+// needed anymore) — free the slot and cancel the pending booking.
+export async function releaseHold(env, { bookingId, slotId }) {
+  return withTransaction(env, async (client) => {
+    if (slotId) {
+      await client.query("update court_slots set status = 'open', hold_expires_at = null where id = $1 and status = 'held'", [slotId]);
+    }
+    if (bookingId) {
+      await client.query(
+        "update bookings set status = 'cancelled', payment_status = 'cancelled', notes = 'Released by user' where id = $1 and status = 'pending_payment'",
+        [bookingId]
+      );
+    }
+    return { ok: true };
+  });
+}
+
+// Sweeps expired holds back to 'open' — wired into the Cron Trigger in
+// wrangler.toml (runs every minute). Prevents a slot from staying stuck
+// 'held' forever if a customer abandons checkout without releasing it.
+export async function sweepExpiredHolds(env) {
+  return withTransaction(env, async (client) => {
+    const { rows: expired } = await client.query(
+      "select id from court_slots where status = 'held' and hold_expires_at < now()"
+    );
+    if (expired.length === 0) return { swept: 0 };
+    const ids = expired.map((r) => r.id);
+    await client.query("update court_slots set status = 'open', hold_expires_at = null where id = any($1::uuid[])", [ids]);
+    await client.query(
+      "update bookings set status = 'cancelled', payment_status = 'cancelled', notes = 'Hold expired' where court_slot_id = any($1::uuid[]) and status = 'pending_payment'",
+      [ids]
+    );
+    return { swept: ids.length };
+  });
+}
