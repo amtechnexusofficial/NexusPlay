@@ -16,14 +16,26 @@ crons = ["* * * * *"]
 binding = "MEDIA"
 bucket_name = "nexusplay-media"
 
-# DATABASE_URL and JWT_SECRET are SECRETS, not vars — never commit them.
-# Set them with:
+# DATABASE_URL, JWT_SECRET, RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET are
+# SECRETS, not vars — never commit them. Set them with:
 #   wrangler secret put DATABASE_URL
-#   wrangler secret put JWT_SECRET      # any long random string
+#   wrangler secret put JWT_SECRET          # any long random string
+#   wrangler secret put RAZORPAY_KEY_ID     # from the Razorpay dashboard
+#   wrangler secret put RAZORPAY_KEY_SECRET # from the Razorpay dashboard
+#
+# RAZORPAY_KEY_ID/SECRET power the "Pay Online" checkout option (card/UPI/
+# netbanking/wallet, instant signature-verified confirmation). Money for
+# this option lands in NexusPlay's own Razorpay account, not the venue
+# owner's bank account directly — there is no payout/settlement system to
+# venues built yet, so treat this as an aggregator model until one exists.
+# Leave these two unset and "Pay Online" simply won't be offered; the
+# direct-to-owner UPI QR flow (0% fee, no gateway) keeps working either way.
 #
 # For local dev, put them in a .dev.vars file (gitignored):
 #   DATABASE_URL=postgres://...
 #   JWT_SECRET=some-long-random-string
+#   RAZORPAY_KEY_ID=rzp_test_...
+#   RAZORPAY_KEY_SECRET=...
 #   DEV_MODE=true   # returns the OTP code in the API response so you can test without SMS
 
 [vars]

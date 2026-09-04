@@ -407,3 +407,13 @@ alter table bookings add constraint bookings_source_check
 alter table notifications add column if not exists recipient_phone text;
 alter table notifications add column if not exists message text;
 create index if not exists idx_notifications_recipient_phone on notifications(recipient_phone);
+
+-- ===========================================================================
+-- Migration: Razorpay online payment gateway. The order is created at
+-- hold time (before the customer pays) so the Razorpay Checkout modal has
+-- something to pay against; this column lets confirmBooking check the
+-- signature the customer submits back against the exact order that was
+-- created for this booking, not just any order.
+-- ===========================================================================
+
+alter table bookings add column if not exists razorpay_order_id text;

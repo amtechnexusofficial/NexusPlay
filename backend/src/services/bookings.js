@@ -14,7 +14,7 @@ const HOLD_MINUTES = 10;
 // 'held' and is rejected. The partial unique index on bookings
 // (court_slot_id where status in pending_payment/confirmed) is a second,
 // database-level backstop against the same race.
-export async function holdSlot(env, { slotId, customerName, customerPhone, customerEmail }) {
+export async function holdSlot(env, { slotId, customerName, customerPhone, customerEmail, paymentMethod = "upi" }) {
   if (!slotId || !customerPhone) throw httpError(400, "slotId and customerPhone are required");
 
   const { booking, slot, venue } = await withTransaction(env, async (client) => {
@@ -56,13 +56,23 @@ export async function holdSlot(env, { slotId, customerName, customerPhone, custo
     return { booking: bookingRows[0], slot: { ...slot, status: "held", hold_expires_at: holdExpiresAt }, venue: venueRows[0] };
   });
 
-  const paymentOrder = await getPaymentProvider("upi").createOrder({
+  const paymentOrder = await getPaymentProvider(paymentMethod === "razorpay" ? "razorpay" : "upi", env).createOrder({
     amount: slot.price,
     currency: "INR",
     bookingId: booking.id,
     customer: { name: customerName, phone: customerPhone, email: customerEmail },
     venue,
   });
+
+  // Razorpay's checkout modal needs the order it's paying against, and
+  // confirmBooking below re-checks the signature against this exact order
+  // id so a customer can't submit a signature from a payment made against
+  // a different booking.
+  if (paymentOrder.provider === "razorpay") {
+    await withTransaction(env, async (client) => {
+      await client.query("update bookings set razorpay_order_id = $1 where id = $2", [paymentOrder.orderId, booking.id]);
+    });
+  }
 
   return { bookingId: booking.id, holdExpiresAt: booking.hold_expires_at, lockMinutes: HOLD_MINUTES, slot, venue, paymentOrder };
 }
@@ -72,7 +82,7 @@ export async function holdSlot(env, { slotId, customerName, customerPhone, custo
 // — but payment_status stays 'pending_verification' until the owner checks
 // their bank statement and confirms the credit (see owner UPI verification
 // endpoints, Phase 2).
-export async function confirmBooking(env, { bookingId, paymentProvider = "upi", utr = "", splitCount = 1, participants = [] }) {
+export async function confirmBooking(env, { bookingId, paymentProvider = "upi", utr = "", razorpayPaymentId = "", razorpaySignature = "", splitCount = 1, participants = [] }) {
   if (!bookingId) throw httpError(400, "bookingId is required");
 
   return withTransaction(env, async (client) => {
@@ -83,16 +93,31 @@ export async function confirmBooking(env, { bookingId, paymentProvider = "upi", 
     if (booking.status !== "pending_payment") throw httpError(409, `Booking is ${booking.status}, cannot confirm`);
 
     const isPayAtVenue = paymentProvider === "cash";
+    const isRazorpay = paymentProvider === "razorpay";
     const cleanUtr = utr.trim();
-    if (!isPayAtVenue) await getPaymentProvider("upi").verifyPayment({ utr: cleanUtr }).catch(() => {
-      // A malformed UTR still lets the booking through as 'pending' —
-      // the owner's manual verification is the real gate, this just
-      // decides whether to show it as "verification in progress".
-    });
 
-    const paymentStatus = isPayAtVenue ? "cash" : cleanUtr ? "pending_verification" : "pending";
+    if (isRazorpay) {
+      // Unlike UPI (owner manually checks their bank statement), a
+      // Razorpay signature is cryptographic proof of payment — this
+      // either verifies or throws, there's no "pending" middle state.
+      await getPaymentProvider("razorpay", env).verifyPayment({
+        orderId: booking.razorpay_order_id,
+        paymentId: razorpayPaymentId,
+        signature: razorpaySignature,
+      });
+    } else if (!isPayAtVenue) {
+      await getPaymentProvider("upi").verifyPayment({ utr: cleanUtr }).catch(() => {
+        // A malformed UTR still lets the booking through as 'pending' —
+        // the owner's manual verification is the real gate, this just
+        // decides whether to show it as "verification in progress".
+      });
+    }
+
+    const paymentStatus = isRazorpay ? "paid" : isPayAtVenue ? "cash" : cleanUtr ? "pending_verification" : "pending";
     const amountPaid = isPayAtVenue ? 0 : booking.total_amount;
-    const notes = isPayAtVenue
+    const notes = isRazorpay
+      ? `Paid online via Razorpay | Payment ID: ${razorpayPaymentId}`
+      : isPayAtVenue
       ? "Pay at venue reception desk"
       : cleanUtr
       ? `Submitted via owner UPI QR | UTR: ${cleanUtr}`
@@ -106,10 +131,20 @@ export async function confirmBooking(env, { bookingId, paymentProvider = "upi", 
       [paymentStatus, amountPaid, notes, cleanUtr || null, bookingId]
     );
 
+    const provider = isRazorpay ? "razorpay" : isPayAtVenue ? "cash" : "upi";
     await client.query(
-      `insert into payments (organization_id, booking_id, provider, amount, status, method)
-       values ($1, $2, $3, $4, 'created', $5)`,
-      [booking.organization_id, bookingId, isPayAtVenue ? "cash" : "upi", booking.total_amount, isPayAtVenue ? "cash" : "upi"]
+      `insert into payments (organization_id, booking_id, provider, provider_payment_id, provider_order_id, amount, status, method)
+       values ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [
+        booking.organization_id,
+        bookingId,
+        provider,
+        isRazorpay ? razorpayPaymentId : null,
+        isRazorpay ? booking.razorpay_order_id : null,
+        booking.total_amount,
+        isRazorpay ? "captured" : "created",
+        provider,
+      ]
     );
 
     const customer = await recordCustomerBookingInTx(client, booking.customer_id, amountPaid);
@@ -123,12 +158,23 @@ export async function confirmBooking(env, { bookingId, paymentProvider = "upi", 
       organizationId: booking.organization_id,
       recipientPhone: customer.phone,
       type: "booking_confirmation",
-      message: cleanUtr
+      message: isRazorpay
+        ? `Payment received! Your slot at ${venue.name} on ${slot.date} (${slot.start_time} - ${slot.end_time}) is confirmed.`
+        : cleanUtr
         ? `Your slot at ${venue.name} on ${slot.date} (${slot.start_time} - ${slot.end_time}) is locked! UTR #${cleanUtr} submitted to the venue owner for credit confirmation.`
         : `Your slot at ${venue.name} on ${slot.date} (${slot.start_time} - ${slot.end_time}) is reserved. Pay at the venue desk on arrival.`,
     });
 
-    if (!isPayAtVenue && cleanUtr) {
+    if (isRazorpay) {
+      await notifyInTx(client, {
+        organizationId: booking.organization_id,
+        recipientPhone: venue.phone,
+        type: "payment_confirmation",
+        message: `Online payment verified (₹${booking.total_amount}) from ${customer.name || customer.phone} for the slot on ${slot.date} at ${slot.start_time}. No UTR to check — this one was paid through the gateway.`,
+      });
+    }
+
+    if (!isPayAtVenue && !isRazorpay && cleanUtr) {
       await notifyInTx(client, {
         organizationId: booking.organization_id,
         recipientPhone: venue.phone,
