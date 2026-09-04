@@ -1,19 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api.js';
-
-function loadRazorpayScript() {
-  return new Promise((resolve) => {
-    if (window.Razorpay) return resolve(true);
-    const script = document.createElement('script');
-    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-    script.onload = () => resolve(true);
-    script.onerror = () => resolve(false);
-    document.body.appendChild(script);
-  });
-}
 import {
   Calendar, Clock, MapPin, Phone, ShieldCheck, ChevronRight,
-  Share2, Users, ArrowLeft, CheckCircle, AlertCircle, CreditCard,
+  Share2, Users, ArrowLeft, CheckCircle, AlertCircle,
   Banknote, Split, Sparkles, Trophy, Lock, QrCode, Copy, CheckCircle2,
   ExternalLink, RefreshCw, Star
 } from 'lucide-react';
@@ -167,8 +156,7 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
         customerName: customerName || 'Player',
         customerPhone,
         customerEmail,
-        sportId: selectedSport,
-        paymentMethod: paymentProvider
+        sportId: selectedSport
       });
       setActiveHold(res);
       setCheckoutStep('payment');
@@ -214,63 +202,6 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
     } finally {
       setIsHolding(false);
     }
-  }
-
-  // Step 2 (Razorpay variant): open the gateway's own checkout modal instead
-  // of asking for a manually-typed UTR — its signature is verified
-  // server-side in confirmBooking, so a successful `handler` callback here
-  // is real proof of payment, not just a UI state.
-  async function handleRazorpayPayment() {
-    if (!activeHold?.paymentOrder?.orderId) return;
-    setErrorMsg('');
-    const ready = await loadRazorpayScript();
-    if (!ready || !window.Razorpay) {
-      setErrorMsg('Could not load the payment gateway. Check your connection and try again.');
-      return;
-    }
-    const { paymentOrder } = activeHold;
-    const rzp = new window.Razorpay({
-      key: paymentOrder.keyId,
-      order_id: paymentOrder.orderId,
-      amount: paymentOrder.amountPaise,
-      currency: paymentOrder.currency || 'INR',
-      name: venue.name,
-      description: `Slot booking at ${venue.name}`,
-      prefill: { name: customerName, contact: customerPhone, email: customerEmail },
-      theme: { color: '#059669' },
-      handler: async function (response) {
-        setIsHolding(true);
-        setErrorMsg('');
-        try {
-          const res = await api.confirmBooking({
-            bookingId: activeHold.bookingId,
-            paymentProvider: 'razorpay',
-            razorpayPaymentId: response.razorpay_payment_id,
-            razorpaySignature: response.razorpay_signature,
-            splitCount,
-            participants: Array.from({ length: splitCount }).map((_, i) => ({
-              name: i === 0 ? (customerName || 'Organizer') : `Player ${i + 1}`,
-              phone: i === 0 ? customerPhone : ''
-            }))
-          });
-          setConfirmedBooking(res);
-          setCheckoutStep('confirmed');
-        } catch (err) {
-          setErrorMsg(`Payment was received but confirming the booking failed: ${err.message}. Save this payment ID and contact the venue: ${response.razorpay_payment_id}`);
-        } finally {
-          setIsHolding(false);
-        }
-      },
-      modal: {
-        ondismiss: function () {
-          setErrorMsg('Payment window closed. You can try again before the hold expires.');
-        }
-      }
-    });
-    rzp.on('payment.failed', function (response) {
-      setErrorMsg(response.error?.description || 'Payment failed. Please try again.');
-    });
-    rzp.open();
   }
 
   async function handleCancelHold() {
@@ -759,32 +690,12 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
                     </div>
                   </div>
 
-                  {/* Payment Options */}
+                  {/* Payment Options (Direct to venue) */}
                   <div style={{ marginBottom: 16 }}>
                     <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>
-                      PAYMENT METHOD
+                      PAYMENT METHOD (Direct to Venue Owner)
                     </label>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-                      <button
-                        onClick={() => setPaymentProvider('razorpay')}
-                        style={{
-                          background: paymentProvider === 'razorpay' ? '#ecfdf5' : '#ffffff',
-                          border: `1.5px solid ${paymentProvider === 'razorpay' ? '#059669' : '#cbd5e1'}`,
-                          color: paymentProvider === 'razorpay' ? '#065f46' : '#0f172a',
-                          borderRadius: 8,
-                          padding: '10px 8px',
-                          fontSize: 12,
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: 6,
-                          boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
-                        }}
-                      >
-                        <CreditCard size={14} style={{ color: '#2563eb' }} /> Pay Online
-                      </button>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                       <button
                         onClick={() => setPaymentProvider('upi')}
                         style={{
@@ -826,11 +737,6 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
                         <Banknote size={14} style={{ color: '#d97706' }} /> Pay at Turf
                       </button>
                     </div>
-                    {paymentProvider !== 'razorpay' && (
-                      <div style={{ fontSize: 10.5, color: '#94a3b8', marginTop: 5 }}>
-                        {paymentProvider === 'upi' ? 'Goes direct to the venue owner — 0% platform fee.' : 'Settle in person at the venue.'}
-                      </div>
-                    )}
                   </div>
 
                   {/* Split Bill Feature */}
@@ -861,9 +767,7 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#64748b', marginBottom: 8 }}>
                       <span>Platform Fee</span>
-                      <span style={{ color: paymentProvider === 'razorpay' ? '#0f172a' : '#059669', fontWeight: 600 }}>
-                        {paymentProvider === 'razorpay' ? 'Included' : '₹0 (Direct to Venue)'}
-                      </span>
+                      <span style={{ color: '#059669', fontWeight: 600 }}>₹0 (Direct UPI to Venue)</span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 18, fontWeight: 800, color: '#0f172a' }}>
                       <span>Total Due</span>
@@ -879,27 +783,11 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
                       disabled={isHolding}
                       onClick={handleLockSlot}
                     >
-                      {isHolding
-                        ? 'Locking Slot...'
-                        : paymentProvider === 'razorpay'
-                        ? 'Lock Slot & Pay Online (10m Hold)'
-                        : paymentProvider === 'upi'
-                        ? 'Lock Slot & Show UPI QR (10m Hold)'
-                        : 'Lock Slot & Pay at Turf'}
+                      {isHolding ? 'Locking Slot...' : paymentProvider === 'upi' ? 'Lock Slot & Show UPI QR (10m Hold)' : 'Lock Slot & Pay at Turf'}
                     </button>
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                      {paymentProvider === 'razorpay' ? (
-                        <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 12, padding: 16, textAlign: 'center' }}>
-                          <CreditCard size={26} style={{ color: '#2563eb', marginBottom: 8 }} />
-                          <div style={{ fontSize: 13.5, color: '#0f172a', fontWeight: 700, marginBottom: 4 }}>
-                            Ready to pay ₹{selectedSlot.price}
-                          </div>
-                          <div style={{ fontSize: 12, color: '#64748b' }}>
-                            Card, UPI, netbanking or wallet — click below to open secure checkout.
-                          </div>
-                        </div>
-                      ) : paymentProvider === 'upi' ? (
+                      {paymentProvider === 'upi' ? (
                         <div style={{ background: '#f8fafc', border: '1px solid #a7f3d0', borderRadius: 12, padding: 16 }}>
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                             <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.05em', color: '#059669', textTransform: 'uppercase' }}>
@@ -1018,17 +906,11 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
 
                       <button
                         className="btn-primary"
-                        style={{ width: '100%', background: paymentProvider === 'razorpay' ? '#2563eb' : '#059669', padding: '12px' }}
+                        style={{ width: '100%', background: '#059669', padding: '12px' }}
                         disabled={isHolding}
-                        onClick={paymentProvider === 'razorpay' ? handleRazorpayPayment : handleFinalizeBooking}
+                        onClick={handleFinalizeBooking}
                       >
-                        {isHolding
-                          ? 'Submitting...'
-                          : paymentProvider === 'razorpay'
-                          ? `Pay ₹${selectedSlot.price} Now`
-                          : paymentProvider === 'upi'
-                          ? 'Submit UTR & Confirm Slot'
-                          : 'Confirm Slot (Pay at Desk)'}
+                        {isHolding ? 'Submitting...' : paymentProvider === 'upi' ? 'Submit UTR & Confirm Slot' : 'Confirm Slot (Pay at Desk)'}
                       </button>
 
                       <button
