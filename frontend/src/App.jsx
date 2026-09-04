@@ -5,6 +5,7 @@ import OpenGamesHub from './components/OpenGamesHub.jsx';
 import OwnerSaaSView from './components/OwnerSaaSView.jsx';
 import { PlayerDashboard } from './components/PlayerDashboard.jsx';
 import { AuthModal } from './components/AuthModal.jsx';
+import SplitPaymentView from './components/SplitPaymentView.jsx';
 import {
   Trophy, 
   Compass, 
@@ -48,6 +49,11 @@ export default function App() {
     const params = new URLSearchParams(window.location.search);
     return params.get('venue') || params.get('v') || 'nexus-central-koramangala';
   });
+
+  // Split-payment share link (?pay=<token>) — a standalone view outside
+  // the normal app chrome, since whoever opens it may not be signed in
+  // or care about the rest of the marketplace.
+  const [paymentToken] = useState(() => new URLSearchParams(window.location.search).get('pay'));
 
   // User Auth Session State
   const [currentUser, setCurrentUser] = useState(() => {
@@ -140,6 +146,18 @@ export default function App() {
       setAuthModalRole('owner');
       setAuthModalOpen(true);
     }
+  }
+
+  if (paymentToken) {
+    return (
+      <SplitPaymentView
+        token={paymentToken}
+        onClose={() => {
+          window.history.pushState({}, '', '/');
+          window.location.reload();
+        }}
+      />
+    );
   }
 
   return (

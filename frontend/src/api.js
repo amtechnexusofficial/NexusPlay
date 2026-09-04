@@ -68,6 +68,24 @@ export const api = {
     return res.json();
   },
 
+  // Split payment — a teammate's individual reimbursement share
+  async getSplitShare(token) {
+    const res = await fetch(`${API_BASE}/split/${token}`);
+    if (!res.ok) throw new Error('Payment link not found');
+    return res.json();
+  },
+
+  async paySplitShare(token, data) {
+    const res = await fetch(`${API_BASE}/split/${token}/pay`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error || 'Failed to submit payment');
+    return body;
+  },
+
   // Open Games
   async getGames(params = {}) {
     const q = new URLSearchParams(params).toString();

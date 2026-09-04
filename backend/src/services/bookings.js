@@ -71,7 +71,7 @@ export async function holdSlot(env, { slotId, customerName, customerPhone, custo
 // — but payment_status stays 'pending_verification' until the owner checks
 // their bank statement and confirms the credit (see owner UPI verification
 // endpoints, Phase 2).
-export async function confirmBooking(env, { bookingId, paymentProvider = "upi", utr = "" }) {
+export async function confirmBooking(env, { bookingId, paymentProvider = "upi", utr = "", splitCount = 1, participants = [] }) {
   if (!bookingId) throw httpError(400, "bookingId is required");
 
   return withTransaction(env, async (client) => {
@@ -113,7 +113,29 @@ export async function confirmBooking(env, { bookingId, paymentProvider = "upi", 
 
     const customer = await recordCustomerBookingInTx(client, booking.customer_id, amountPaid);
 
-    return { booking: updatedRows[0], customer, paymentStatus };
+    // Split payment: the organizer already paid (or is paying at venue)
+    // for the whole booking above — these rows are reimbursement tracking
+    // for teammates, each with their own shareable link, not a second
+    // payment gate on the booking itself.
+    const shareLinks = [];
+    const count = Math.max(1, Number(splitCount) || 1);
+    if (count > 1) {
+      const shareAmount = Math.round(booking.total_amount / count);
+      for (let i = 0; i < count; i++) {
+        const name = participants[i]?.name || `Player ${i + 1}`;
+        const phone = participants[i]?.phone || "";
+        const status = i === 0 ? "paid" : "pending";
+        const { rows: partRows } = await client.query(
+          `insert into booking_participants (booking_id, name, phone, share_amount, payment_status)
+           values ($1, $2, $3, $4, $5) returning *`,
+          [bookingId, name, phone, shareAmount, status]
+        );
+        const p = partRows[0];
+        shareLinks.push({ participantId: p.id, name: p.name, token: p.payment_link_token, shareAmount: p.share_amount, status: p.payment_status });
+      }
+    }
+
+    return { booking: updatedRows[0], customer, paymentStatus, shareLinks };
   });
 }
 

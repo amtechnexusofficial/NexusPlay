@@ -358,7 +358,7 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
                   <span style={{ color: '#0f172a' }}>{link.name} ({link.status === 'paid' ? 'Paid by you' : 'Pending'})</span>
                   <button
                     onClick={() => {
-                      navigator.clipboard.writeText(`${window.location.origin}/pay/${link.token}`);
+                      navigator.clipboard.writeText(`${window.location.origin}/?pay=${link.token}`);
                       alert(`Shareable payment link for ${link.name} copied!`);
                     }}
                     style={{ background: 'none', border: 'none', color: '#059669', cursor: 'pointer', fontWeight: 600 }}

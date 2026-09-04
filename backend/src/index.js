@@ -23,6 +23,7 @@ import {
 } from "./services/courts.js";
 import { listSlots, blockSlot, unblockSlot, updateSlotPrice, listLiveSlots } from "./services/slots.js";
 import { holdSlot, confirmBooking, releaseHold, sweepExpiredHolds } from "./services/bookings.js";
+import { getSplitShare, paySplitShare } from "./services/splitPayments.js";
 import {
   getContext,
   getAnalytics,
@@ -173,6 +174,19 @@ app.post("/api/bookings/confirm", async (c) => {
 app.post("/api/bookings/release-hold", async (c) => {
   const result = await releaseHold(c.env, await c.req.json());
   return c.json(result);
+});
+
+// Split payment: a shareable per-teammate reimbursement link generated
+// when a booking is confirmed with splitCount > 1.
+app.get("/api/split/:token", async (c) => {
+  const sql = getDb(c.env);
+  return c.json(await getSplitShare(sql, c.req.param("token")));
+});
+
+app.post("/api/split/:token/pay", async (c) => {
+  const sql = getDb(c.env);
+  const result = await paySplitShare(sql, c.req.param("token"), await c.req.json());
+  return c.json({ success: true, ...result });
 });
 
 // ===========================================================================
