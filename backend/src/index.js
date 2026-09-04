@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { getDb } from "./db.js";
 import { httpError } from "./errors.js";
-import { requestOtp, verifyOtp, adminLogin, requireAuth, requireOrg } from "./auth.js";
+import { requestOtp, verifyOtp, adminLogin, registerOwner, loginOwnerPassword, requireAuth, requireOrg } from "./auth.js";
 import { uploadImage, serveUpload } from "./uploads.js";
 import { listSports } from "./services/sports.js";
 import {
@@ -21,6 +21,8 @@ import {
   updateCourt,
   deleteCourt,
 } from "./services/courts.js";
+import { listSlots } from "./services/slots.js";
+import { holdSlot, confirmBooking, releaseHold, sweepExpiredHolds } from "./services/bookings.js";
 
 const app = new Hono();
 
@@ -69,6 +71,23 @@ app.post("/api/auth/admin-login", async (c) => {
   return c.json(result);
 });
 
+// Owner: email + password (second front door alongside phone + OTP above).
+app.post("/api/auth/owner/register", async (c) => {
+  const sql = getDb(c.env);
+  const result = await registerOwner(sql, c.env, await c.req.json());
+  return c.json(result, 201);
+});
+
+app.post("/api/auth/owner/login", async (c) => {
+  const sql = getDb(c.env);
+  const result = await loginOwnerPassword(sql, c.env, await c.req.json());
+  return c.json(result);
+});
+
+app.get("/api/auth/me", requireAuth(), async (c) => {
+  return c.json({ user: c.get("user") });
+});
+
 // ===========================================================================
 // Sports catalog (global, read-only for now)
 // ===========================================================================
@@ -95,6 +114,33 @@ app.get("/api/public/venues/:slug", async (c) => {
   const venue = await getPublicVenue(sql, c.req.param("slug"));
   const courts = await listPublicCourtsForVenue(sql, venue.id);
   return c.json({ ...venue, courts });
+});
+
+app.get("/api/public/venues/:slug/slots", async (c) => {
+  const sql = getDb(c.env);
+  const venue = await getPublicVenue(sql, c.req.param("slug"));
+  const date = c.req.query("date") || undefined;
+  const courtId = c.req.query("courtId") || undefined;
+  return c.json(await listSlots(sql, venue.id, { date, courtId }));
+});
+
+// ===========================================================================
+// Booking flow (public — no auth required to hold/confirm/release a slot)
+// ===========================================================================
+
+app.post("/api/bookings/hold-slot", async (c) => {
+  const result = await holdSlot(c.env, await c.req.json());
+  return c.json({ success: true, ...result });
+});
+
+app.post("/api/bookings/confirm", async (c) => {
+  const result = await confirmBooking(c.env, await c.req.json());
+  return c.json({ success: true, ...result });
+});
+
+app.post("/api/bookings/release-hold", async (c) => {
+  const result = await releaseHold(c.env, await c.req.json());
+  return c.json(result);
 });
 
 // ===========================================================================
@@ -173,10 +219,10 @@ app.get("/api/uploads/*", async (c) => {
 export default {
   fetch: app.fetch,
 
-  // Cloudflare Cron Trigger — see wrangler.toml [triggers]. Currently a
-  // no-op placeholder; Phase 3 (booking flow) will add the expired-hold
-  // sweep here, reusing this same trigger.
+  // Cloudflare Cron Trigger — see wrangler.toml [triggers]. Runs every
+  // minute; releases any slot whose 10-minute payment hold expired
+  // without the customer completing checkout.
   async scheduled(event, env, ctx) {
-    // TODO(phase 3): sweep expired booking holds back to open slots.
+    ctx.waitUntil(sweepExpiredHolds(env));
   },
 };

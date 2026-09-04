@@ -81,13 +81,13 @@ export async function createVenue(sql, organizationId, input) {
   const [venue] = await sql`
     insert into venues (
       organization_id, name, slug, description, address, lat, lng, phone, email,
-      photos, amenities, sport_ids, open_time, close_time, status
+      photos, amenities, sport_ids, open_time, close_time, status, upi_id, upi_name, upi_qr_image
     ) values (
       ${organizationId}, ${input.name}, ${slug}, ${input.description || null}, ${input.address},
       ${input.lat ?? null}, ${input.lng ?? null}, ${input.phone || null}, ${input.email || null},
       ${JSON.stringify(input.photos || [])}, ${JSON.stringify(input.amenities || [])},
       ${input.sportIds || []}, ${input.openTime || "06:00"}, ${input.closeTime || "23:00"},
-      ${input.status || "draft"}
+      ${input.status || "draft"}, ${input.upiId || null}, ${input.upiName || null}, ${input.upiQrImage || null}
     )
     returning *
   `;
@@ -110,7 +110,10 @@ export async function updateVenue(sql, organizationId, venueId, input) {
       sport_ids = ${input.sportIds ?? existing.sport_ids},
       open_time = ${input.openTime ?? existing.open_time},
       close_time = ${input.closeTime ?? existing.close_time},
-      status = ${input.status ?? existing.status}
+      status = ${input.status ?? existing.status},
+      upi_id = ${input.upiId ?? existing.upi_id},
+      upi_name = ${input.upiName ?? existing.upi_name},
+      upi_qr_image = ${input.upiQrImage ?? existing.upi_qr_image}
     where id = ${venueId} and organization_id = ${organizationId}
     returning *
   `;

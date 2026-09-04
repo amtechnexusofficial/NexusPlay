@@ -44,7 +44,7 @@ async function verifyPassword(password, stored) {
   return recomputed === stored;
 }
 
-export { hashPassword };
+export { hashPassword, verifyPassword };
 
 // --- Player / Owner: phone + OTP ------------------------------------------
 
@@ -135,6 +135,53 @@ export async function verifyOtp(sql, env, { phone, code, role, name, organizatio
   );
 
   return { token, user: { id: user.id, phone: user.phone, name: user.name, role: user.role, organizationId } };
+}
+
+// --- Owner: email + password -------------------------------------------
+// Player and owner accounts can both also use phone + OTP above (a phone
+// number is one identity, one role). This is a second front door for
+// owners specifically, matching the venue-owner sign-in UI that already
+// collects a password.
+
+export async function registerOwner(sql, env, { email, password, name, organizationName }) {
+  if (!email || !password || !name) throw httpError(400, "email, password and name are required");
+  if (password.length < 8) throw httpError(400, "Password must be at least 8 characters");
+
+  const cleanEmail = email.trim().toLowerCase();
+  const [existing] = await sql`select id from users where email = ${cleanEmail}`;
+  if (existing) throw httpError(409, "An account with this email already exists");
+
+  const passwordHash = await hashPassword(password);
+  const [user] = await sql`
+    insert into users (email, password_hash, name, role)
+    values (${cleanEmail}, ${passwordHash}, ${name.trim()}, 'owner')
+    returning *
+  `;
+  const [org] = await sql`insert into organizations (name) values (${organizationName || `${user.name}'s Organization`}) returning id`;
+  await sql`insert into organization_members (organization_id, user_id, org_role) values (${org.id}, ${user.id}, 'owner')`;
+
+  const token = await sign(
+    { sub: user.id, email: user.email, role: "owner", name: user.name, organizationId: org.id, exp: Math.floor(Date.now() / 1000) + TOKEN_TTL_SECONDS },
+    env.JWT_SECRET
+  );
+  return { token, user: { id: user.id, email: user.email, name: user.name, role: "owner", organizationId: org.id } };
+}
+
+export async function loginOwnerPassword(sql, env, { email, password }) {
+  if (!email || !password) throw httpError(400, "email and password are required");
+  const [user] = await sql`select * from users where email = ${email.trim().toLowerCase()} and role = 'owner'`;
+  if (!user || !(await verifyPassword(password, user.password_hash))) {
+    throw httpError(401, "Invalid email or password");
+  }
+
+  const [membership] = await sql`select organization_id from organization_members where user_id = ${user.id} and org_role = 'owner' limit 1`;
+  const organizationId = membership?.organization_id || null;
+
+  const token = await sign(
+    { sub: user.id, email: user.email, role: "owner", name: user.name, organizationId, exp: Math.floor(Date.now() / 1000) + TOKEN_TTL_SECONDS },
+    env.JWT_SECRET
+  );
+  return { token, user: { id: user.id, email: user.email, name: user.name, role: "owner", organizationId } };
 }
 
 // --- Admin: email + password -----------------------------------------------

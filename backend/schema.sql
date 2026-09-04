@@ -334,3 +334,23 @@ insert into sports (name, slug, icon) values
   ('Tennis', 'tennis', '🎾'),
   ('Basketball', 'basketball', '🏀')
 on conflict (name) do nothing;
+
+-- ===========================================================================
+-- Migration: direct-to-owner UPI payments + owner password login (Phase 1
+-- booking flow). Safe to re-run against an already-provisioned database —
+-- every statement below is idempotent.
+-- ===========================================================================
+
+alter table venues add column if not exists upi_id text;
+alter table venues add column if not exists upi_name text;
+alter table venues add column if not exists upi_qr_image text;
+
+-- 'pending_verification': UPI UTR submitted by customer, awaiting the
+-- owner checking their bank statement and confirming the credit.
+alter table bookings drop constraint if exists bookings_payment_status_check;
+alter table bookings add constraint bookings_payment_status_check
+  check (payment_status in ('pending', 'paid', 'failed', 'cash', 'partially_paid', 'refunded', 'cancelled', 'pending_verification'));
+
+alter table payments drop constraint if exists payments_provider_check;
+alter table payments add constraint payments_provider_check
+  check (provider in ('razorpay', 'stripe', 'cash', 'upi'));

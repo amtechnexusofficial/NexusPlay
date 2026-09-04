@@ -1,4 +1,9 @@
-const API_BASE = '/api';
+// The backend is a separate Cloudflare Worker, not served from this same
+// origin — set VITE_API_BASE_URL (Cloudflare Pages → Settings → Environment
+// variables) to the Worker's URL, e.g. https://nexusplay.<subdomain>.workers.dev.
+// Falls back to same-origin /api for local dev against `wrangler dev` with
+// a proxy, but will 404 in production if the env var isn't set.
+const API_BASE = `${(import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')}/api`;
 
 export const api = {
   // Catalog & Marketplace
@@ -10,14 +15,14 @@ export const api = {
 
   async getMarketplaceVenues(params = {}) {
     const q = new URLSearchParams(params).toString();
-    const res = await fetch(`${API_BASE}/marketplace/venues?${q}`);
+    const res = await fetch(`${API_BASE}/public/venues?${q}`);
     if (!res.ok) throw new Error('Failed to fetch venues');
     return res.json();
   },
 
   // Public Venue Page & Slots
   async getPublicVenue(slugOrId) {
-    const res = await fetch(`${API_BASE}/public/venue/${slugOrId}`);
+    const res = await fetch(`${API_BASE}/public/venues/${slugOrId}`);
     if (!res.ok) throw new Error('Venue not found');
     return res.json();
   },
@@ -26,7 +31,7 @@ export const api = {
     const params = new URLSearchParams();
     if (date) params.append('date', date);
     if (courtId) params.append('courtId', courtId);
-    const res = await fetch(`${API_BASE}/public/venue/${venueId}/slots?${params.toString()}`);
+    const res = await fetch(`${API_BASE}/public/venues/${venueId}/slots?${params.toString()}`);
     if (!res.ok) throw new Error('Failed to fetch slots');
     return res.json();
   },
@@ -279,25 +284,50 @@ export const api = {
   },
 
   // Authentication & Sessions
-  async loginPlayer(credentials) {
-    const res = await fetch(`${API_BASE}/auth/player/login`, {
+  // Player + owner can both sign in with phone + OTP (one identity, one
+  // role per phone number); owner also has a second front door via
+  // email + password, matching the SaaS dashboard sign-in UI.
+  async requestOtp({ phone, role }) {
+    const res = await fetch(`${API_BASE}/auth/request-otp`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(credentials)
+      body: JSON.stringify({ phone, role })
     });
     const body = await res.json();
-    if (!res.ok) throw new Error(body.error || 'Player login failed');
+    if (!res.ok) throw new Error(body.error || 'Failed to send verification code');
     return body;
   },
 
-  async loginOwner(credentials) {
+  async verifyOtp({ phone, code, role, name, organizationName }) {
+    const res = await fetch(`${API_BASE}/auth/verify-otp`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone, code, role, name, organizationName })
+    });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error || 'Verification failed');
+    return body;
+  },
+
+  async loginOwner({ email, password }) {
     const res = await fetch(`${API_BASE}/auth/owner/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(credentials)
+      body: JSON.stringify({ email, password })
     });
     const body = await res.json();
     if (!res.ok) throw new Error(body.error || 'Owner login failed');
+    return body;
+  },
+
+  async registerOwner({ name, email, password, organizationName }) {
+    const res = await fetch(`${API_BASE}/auth/owner/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, email, password, organizationName })
+    });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error || 'Owner registration failed');
     return body;
   },
 
