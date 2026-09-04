@@ -2,6 +2,7 @@ import { httpError } from "../errors.js";
 import { withTransaction } from "../db.js";
 import { findOrCreateCustomerInTx, recordCustomerBookingInTx } from "./customers.js";
 import { getPaymentProvider } from "./payments.js";
+import { notifyInTx } from "./notifications.js";
 
 const HOLD_MINUTES = 10;
 
@@ -112,6 +113,29 @@ export async function confirmBooking(env, { bookingId, paymentProvider = "upi", 
     );
 
     const customer = await recordCustomerBookingInTx(client, booking.customer_id, amountPaid);
+
+    const { rows: slotRows } = await client.query("select * from court_slots where id = $1", [booking.court_slot_id]);
+    const { rows: venueRows } = await client.query("select * from venues where id = $1", [booking.venue_id]);
+    const slot = slotRows[0];
+    const venue = venueRows[0];
+
+    await notifyInTx(client, {
+      organizationId: booking.organization_id,
+      recipientPhone: customer.phone,
+      type: "booking_confirmation",
+      message: cleanUtr
+        ? `Your slot at ${venue.name} on ${slot.date} (${slot.start_time} - ${slot.end_time}) is locked! UTR #${cleanUtr} submitted to the venue owner for credit confirmation.`
+        : `Your slot at ${venue.name} on ${slot.date} (${slot.start_time} - ${slot.end_time}) is reserved. Pay at the venue desk on arrival.`,
+    });
+
+    if (!isPayAtVenue && cleanUtr) {
+      await notifyInTx(client, {
+        organizationId: booking.organization_id,
+        recipientPhone: venue.phone,
+        type: "payment_confirmation",
+        message: `UPI payment to verify (₹${booking.total_amount}): ${customer.name || customer.phone} submitted UTR #${cleanUtr} for the slot on ${slot.date} at ${slot.start_time}. Check your bank credit and confirm in the owner dashboard.`,
+      });
+    }
 
     // Split payment: the organizer already paid (or is paying at venue)
     // for the whole booking above — these rows are reimbursement tracking

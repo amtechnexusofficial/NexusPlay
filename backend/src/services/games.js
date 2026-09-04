@@ -1,6 +1,7 @@
 import { httpError } from "../errors.js";
 import { withTransaction } from "../db.js";
-import { findOrCreateCustomerInTx, recordCustomerBookingInTx } from "./customers.js";
+import { findOrCreateCustomerInTx } from "./customers.js";
+import { notifyInTx, notify } from "./notifications.js";
 
 // Public discovery feed: every open or filling-up pickup game, enriched
 // with venue/court/sport display fields and its current roster.
@@ -146,6 +147,18 @@ export async function joinGame(env, gameId, { playerName, playerPhone }) {
       gameId,
     ]);
 
+    if (isNowFull) {
+      const { rows: organizerRows } = await client.query("select phone from customers where id = $1", [game.organizer_customer_id]);
+      const { rows: slotRows } = await client.query("select date, start_time from court_slots where id = $1", [game.court_slot_id]);
+      const slot = slotRows[0];
+      await notifyInTx(client, {
+        organizationId: game.organization_id,
+        recipientPhone: organizerRows[0]?.phone,
+        type: "confirmation",
+        message: `Your game "${game.title}" is FULL! All ${game.capacity} player spots are filled and confirmed for ${slot?.date} at ${slot?.start_time}. Kickoff ready!`,
+      });
+    }
+
     return { newPlayerCount, isNowFull, game: updated[0] };
   });
 }
@@ -163,6 +176,10 @@ export async function requestFullSlot(sql, gameId, { clientName, clientPhone, am
   const [slot] = await sql`select * from court_slots where id = ${game.court_slot_id}`;
   if (!slot) throw httpError(404, "Associated court slot not found");
 
+  const [venue] = await sql`select name, phone from venues where id = ${game.venue_id}`;
+  const [court] = await sql`select name from courts where id = ${game.court_id}`;
+  const [{ n: registeredCount }] = await sql`select count(*)::int as n from game_participants where game_id = ${gameId}`;
+
   const offerAmount = Number(amount) || slot.price;
 
   await sql`
@@ -175,6 +192,13 @@ export async function requestFullSlot(sql, gameId, { clientName, clientPhone, am
       full_inquiry_requested_at = now()
     where id = ${slot.id}
   `;
+
+  await notify(sql, {
+    organizationId: game.organization_id,
+    recipientPhone: venue?.phone,
+    type: "full_slot_request",
+    message: `Client ${clientName} (+91 ${clientPhone}) requested full booking for ${slot.date} (${slot.start_time} - ${slot.end_time}) on ${court?.name || "a court"}. Offer: ₹${offerAmount}. Currently ${registeredCount} player(s) registered. Review in the owner dashboard to accept and auto-refund players.`,
+  });
 
   return {
     message: "Full slot booking request submitted to the venue owner for review.",

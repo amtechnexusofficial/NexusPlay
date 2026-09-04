@@ -3,6 +3,7 @@ import { withTransaction } from "../db.js";
 import { getVenueForOrg, updateVenue } from "./venues.js";
 import { listCourtsForVenue } from "./courts.js";
 import { findOrCreateCustomerInTx, recordCustomerBookingInTx } from "./customers.js";
+import { notifyInTx, notify } from "./notifications.js";
 
 // ===========================================================================
 // Dashboard shell: venues + org info for the SaaS shell to bootstrap with.
@@ -185,6 +186,11 @@ export async function updateBookingAction(env, organizationId, bookingId, { acti
     const booking = rows[0];
     if (!booking) throw httpError(404, "Booking not found");
 
+    const { rows: customerRows } = await client.query("select * from customers where id = $1", [booking.customer_id]);
+    const { rows: venueRows } = await client.query("select name from venues where id = $1", [booking.venue_id]);
+    const customer = customerRows[0];
+    const venueName = venueRows[0]?.name || "the venue";
+
     if (action === "mark_cash_paid") {
       const { rows: updated } = await client.query(
         "update bookings set payment_status = 'cash', status = 'confirmed', amount_paid = total_amount, updated_at = now() where id = $1 returning *",
@@ -201,6 +207,12 @@ export async function updateBookingAction(env, organizationId, bookingId, { acti
       if (booking.court_slot_id) {
         await client.query("update court_slots set status = 'open', hold_expires_at = null where id = $1", [booking.court_slot_id]);
       }
+      await notifyInTx(client, {
+        organizationId,
+        recipientPhone: customer?.phone,
+        type: "cancellation",
+        message: `Your booking at ${venueName} has been cancelled by the venue. If you already paid, your refund is being processed.`,
+      });
       return { booking: updated[0], message: "Booking cancelled and slot reopened" };
     }
 
@@ -244,6 +256,12 @@ export async function updateBookingAction(env, organizationId, bookingId, { acti
         "update bookings set court_slot_id = $1, notes = 'Rescheduled by owner', updated_at = now() where id = $2 returning *",
         [targetSlot.id, bookingId]
       );
+      await notifyInTx(client, {
+        organizationId,
+        recipientPhone: customer?.phone,
+        type: "reschedule",
+        message: `Your booking at ${venueName} was rescheduled by the venue to ${newDate} (${newStartTime} - ${endTime}).`,
+      });
       return {
         booking: { ...updated[0], date: newDate, start_time: newStartTime, end_time: endTime },
         message: "Booking rescheduled",
@@ -291,6 +309,11 @@ export async function verifyUpiPayment(env, organizationId, bookingId, { action 
     const booking = rows[0];
     if (!booking) throw httpError(404, "Booking not found");
 
+    const { rows: customerRows } = await client.query("select * from customers where id = $1", [booking.customer_id]);
+    const { rows: venueRows } = await client.query("select name from venues where id = $1", [booking.venue_id]);
+    const customer = customerRows[0];
+    const venueName = venueRows[0]?.name || "the venue";
+
     if (action === "verify_credit") {
       const { rows: updated } = await client.query(
         `update bookings set payment_status = 'paid', status = 'confirmed', amount_paid = total_amount,
@@ -302,18 +325,31 @@ export async function verifyUpiPayment(env, organizationId, bookingId, { action 
       // Customer CRM stats (total_spend/total_bookings) were already
       // incremented when the booking was confirmed in bookings.js — this
       // step only flips the verification status, it doesn't re-count.
+      await notifyInTx(client, {
+        organizationId,
+        recipientPhone: customer?.phone,
+        type: "payment_confirmation",
+        message: `Your payment of ₹${booking.total_amount} (UTR: ${booking.upi_utr || "direct"}) has been verified by ${venueName}. Your slot is 100% confirmed!`,
+      });
       return { status: "paid", booking: updated[0], message: "UPI payment verified and credited to venue" };
     }
 
     if (action === "reject") {
+      const reason = notes || "Payment not received in owner UPI bank account";
       const { rows: updated } = await client.query(
         "update bookings set payment_status = 'failed', status = 'cancelled', notes = $2, updated_at = now() where id = $1 returning *",
-        [bookingId, notes || "Payment not received in owner UPI bank account"]
+        [bookingId, reason]
       );
       if (booking.court_slot_id) {
         await client.query("update court_slots set status = 'open', hold_expires_at = null where id = $1", [booking.court_slot_id]);
       }
       await client.query("update payments set status = 'failed' where booking_id = $1", [bookingId]);
+      await notifyInTx(client, {
+        organizationId,
+        recipientPhone: customer?.phone,
+        type: "cancellation",
+        message: `Your booking at ${venueName} was not verified. Reason: ${reason}. The slot has been released.`,
+      });
       return { status: "rejected", booking: updated[0], message: "Booking rejected and slot released back to open" };
     }
 
@@ -378,6 +414,12 @@ export async function convertSlotToFullInquiry(env, organizationId, slotId, { cl
     const slot = slotRows[0];
     if (!slot) throw httpError(404, "Slot not found");
 
+    const { rows: venueRows } = await client.query("select name, phone from venues where id = $1", [slot.venue_id]);
+    const { rows: courtRows } = await client.query("select name from courts where id = $1", [slot.court_id]);
+    const venueName = venueRows[0]?.name || "the venue";
+    const venuePhone = venueRows[0]?.phone;
+    const courtName = courtRows[0]?.name || "the court";
+
     const { rows: gameRows } = await client.query(
       "select * from games where court_slot_id = $1 and status in ('open', 'confirmed') for update",
       [slotId]
@@ -386,13 +428,22 @@ export async function convertSlotToFullInquiry(env, organizationId, slotId, { cl
     let registeredPlayersCount = 0;
 
     if (game) {
-      const { rows: countRows } = await client.query("select count(*)::int as n from game_participants where game_id = $1", [game.id]);
-      registeredPlayersCount = countRows[0].n;
+      const { rows: displacedPlayers } = await client.query(
+        "select gp.*, c.name, c.phone from game_participants gp join customers c on gp.customer_id = c.id where gp.game_id = $1",
+        [game.id]
+      );
+      registeredPlayersCount = displacedPlayers.length;
       await client.query("update games set status = 'converted_to_full_booking' where id = $1", [game.id]);
       await client.query("update game_participants set payment_status = 'refunded' where game_id = $1", [game.id]);
-      // Refund notifications to the displaced players are a known gap —
-      // notification delivery isn't wired up yet (schema exists, nothing
-      // dispatches). They're refunded in the ledger; they aren't texted.
+
+      for (const player of displacedPlayers) {
+        await notifyInTx(client, {
+          organizationId,
+          recipientPhone: player.phone,
+          type: "full_inquiry_refund",
+          message: `Hi ${player.name}! Your open pickup game at ${venueName} on ${slot.date} (${slot.start_time} - ${slot.end_time}) on ${courtName} was booked in full by an exclusive private team. Your registration fee of ₹${player.share_amount} has been 100% refunded. Contact ${venueName} at ${venuePhone || "the venue"} for any queries.`,
+        });
+      }
     }
 
     const bookingAmount = Number(amount) || slot.price;
@@ -418,6 +469,13 @@ export async function convertSlotToFullInquiry(env, organizationId, slotId, { cl
       [bookingAmount, clientName, clientPhone, notes, slot.id]
     );
 
+    await notifyInTx(client, {
+      organizationId,
+      recipientPhone: clientPhone,
+      type: "booking_confirmation",
+      message: `Dear ${clientName}, your full pitch booking at ${venueName} (${courtName}) for ${slot.date} from ${slot.start_time} to ${slot.end_time} is confirmed! Amount: ₹${bookingAmount}.`,
+    });
+
     return {
       bookingId: bookingRows[0].id,
       registeredPlayersCount,
@@ -435,6 +493,17 @@ export async function declineSlotInquiry(sql, organizationId, slotId) {
     returning *
   `;
   if (!updated) throw httpError(404, "Slot not found");
+
+  if (updated.full_inquiry_phone) {
+    const [venue] = await sql`select name from venues where id = ${updated.venue_id}`;
+    await notify(sql, {
+      organizationId,
+      recipientPhone: updated.full_inquiry_phone,
+      type: "notice",
+      message: `Hello ${updated.full_inquiry_client || "there"}, your full slot booking request for ${updated.date} (${updated.start_time} - ${updated.end_time}) was declined by ${venue?.name || "the venue"} — the community pickup game remains active. Please explore other available slots on NexusPlay.`,
+    });
+  }
+
   return {
     slot: updated,
     message: "Full slot booking request declined. The community pickup session remains active.",

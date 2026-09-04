@@ -396,3 +396,14 @@ alter table court_slots add column if not exists full_inquiry_requested_at times
 alter table bookings drop constraint if exists bookings_source_check;
 alter table bookings add constraint bookings_source_check
   check (source in ('online', 'walk_in', 'marketplace', 'game', 'full_time_inquiry'));
+
+-- ===========================================================================
+-- Migration: notification delivery. Dispatch is still a stub (logs
+-- instead of actually sending SMS/WhatsApp — see services/notifications.js),
+-- but every trigger point now writes a real, queryable row here, and the
+-- player dashboard's WhatsApp-alerts tab reads it directly.
+-- ===========================================================================
+
+alter table notifications add column if not exists recipient_phone text;
+alter table notifications add column if not exists message text;
+create index if not exists idx_notifications_recipient_phone on notifications(recipient_phone);

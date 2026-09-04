@@ -66,9 +66,10 @@ export async function getPlayerDashboard(sql, phone) {
 export async function listPlayerNotifications(sql, phone) {
   const cleanPhone = (phone || "").trim();
   if (!cleanPhone) return [];
+  const last10 = cleanPhone.replace(/\D/g, "").slice(-10);
   return sql`
     select * from notifications
-    where regexp_replace(phone, '[^0-9]', '', 'g') like ${"%" + cleanPhone.replace(/\D/g, "").slice(-10)}
+    where regexp_replace(recipient_phone, '[^0-9]', '', 'g') like ${"%" + last10}
     order by created_at desc
     limit 25
   `;
