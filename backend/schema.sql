@@ -367,3 +367,32 @@ alter table venues add column if not exists rules text;
 
 alter table court_slots add column if not exists block_reason text;
 alter table bookings add column if not exists upi_utr text;
+
+-- ===========================================================================
+-- Migration: Open Games (players self-organizing a pickup match on a slot,
+-- and an owner's option to convert a partially-filled game into an
+-- exclusive full-pitch booking).
+-- ===========================================================================
+
+alter table games add column if not exists skill_level text;
+alter table games add column if not exists rules text;
+
+-- 'converted_to_full_booking': an owner accepted a full-slot inquiry over
+-- an in-progress open game, refunding the players who'd already joined.
+alter table games drop constraint if exists games_status_check;
+alter table games add constraint games_status_check
+  check (status in ('open', 'full', 'confirmed', 'cancelled', 'converted_to_full_booking'));
+
+-- A player (or team) can offer to book an open game's slot outright,
+-- displacing the individual sign-ups; these fields track that inquiry
+-- until the owner accepts or declines it.
+alter table court_slots add column if not exists full_inquiry_client text;
+alter table court_slots add column if not exists full_inquiry_phone text;
+alter table court_slots add column if not exists full_inquiry_notes text;
+alter table court_slots add column if not exists full_inquiry_amount integer;
+alter table court_slots add column if not exists full_inquiry_status text;
+alter table court_slots add column if not exists full_inquiry_requested_at timestamptz;
+
+alter table bookings drop constraint if exists bookings_source_check;
+alter table bookings add constraint bookings_source_check
+  check (source in ('online', 'walk_in', 'marketplace', 'game', 'full_time_inquiry'));

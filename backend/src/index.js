@@ -34,7 +34,10 @@ import {
   verifyUpiPayment,
   updateVenueProfile,
   getVenueProfile,
+  convertSlotToFullInquiry,
+  declineSlotInquiry,
 } from "./services/owner.js";
+import { listGames, createGame, joinGame, requestFullSlot } from "./services/games.js";
 
 const app = new Hono();
 
@@ -156,6 +159,36 @@ app.post("/api/bookings/release-hold", async (c) => {
 });
 
 // ===========================================================================
+// Open Games (public — no auth, mirrors the booking flow's trust model:
+// organizer/player identity comes from the name+phone they submit, same
+// as a customer checking out)
+// ===========================================================================
+
+app.get("/api/games", async (c) => {
+  const sql = getDb(c.env);
+  const sportId = c.req.query("sport") || undefined;
+  const venueId = c.req.query("venueId") || undefined;
+  const date = c.req.query("date") || undefined;
+  return c.json(await listGames(sql, { sportId, venueId, date }));
+});
+
+app.post("/api/games/create", async (c) => {
+  const result = await createGame(c.env, await c.req.json());
+  return c.json({ success: true, ...result });
+});
+
+app.post("/api/games/:gameId/join", async (c) => {
+  const result = await joinGame(c.env, c.req.param("gameId"), await c.req.json());
+  return c.json({ success: true, ...result });
+});
+
+app.post("/api/games/:gameId/request-full-slot", async (c) => {
+  const sql = getDb(c.env);
+  const result = await requestFullSlot(sql, c.req.param("gameId"), await c.req.json());
+  return c.json({ success: true, ...result });
+});
+
+// ===========================================================================
 // Owner: venues (requires an owner/manager/staff token with an org)
 // ===========================================================================
 
@@ -239,6 +272,17 @@ app.patch("/api/owner/slots/:slotId/price", ...ownerAuth, async (c) => {
   const { price } = await c.req.json();
   const slot = await updateSlotPrice(sql, c.get("organizationId"), c.req.param("slotId"), Number(price));
   return c.json({ success: true, slot });
+});
+
+app.post("/api/owner/slots/:slotId/convert-full-inquiry", ...ownerAuth, async (c) => {
+  const result = await convertSlotToFullInquiry(c.env, c.get("organizationId"), c.req.param("slotId"), await c.req.json());
+  return c.json({ success: true, ...result });
+});
+
+app.post("/api/owner/slots/:slotId/decline-full-inquiry", ...ownerAuth, async (c) => {
+  const sql = getDb(c.env);
+  const result = await declineSlotInquiry(sql, c.get("organizationId"), c.req.param("slotId"));
+  return c.json({ success: true, ...result });
 });
 
 app.get("/api/owner/live-slots", ...ownerAuth, async (c) => {

@@ -360,3 +360,83 @@ export async function getVenueProfile(sql, organizationId, venueId) {
   const courts = await listCourtsForVenue(sql, organizationId, venueId);
   return { ...venue, organization_name: organization?.name || "", courts };
 }
+
+// ===========================================================================
+// Full-slot inquiries — a player/team offering to book an open game's slot
+// outright, displacing the individual sign-ups (see requestFullSlot in
+// services/games.js, which raises the request this responds to).
+// ===========================================================================
+
+export async function convertSlotToFullInquiry(env, organizationId, slotId, { clientName, clientPhone, amount, paymentMode = "cash", notes = "" }) {
+  if (!clientName || !clientPhone) throw httpError(400, "Client name and phone number are required");
+
+  return withTransaction(env, async (client) => {
+    const { rows: slotRows } = await client.query(
+      "select * from court_slots where id = $1 and organization_id = $2 for update",
+      [slotId, organizationId]
+    );
+    const slot = slotRows[0];
+    if (!slot) throw httpError(404, "Slot not found");
+
+    const { rows: gameRows } = await client.query(
+      "select * from games where court_slot_id = $1 and status in ('open', 'confirmed') for update",
+      [slotId]
+    );
+    const game = gameRows[0];
+    let registeredPlayersCount = 0;
+
+    if (game) {
+      const { rows: countRows } = await client.query("select count(*)::int as n from game_participants where game_id = $1", [game.id]);
+      registeredPlayersCount = countRows[0].n;
+      await client.query("update games set status = 'converted_to_full_booking' where id = $1", [game.id]);
+      await client.query("update game_participants set payment_status = 'refunded' where game_id = $1", [game.id]);
+      // Refund notifications to the displaced players are a known gap —
+      // notification delivery isn't wired up yet (schema exists, nothing
+      // dispatches). They're refunded in the ledger; they aren't texted.
+    }
+
+    const bookingAmount = Number(amount) || slot.price;
+    const customer = await findOrCreateCustomerInTx(client, organizationId, { name: clientName, phone: clientPhone });
+
+    const { rows: bookingRows } = await client.query(
+      `insert into bookings (organization_id, venue_id, court_id, court_slot_id, customer_id, source, status, payment_status, total_amount, amount_paid, notes)
+       values ($1, $2, $3, $4, $5, 'full_time_inquiry', 'confirmed', 'paid', $6, $6, $7) returning *`,
+      [
+        organizationId, slot.venue_id, slot.court_id, slot.id, customer.id, bookingAmount,
+        `Full-time inquiry converted by owner. Client: ${clientName} (${clientPhone}).${
+          registeredPlayersCount > 0 ? ` Replaced open game with ${registeredPlayersCount} registered player(s).` : ""
+        } ${notes}`.trim(),
+      ]
+    );
+
+    await recordCustomerBookingInTx(client, customer.id, bookingAmount);
+
+    await client.query(
+      `update court_slots set status = 'booked', hold_expires_at = null, price = $1,
+         full_inquiry_client = $2, full_inquiry_phone = $3, full_inquiry_notes = $4, full_inquiry_status = 'accepted'
+       where id = $5`,
+      [bookingAmount, clientName, clientPhone, notes, slot.id]
+    );
+
+    return {
+      bookingId: bookingRows[0].id,
+      registeredPlayersCount,
+      message: `Full-time inquiry accepted! Pitch booked exclusively for ${clientName}.${
+        registeredPlayersCount > 0 ? ` ${registeredPlayersCount} registered player(s) marked as refunded.` : ""
+      }`,
+    };
+  });
+}
+
+export async function declineSlotInquiry(sql, organizationId, slotId) {
+  const [updated] = await sql`
+    update court_slots set full_inquiry_status = 'declined'
+    where id = ${slotId} and organization_id = ${organizationId}
+    returning *
+  `;
+  if (!updated) throw httpError(404, "Slot not found");
+  return {
+    slot: updated,
+    message: "Full slot booking request declined. The community pickup session remains active.",
+  };
+}
