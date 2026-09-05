@@ -25,6 +25,8 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
   const [customers, setCustomers] = useState([]);
   const [pendingUpiBookings, setPendingUpiBookings] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [notSignedIn, setNotSignedIn] = useState(false);
+  const [loadError, setLoadError] = useState('');
 
   // First-run onboarding: a new owner account has an organization but no
   // venue yet, and nothing else in this dashboard has anything to show
@@ -137,6 +139,8 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
   async function loadData(targetVenueId = null) {
     try {
       setLoading(true);
+      setNotSignedIn(false);
+      setLoadError('');
       const ctx = await api.getOwnerContext();
       setContext(ctx);
       setVenues(ctx.venues || []);
@@ -164,6 +168,11 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
       }
     } catch (err) {
       console.error('Error fetching owner data:', err);
+      if (String(err.message) === 'Not signed in') {
+        setNotSignedIn(true);
+      } else {
+        setLoadError(err.message || 'Could not reach the server. Check your connection and try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -641,6 +650,48 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
     return (
       <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
         Loading Turf Management System...
+      </div>
+    );
+  }
+
+  // Not signed in at all (no token, or one that no longer verifies) —
+  // distinct from "signed in but zero venues yet" below. Landing here
+  // with nothing signed in is expected (e.g. opening ?view=owner
+  // directly) — don't imply anything is broken.
+  if (notSignedIn) {
+    return (
+      <div style={{ maxWidth: 420, margin: '80px auto', padding: '0 16px', textAlign: 'center' }}>
+        <div className="nexus-card" style={{ padding: 32 }}>
+          <Building size={28} style={{ color: '#10b981', marginBottom: 12 }} />
+          <h2 style={{ fontSize: 18, fontWeight: 800, color: '#0f172a', marginBottom: 8 }}>
+            Sign In Required
+          </h2>
+          <p style={{ fontSize: 13.5, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+            You'll need to sign in with your Arena Owner account to manage venues, courts, and bookings.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // A real failure (network unreachable, server error) — distinct from
+  // "loaded fine, zero venues" below. Showing the create-venue form here
+  // would be misleading: we don't actually know whether they have one.
+  if (loadError) {
+    return (
+      <div style={{ maxWidth: 420, margin: '80px auto', padding: '0 16px', textAlign: 'center' }}>
+        <div className="nexus-card" style={{ padding: 32 }}>
+          <AlertCircle size={28} style={{ color: '#dc2626', marginBottom: 12 }} />
+          <h2 style={{ fontSize: 18, fontWeight: 800, color: '#0f172a', marginBottom: 8 }}>
+            Couldn't Load Your Dashboard
+          </h2>
+          <p style={{ fontSize: 13.5, color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: 16 }}>
+            {loadError}
+          </p>
+          <button onClick={() => loadData()} className="btn-primary" style={{ padding: '9px 18px', fontSize: 13 }}>
+            Retry
+          </button>
+        </div>
       </div>
     );
   }

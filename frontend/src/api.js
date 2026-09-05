@@ -18,11 +18,14 @@ function authHeaders() {
 // every owner call would then fail with a confusing "Invalid or expired
 // token" while the UI still shows as signed in, since currentUser comes
 // straight from localStorage independent of whether the token verifies.
-// Centralizing the fetch here means one 401 clears the stale session and
-// reloads to a clean signed-out state instead of failing silently forever.
+// Only reload when a token was actually sent and rejected — a signed-out
+// visitor with no token at all also gets a 401 (correctly), and reloading
+// for that case just re-runs the same unauthenticated request forever,
+// which is a blank-page reload loop, not a fix.
 async function ownerFetch(url, options = {}) {
+  const hadToken = !!localStorage.getItem('nexus_token');
   const res = await fetch(url, { ...options, headers: { ...(options.headers || {}), ...authHeaders() } });
-  if (res.status === 401) {
+  if (res.status === 401 && hadToken) {
     localStorage.removeItem('nexus_token');
     localStorage.removeItem('nexus_user');
     localStorage.removeItem('nexus_owner_venue');
@@ -163,6 +166,7 @@ export const api = {
   // Venue Owner SaaS
   async getOwnerContext() {
     const res = await ownerFetch(`${API_BASE}/owner/context`);
+    if (res.status === 401) throw new Error('Not signed in');
     if (!res.ok) throw new Error('Failed to get owner context');
     return res.json();
   },
