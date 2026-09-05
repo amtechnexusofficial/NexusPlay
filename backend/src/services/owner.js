@@ -129,6 +129,72 @@ export async function listBookings(sql, organizationId, { venueId, date } = {}) 
   `;
 }
 
+// ===========================================================================
+// Reports & Billing — a POS-style transaction log: every booking in a date
+// range with its payment method, plus revenue/count summaries that are
+// computed against the full range (not just the page of rows returned),
+// so the numbers stay accurate even past the row cap below.
+// ===========================================================================
+
+export async function getBillingReport(sql, organizationId, { venueId, dateFrom, dateTo } = {}) {
+  const today = new Date().toISOString().slice(0, 10);
+  const thirtyDaysAgo = new Date(Date.now() - 29 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const from = dateFrom || thirtyDaysAgo;
+  const to = dateTo || today;
+  const venueClause = venueId ? sql`and b.venue_id = ${venueId}` : sql``;
+
+  const transactions = await sql`
+    select b.id, b.status, b.payment_status, b.total_amount, b.amount_paid, b.source,
+           b.notes, b.upi_utr, b.created_at,
+           cs.date, cs.start_time, cs.end_time,
+           c.name as customer_name, c.phone as customer_phone,
+           crt.name as court_name, v.name as venue_name,
+           (select p.provider from payments p where p.booking_id = b.id order by p.created_at desc limit 1) as payment_provider
+    from bookings b
+    join court_slots cs on b.court_slot_id = cs.id
+    left join customers c on b.customer_id = c.id
+    left join courts crt on b.court_id = crt.id
+    left join venues v on b.venue_id = v.id
+    where b.organization_id = ${organizationId} ${venueClause}
+      and cs.date >= ${from} and cs.date <= ${to}
+    order by cs.date desc, cs.start_time desc
+    limit 500
+  `;
+
+  const [totals] = await sql`
+    select
+      coalesce(sum(b.amount_paid) filter (where b.status in ('confirmed', 'completed')), 0)::int as total_revenue,
+      count(*) filter (where b.status in ('confirmed', 'completed'))::int as total_bookings,
+      count(*) filter (where b.status = 'cancelled')::int as cancelled_count,
+      coalesce(sum(b.amount_paid) filter (where b.status in ('confirmed', 'completed')
+        and (select p.provider from payments p where p.booking_id = b.id order by p.created_at desc limit 1) = 'upi'), 0)::int as upi_revenue,
+      coalesce(sum(b.amount_paid) filter (where b.status in ('confirmed', 'completed')
+        and (select p.provider from payments p where p.booking_id = b.id order by p.created_at desc limit 1) = 'cash'), 0)::int as cash_revenue,
+      coalesce(sum(b.amount_paid) filter (where b.status in ('confirmed', 'completed')
+        and (select p.provider from payments p where p.booking_id = b.id order by p.created_at desc limit 1) = 'razorpay'), 0)::int as razorpay_revenue
+    from bookings b
+    join court_slots cs on b.court_slot_id = cs.id
+    where b.organization_id = ${organizationId} ${venueClause}
+      and cs.date >= ${from} and cs.date <= ${to}
+  `;
+
+  return {
+    dateFrom: from,
+    dateTo: to,
+    transactions,
+    summary: {
+      totalRevenue: totals.total_revenue,
+      totalBookings: totals.total_bookings,
+      cancelledCount: totals.cancelled_count,
+      byMethod: {
+        upi: totals.upi_revenue,
+        cash: totals.cash_revenue,
+        razorpay: totals.razorpay_revenue,
+      },
+    },
+  };
+}
+
 // Fast owner-side booking: court + slot are confirmed immediately, no hold
 // step, payment is recorded as already collected (cash or pre-arranged).
 export async function createWalkIn(env, organizationId, input) {

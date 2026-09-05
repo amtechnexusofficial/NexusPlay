@@ -37,6 +37,7 @@ import {
   getVenueProfile,
   convertSlotToFullInquiry,
   declineSlotInquiry,
+  getBillingReport,
 } from "./services/owner.js";
 import { listGames, createGame, joinGame, requestFullSlot } from "./services/games.js";
 import { getPlayerDashboard, listPlayerNotifications } from "./services/players.js";
@@ -288,6 +289,14 @@ app.get("/api/owner/bookings", ...ownerAuth, async (c) => {
   const venueId = c.req.query("venueId") || undefined;
   const date = c.req.query("date") || undefined;
   return c.json(await listBookings(sql, c.get("organizationId"), { venueId, date }));
+});
+
+app.get("/api/owner/billing", ...ownerAuth, async (c) => {
+  const sql = getDb(c.env);
+  const venueId = c.req.query("venueId") || undefined;
+  const dateFrom = c.req.query("dateFrom") || undefined;
+  const dateTo = c.req.query("dateTo") || undefined;
+  return c.json(await getBillingReport(sql, c.get("organizationId"), { venueId, dateFrom, dateTo }));
 });
 
 app.post("/api/owner/walk-in", ...ownerAuth, async (c) => {

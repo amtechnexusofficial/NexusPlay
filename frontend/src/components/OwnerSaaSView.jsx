@@ -6,7 +6,8 @@ import {
   TrendingUp, Activity, Lock, Unlock, Phone, RefreshCw,
   Building, Settings, QrCode, Copy, ShieldCheck, CheckCircle2,
   FileText, Check, ExternalLink, MapPin, Share2, Flame,
-  Tag, AlertCircle, Edit3, Save, Navigation, Sparkles, Trophy
+  Tag, AlertCircle, Edit3, Save, Navigation, Sparkles, Trophy,
+  Download, Receipt, Link2, X
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -31,11 +32,25 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
   const [onboardName, setOnboardName] = useState('');
   const [onboardAddress, setOnboardAddress] = useState('');
   const [onboardCity, setOnboardCity] = useState('');
+  const [onboardMapsLink, setOnboardMapsLink] = useState('');
+  const [onboardLat, setOnboardLat] = useState('');
+  const [onboardLng, setOnboardLng] = useState('');
   const [creatingVenue, setCreatingVenue] = useState(false);
   const [onboardError, setOnboardError] = useState('');
 
+  // Same Google Maps link detection, reused by the Business Setup tab's
+  // Address & GPS card for an already-existing venue.
+  const [bizMapsLink, setBizMapsLink] = useState('');
+
   // Publishing an existing (draft) venue live on the marketplace
   const [publishing, setPublishing] = useState(false);
+
+  // Reports & Billing — POS-style transaction log
+  const [billingDateFrom, setBillingDateFrom] = useState(() => new Date(Date.now() - 29 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
+  const [billingDateTo, setBillingDateTo] = useState(() => new Date().toISOString().slice(0, 10));
+  const [billingData, setBillingData] = useState(null);
+  const [loadingBilling, setLoadingBilling] = useState(false);
+  const [receiptBooking, setReceiptBooking] = useState(null);
 
   // Live Slots & Interactive Calendar State
   const [calendarDate, setCalendarDate] = useState(new Date().toISOString().slice(0, 10));
@@ -210,6 +225,51 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
     }
   }
 
+  async function loadBilling() {
+    if (!selectedVenue) return;
+    setLoadingBilling(true);
+    try {
+      const res = await api.getOwnerBillingReport({
+        venueId: selectedVenue.id,
+        dateFrom: billingDateFrom,
+        dateTo: billingDateTo
+      });
+      setBillingData(res);
+    } catch (err) {
+      console.error('Error fetching billing report:', err);
+    } finally {
+      setLoadingBilling(false);
+    }
+  }
+
+  useEffect(() => {
+    if (activeTab === 'billing' && selectedVenue) {
+      loadBilling();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, selectedVenue?.id]);
+
+  function exportBillingCsv() {
+    if (!billingData?.transactions?.length) return;
+    const headers = ['Date', 'Time', 'Court', 'Customer', 'Phone', 'Status', 'Payment Status', 'Method', 'Amount Paid', 'Total Amount', 'Source'];
+    const rows = billingData.transactions.map(t => [
+      t.date, t.start_time, t.court_name || '', t.customer_name || '', t.customer_phone || '',
+      t.status, t.payment_status, t.payment_provider || '', t.amount_paid, t.total_amount, t.source
+    ]);
+    const csv = [headers, ...rows]
+      .map(row => row.map(cell => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${selectedVenue?.slug || 'billing'}-${billingDateFrom}-to-${billingDateTo}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
   // Save Full Business Details
   async function handleSaveBusinessDetails(e) {
     e.preventDefault();
@@ -257,14 +317,15 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
     setCreatingVenue(true);
     setOnboardError('');
     try {
+      // Created as draft on purpose — publish explicitly (Business Setup's
+      // "Publish Now" banner) once courts/pricing/address are actually
+      // ready, rather than going live with placeholder details.
       const venue = await api.createVenue({
         name: onboardName.trim(),
         address: onboardAddress.trim(),
         city: onboardCity.trim() || undefined,
-        // Published immediately — a brand-new owner has nowhere else to
-        // flip this, and there's no reason to hide their first venue
-        // from players until they've filled in every optional field.
-        status: 'active'
+        lat: onboardLat ? parseFloat(onboardLat) : undefined,
+        lng: onboardLng ? parseFloat(onboardLng) : undefined
       });
       await loadData(venue.id);
     } catch (err) {
@@ -272,6 +333,43 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
     } finally {
       setCreatingVenue(false);
     }
+  }
+
+  // Parses the lat/lng out of a pasted Google Maps URL so an owner never
+  // has to hand-type decimal coordinates. Handles the two common formats:
+  // the "@lat,lng,zoom" pattern in a viewed-location URL, and "!3dlat!4dlng"
+  // from an embedded/shared pin link. Short goo.gl links redirect and
+  // can't be parsed client-side — those need expanding to a full URL first.
+  function parseGoogleMapsLink(url) {
+    if (!url) return null;
+    const at = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+    if (at) return { lat: at[1], lng: at[2] };
+    const bang = url.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/);
+    if (bang) return { lat: bang[1], lng: bang[2] };
+    const q = url.match(/[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/);
+    if (q) return { lat: q[1], lng: q[2] };
+    return null;
+  }
+
+  function handleDetectOnboardLocation() {
+    const coords = parseGoogleMapsLink(onboardMapsLink);
+    if (!coords) {
+      setOnboardError('Could not find coordinates in that link — paste the full maps.google.com URL (open the pin, use Share > Copy link), not a shortened goo.gl one.');
+      return;
+    }
+    setOnboardLat(coords.lat);
+    setOnboardLng(coords.lng);
+    setOnboardError('');
+  }
+
+  function handleDetectBizLocation() {
+    const coords = parseGoogleMapsLink(bizMapsLink);
+    if (!coords) {
+      alert('Could not find coordinates in that link — paste the full maps.google.com URL (open the pin, use Share > Copy link), not a shortened goo.gl one.');
+      return;
+    }
+    setBizLat(coords.lat);
+    setBizLng(coords.lng);
   }
 
   async function handlePublishVenue() {
@@ -602,6 +700,32 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                 placeholder="Bangalore"
               />
             </div>
+            <div style={{ marginBottom: 18 }}>
+              <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
+                GOOGLE MAPS LINK (optional — for "nearby" search)
+              </label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input
+                  type="text"
+                  className="nexus-input"
+                  style={{ flex: 1 }}
+                  value={onboardMapsLink}
+                  onChange={e => setOnboardMapsLink(e.target.value)}
+                  placeholder="Paste your venue's Google Maps link"
+                />
+                <button type="button" onClick={handleDetectOnboardLocation} className="btn-secondary" style={{ padding: '0 14px', fontSize: 12.5, whiteSpace: 'nowrap' }}>
+                  <MapPin size={13} /> Detect
+                </button>
+              </div>
+              {onboardLat && onboardLng && (
+                <div style={{ fontSize: 11.5, color: '#059669', marginTop: 6 }}>
+                  Location set: {onboardLat}, {onboardLng}
+                </div>
+              )}
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6 }}>
+                In Google Maps: search your venue, tap Share → Copy link, paste here. Skip if you don't have one yet — you can add it later from Business Setup.
+              </div>
+            </div>
             {onboardError && (
               <div style={{ color: '#dc2626', fontSize: 12.5, marginBottom: 12 }}>{onboardError}</div>
             )}
@@ -829,6 +953,29 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
           }}
         >
           <Users size={15} /> Customer CRM
+        </button>
+
+        <button
+          onClick={() => setActiveTab('billing')}
+          style={{
+            height: 40,
+            background: activeTab === 'billing' ? '#059669' : '#ffffff',
+            color: activeTab === 'billing' ? '#ffffff' : '#334155',
+            border: activeTab === 'billing' ? '1px solid #059669' : '1px solid #cbd5e1',
+            borderRadius: 10,
+            padding: '0 16px',
+            fontWeight: 700,
+            fontSize: 13,
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 7,
+            whiteSpace: 'nowrap',
+            boxShadow: activeTab === 'billing' ? '0 2px 5px rgba(5,150,105,0.2)' : '0 1px 2px rgba(0,0,0,0.03)',
+            transition: 'all 0.15s ease'
+          }}
+        >
+          <Receipt size={15} /> Reports & Billing
         </button>
 
         <button
@@ -1847,6 +1994,28 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                     </div>
                   </div>
 
+                  <div>
+                    <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
+                      GOOGLE MAPS LINK
+                    </label>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <input
+                        type="text"
+                        className="nexus-input"
+                        style={{ flex: 1 }}
+                        value={bizMapsLink}
+                        onChange={e => setBizMapsLink(e.target.value)}
+                        placeholder="Paste your venue's Google Maps link"
+                      />
+                      <button type="button" onClick={handleDetectBizLocation} className="btn-secondary" style={{ padding: '0 14px', fontSize: 12.5, whiteSpace: 'nowrap' }}>
+                        <MapPin size={13} /> Detect
+                      </button>
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6 }}>
+                      In Google Maps: search your venue, tap Share → Copy link, paste here — fills in the coordinates below.
+                    </div>
+                  </div>
+
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                     <div>
                       <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
@@ -2286,6 +2455,173 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                 </tbody>
               </table>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB: REPORTS & BILLING (POS-STYLE TRANSACTION LOG) */}
+      {/* ========================================================================= */}
+      {activeTab === 'billing' && (
+        <div className="animate-fade-in">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 14, marginBottom: 18 }}>
+            <div>
+              <h2 className="font-display" style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                Reports & Billing
+              </h2>
+              <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: '4px 0 0 0' }}>
+                Every transaction in one place — filter by date, export for your books, or pull up a single receipt.
+              </p>
+            </div>
+          </div>
+
+          {/* Filters */}
+          <div className="nexus-card" style={{ padding: 16, marginBottom: 18, display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'flex-end' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>FROM</label>
+              <input type="date" className="nexus-input" value={billingDateFrom} onChange={e => setBillingDateFrom(e.target.value)} />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>TO</label>
+              <input type="date" className="nexus-input" value={billingDateTo} onChange={e => setBillingDateTo(e.target.value)} />
+            </div>
+            <button type="button" onClick={loadBilling} className="btn-secondary" style={{ padding: '9px 16px', fontSize: 13 }} disabled={loadingBilling}>
+              <RefreshCw size={14} /> {loadingBilling ? 'Loading...' : 'Apply'}
+            </button>
+            <button
+              type="button"
+              onClick={exportBillingCsv}
+              className="btn-primary"
+              style={{ padding: '9px 16px', fontSize: 13, marginLeft: 'auto' }}
+              disabled={!billingData?.transactions?.length}
+            >
+              <Download size={14} /> Export CSV
+            </button>
+          </div>
+
+          {/* Summary tiles */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 18 }}>
+            <div className="nexus-card" style={{ padding: 16 }}>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', marginBottom: 6 }}>Total Revenue</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: '#059669' }}>₹{(billingData?.summary?.totalRevenue ?? 0).toLocaleString('en-IN')}</div>
+            </div>
+            <div className="nexus-card" style={{ padding: 16 }}>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', marginBottom: 6 }}>Confirmed Bookings</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: '#0f172a' }}>{billingData?.summary?.totalBookings ?? 0}</div>
+            </div>
+            <div className="nexus-card" style={{ padding: 16 }}>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', marginBottom: 6 }}>UPI</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: '#0f172a' }}>₹{(billingData?.summary?.byMethod?.upi ?? 0).toLocaleString('en-IN')}</div>
+            </div>
+            <div className="nexus-card" style={{ padding: 16 }}>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', marginBottom: 6 }}>Cash</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: '#0f172a' }}>₹{(billingData?.summary?.byMethod?.cash ?? 0).toLocaleString('en-IN')}</div>
+            </div>
+            <div className="nexus-card" style={{ padding: 16 }}>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', marginBottom: 6 }}>Cancelled</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: '#dc2626' }}>{billingData?.summary?.cancelledCount ?? 0}</div>
+            </div>
+          </div>
+
+          {/* Transaction list */}
+          <div className="nexus-card" style={{ overflow: 'hidden' }}>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 13 }}>
+                <thead>
+                  <tr style={{ background: '#f8fafc', borderBottom: '1px solid var(--border-card)', color: 'var(--text-muted)', fontSize: 11.5 }}>
+                    <th style={{ padding: '12px 16px' }}>DATE</th>
+                    <th style={{ padding: '12px 16px' }}>COURT</th>
+                    <th style={{ padding: '12px 16px' }}>CUSTOMER</th>
+                    <th style={{ padding: '12px 16px' }}>METHOD</th>
+                    <th style={{ padding: '12px 16px' }}>STATUS</th>
+                    <th style={{ padding: '12px 16px' }}>AMOUNT</th>
+                    <th style={{ padding: '12px 16px' }}></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(billingData?.transactions || []).map(t => (
+                    <tr key={t.id} style={{ borderBottom: '1px solid var(--border-card)' }}>
+                      <td style={{ padding: '12px 16px', color: '#0f172a' }}>
+                        {t.date} <span style={{ color: 'var(--text-muted)', fontSize: 11.5 }}>{t.start_time}</span>
+                      </td>
+                      <td style={{ padding: '12px 16px', color: 'var(--text-secondary)' }}>{t.court_name || '—'}</td>
+                      <td style={{ padding: '12px 16px', color: '#0f172a' }}>
+                        {t.customer_name || 'Player'} <span style={{ color: 'var(--text-muted)', fontSize: 11.5 }}>{t.customer_phone}</span>
+                      </td>
+                      <td style={{ padding: '12px 16px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontSize: 11.5 }}>
+                        {t.payment_provider || t.payment_status}
+                      </td>
+                      <td style={{ padding: '12px 16px' }}>
+                        <span style={{
+                          fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', padding: '3px 8px', borderRadius: 999,
+                          background: t.status === 'confirmed' || t.status === 'completed' ? 'rgba(16,185,129,0.12)' : t.status === 'cancelled' ? 'rgba(239,68,68,0.12)' : 'rgba(148,163,184,0.15)',
+                          color: t.status === 'confirmed' || t.status === 'completed' ? '#059669' : t.status === 'cancelled' ? '#dc2626' : '#64748b'
+                        }}>
+                          {t.status}
+                        </span>
+                      </td>
+                      <td style={{ padding: '12px 16px', fontWeight: 700, color: '#0f172a' }}>₹{t.amount_paid}</td>
+                      <td style={{ padding: '12px 16px' }}>
+                        <button
+                          type="button"
+                          onClick={() => setReceiptBooking(t)}
+                          className="btn-secondary"
+                          style={{ padding: '5px 10px', fontSize: 11.5 }}
+                        >
+                          <Receipt size={12} /> Receipt
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {!loadingBilling && (billingData?.transactions || []).length === 0 && (
+                    <tr>
+                      <td colSpan={7} style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>
+                        No transactions in this date range.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: PRINTABLE RECEIPT */}
+      {receiptBooking && (
+        <div
+          onClick={() => setReceiptBooking(null)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 20 }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="nexus-card"
+            style={{ maxWidth: 360, width: '100%', padding: 26, background: '#ffffff' }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+              <div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: '#0f172a' }}>{selectedVenue?.name}</div>
+                <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>Booking Receipt</div>
+              </div>
+              <button onClick={() => setReceiptBooking(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
+                <X size={18} />
+              </button>
+            </div>
+            <div style={{ borderTop: '1px dashed #e2e8f0', borderBottom: '1px dashed #e2e8f0', padding: '14px 0', display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13, marginBottom: 14 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text-muted)' }}>Receipt ID</span><span style={{ fontWeight: 600 }}>{receiptBooking.id?.slice(0, 8)}</span></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text-muted)' }}>Date</span><span>{receiptBooking.date} · {receiptBooking.start_time}-{receiptBooking.end_time}</span></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text-muted)' }}>Court</span><span>{receiptBooking.court_name}</span></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text-muted)' }}>Customer</span><span>{receiptBooking.customer_name || 'Player'}</span></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text-muted)' }}>Phone</span><span>{receiptBooking.customer_phone}</span></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text-muted)' }}>Payment Method</span><span style={{ textTransform: 'uppercase' }}>{receiptBooking.payment_provider || receiptBooking.payment_status}</span></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text-muted)' }}>Status</span><span style={{ textTransform: 'capitalize' }}>{receiptBooking.status}</span></div>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 18, fontWeight: 800, color: '#0f172a', marginBottom: 18 }}>
+              <span>Amount Paid</span><span>₹{receiptBooking.amount_paid}</span>
+            </div>
+            <button onClick={() => window.print()} className="btn-primary" style={{ width: '100%', padding: '10px' }}>
+              Print Receipt
+            </button>
           </div>
         </div>
       )}
