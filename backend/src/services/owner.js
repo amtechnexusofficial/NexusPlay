@@ -381,6 +381,12 @@ export async function updateVenueProfile(sql, organizationId, venueId, body) {
     upiId: body.upi_id,
     upiName: body.upi_name,
     upiQrImage: body.upi_qr_image,
+    // A new venue defaults to 'draft' (see createVenue) and there was
+    // previously no way to flip it — it simply never showed up on the
+    // marketplace or even its own direct link. updateVenue's `??` means
+    // omitting this leaves the current status untouched, so a routine
+    // profile save never accidentally un-publishes an active venue.
+    status: body.status,
   });
 
   if (body.organization_name) {

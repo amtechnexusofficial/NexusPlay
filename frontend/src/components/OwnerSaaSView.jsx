@@ -25,6 +25,18 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
   const [pendingUpiBookings, setPendingUpiBookings] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // First-run onboarding: a new owner account has an organization but no
+  // venue yet, and nothing else in this dashboard has anything to show
+  // until one exists.
+  const [onboardName, setOnboardName] = useState('');
+  const [onboardAddress, setOnboardAddress] = useState('');
+  const [onboardCity, setOnboardCity] = useState('');
+  const [creatingVenue, setCreatingVenue] = useState(false);
+  const [onboardError, setOnboardError] = useState('');
+
+  // Publishing an existing (draft) venue live on the marketplace
+  const [publishing, setPublishing] = useState(false);
+
   // Live Slots & Interactive Calendar State
   const [calendarDate, setCalendarDate] = useState(new Date().toISOString().slice(0, 10));
   const [liveSlots, setLiveSlots] = useState([]);
@@ -233,6 +245,45 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
       alert('Failed to save business details: ' + err.message);
     } finally {
       setSavingBiz(false);
+    }
+  }
+
+  async function handleCreateVenue(e) {
+    e.preventDefault();
+    if (!onboardName.trim() || !onboardAddress.trim()) {
+      setOnboardError('Venue name and address are required.');
+      return;
+    }
+    setCreatingVenue(true);
+    setOnboardError('');
+    try {
+      const venue = await api.createVenue({
+        name: onboardName.trim(),
+        address: onboardAddress.trim(),
+        city: onboardCity.trim() || undefined,
+        // Published immediately — a brand-new owner has nowhere else to
+        // flip this, and there's no reason to hide their first venue
+        // from players until they've filled in every optional field.
+        status: 'active'
+      });
+      await loadData(venue.id);
+    } catch (err) {
+      setOnboardError(err.message || 'Failed to create venue');
+    } finally {
+      setCreatingVenue(false);
+    }
+  }
+
+  async function handlePublishVenue() {
+    if (!selectedVenue) return;
+    setPublishing(true);
+    try {
+      await api.updateVenueProfile(selectedVenue.id, { status: 'active' });
+      await loadData(selectedVenue.id);
+    } catch (err) {
+      alert('Failed to publish venue: ' + err.message);
+    } finally {
+      setPublishing(false);
     }
   }
 
@@ -492,6 +543,73 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
     return (
       <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
         Loading Turf Management System...
+      </div>
+    );
+  }
+
+  // A brand-new owner account has an organization but no venue yet —
+  // nothing else in this dashboard (courts, slots, bookings) has anywhere
+  // to attach to until one exists.
+  if (!loading && !selectedVenue) {
+    return (
+      <div style={{ maxWidth: 480, margin: '60px auto', padding: '0 16px' }}>
+        <div className="nexus-card" style={{ padding: 28 }}>
+          <h2 style={{ fontSize: 19, fontWeight: 800, color: '#0f172a', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Building size={18} style={{ color: '#10b981' }} /> Set Up Your First Venue
+          </h2>
+          <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 20, lineHeight: 1.5 }}>
+            One venue, then add courts and you're bookable — slots for the next two weeks are generated automatically from each court's operating hours, nothing to configure manually.
+          </p>
+          <form onSubmit={handleCreateVenue}>
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
+                VENUE / ARENA NAME *
+              </label>
+              <input
+                type="text"
+                required
+                className="nexus-input"
+                style={{ width: '100%' }}
+                value={onboardName}
+                onChange={e => setOnboardName(e.target.value)}
+                placeholder="e.g. Koramangala Turf Arena"
+              />
+            </div>
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
+                ADDRESS *
+              </label>
+              <input
+                type="text"
+                required
+                className="nexus-input"
+                style={{ width: '100%' }}
+                value={onboardAddress}
+                onChange={e => setOnboardAddress(e.target.value)}
+                placeholder="Full street address"
+              />
+            </div>
+            <div style={{ marginBottom: 18 }}>
+              <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
+                CITY
+              </label>
+              <input
+                type="text"
+                className="nexus-input"
+                style={{ width: '100%' }}
+                value={onboardCity}
+                onChange={e => setOnboardCity(e.target.value)}
+                placeholder="Bangalore"
+              />
+            </div>
+            {onboardError && (
+              <div style={{ color: '#dc2626', fontSize: 12.5, marginBottom: 12 }}>{onboardError}</div>
+            )}
+            <button type="submit" className="btn-primary" style={{ width: '100%', padding: '11px' }} disabled={creatingVenue}>
+              {creatingVenue ? 'Creating...' : 'Create Venue & Continue'}
+            </button>
+          </form>
+        </div>
       </div>
     );
   }
@@ -1519,6 +1637,28 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
               </div>
             )}
           </div>
+
+          {selectedVenue && selectedVenue.status !== 'active' && (
+            <div className="nexus-card" style={{ padding: '16px 20px', marginBottom: 20, display: 'flex', flexWrap: 'wrap', gap: 14, alignItems: 'center', justifyContent: 'space-between', background: '#fffbeb', border: '1px solid #fde68a' }}>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: '#92400e', marginBottom: 2 }}>
+                  This venue is {selectedVenue.status} — not visible to players yet
+                </div>
+                <div style={{ fontSize: 12.5, color: '#b45309' }}>
+                  Players can't find it on the marketplace or its direct link until you publish it.
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handlePublishVenue}
+                disabled={publishing}
+                className="btn-primary"
+                style={{ padding: '9px 18px', fontSize: 13, whiteSpace: 'nowrap' }}
+              >
+                {publishing ? 'Publishing...' : 'Publish Now'}
+              </button>
+            </div>
+          )}
 
           {selectedVenue?.slug && (
             <div className="nexus-card" style={{ padding: 22, marginBottom: 20, display: 'flex', flexWrap: 'wrap', gap: 20, alignItems: 'center' }}>

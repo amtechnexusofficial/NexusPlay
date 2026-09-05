@@ -218,6 +218,20 @@ export const api = {
     return res.json();
   },
 
+  // A brand-new owner account has an organization but zero venues — this
+  // is the one-time "create your first venue" call that unblocks
+  // everything else (courts, slots, the public booking page).
+  async createVenue(data) {
+    const res = await fetch(`${API_BASE}/venues`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify(data)
+    });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error || 'Failed to create venue');
+    return body;
+  },
+
   async getOwnerVenueDetails(venueId) {
     const res = await fetch(`${API_BASE}/owner/venues/${venueId}`, { headers: authHeaders() });
     if (!res.ok) throw new Error('Failed to fetch venue details');
