@@ -417,3 +417,17 @@ create index if not exists idx_notifications_recipient_phone on notifications(re
 -- ===========================================================================
 
 alter table bookings add column if not exists razorpay_order_id text;
+
+-- ===========================================================================
+-- Migration: fix schema drift on users.phone. Databases that existed
+-- before this multi-tenant rewrite may still carry an old `phone not null`
+-- constraint from an earlier version of this project — `create table if
+-- not exists` above never touches a table that already exists, so it
+-- silently leaves that old constraint in place. Email-only sign-up
+-- (owner register, admin accounts) has never supplied phone, so on an
+-- untouched old table every one of those inserts fails with "null value
+-- in column phone violates not-null constraint". Dropping NOT NULL is a
+-- no-op if the column is already nullable, so this is safe to re-run.
+-- ===========================================================================
+
+alter table users alter column phone drop not null;
