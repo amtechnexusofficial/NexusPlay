@@ -428,6 +428,15 @@ alter table bookings add column if not exists razorpay_order_id text;
 -- untouched old table every one of those inserts fails with "null value
 -- in column phone violates not-null constraint". Dropping NOT NULL is a
 -- no-op if the column is already nullable, so this is safe to re-run.
+--
+-- Same story for the role check constraint: an old table predating the
+-- 'admin' role rejects it outright ("violates check constraint
+-- users_role_check"). drop+recreate is idempotent regardless of whether
+-- the old or new definition is currently in place.
 -- ===========================================================================
 
 alter table users alter column phone drop not null;
+
+alter table users drop constraint if exists users_role_check;
+alter table users add constraint users_role_check
+  check (role in ('admin', 'owner', 'player'));
