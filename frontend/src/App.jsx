@@ -74,6 +74,10 @@ export default function App() {
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authModalRole, setAuthModalRole] = useState('player'); // 'player' | 'owner'
 
+  // Which tab the Player Dashboard opens on — lets Open Games Hub's
+  // "Host Open Game in My Profile" jump straight to that tab.
+  const [playerDashboardInitialTab, setPlayerDashboardInitialTab] = useState('bookings');
+
   // Sync session on mount
   useEffect(() => {
     const token = localStorage.getItem('nexus_token');
@@ -150,6 +154,22 @@ export default function App() {
     } else {
       setAuthModalRole('owner');
       setAuthModalOpen(true);
+    }
+  }
+
+  // Open Games Hub's three "host a game" entry points — matches its
+  // onNavigateToLogin(role) / onNavigateToDashboard(role, tab) call shape.
+  function handleGamesHubLogin(role) {
+    if (role === 'owner') openOwnerAuth();
+    else openPlayerAuth();
+  }
+
+  function handleGamesHubNavigateToDashboard(role, tab) {
+    if (role === 'owner') {
+      navigateTo('owner');
+    } else {
+      setPlayerDashboardInitialTab(tab || 'bookings');
+      navigateTo('player-dashboard');
     }
   }
 
@@ -607,10 +627,11 @@ export default function App() {
         )}
 
         {activeView === 'opengames' && (
-          <OpenGamesHub 
+          <OpenGamesHub
             onNavigateToVenue={handleSelectVenue}
             currentUser={currentUser}
-            onOpenAuth={openPlayerAuth}
+            onNavigateToLogin={handleGamesHubLogin}
+            onNavigateToDashboard={handleGamesHubNavigateToDashboard}
           />
         )}
 
@@ -658,6 +679,7 @@ export default function App() {
           ) : (
             <PlayerDashboard
               user={currentUser}
+              initialTab={playerDashboardInitialTab}
               onBookVenue={() => navigateTo('marketplace')}
               onBrowseGames={() => navigateTo('opengames')}
               onLogout={handleLogout}
