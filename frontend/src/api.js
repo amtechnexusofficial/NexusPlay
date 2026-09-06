@@ -29,7 +29,10 @@ async function ownerFetch(url, options = {}) {
     localStorage.removeItem('nexus_token');
     localStorage.removeItem('nexus_user');
     localStorage.removeItem('nexus_owner_venue');
-    window.location.reload();
+    // TEMPORARILY disabled while tracking down a real 401 on freshly-issued
+    // tokens — reloading immediately wipes the diagnostic detail off the
+    // screen before it can be read. Re-enable once that's root-caused.
+    // window.location.reload();
   }
   return res;
 }
@@ -166,7 +169,15 @@ export const api = {
   // Venue Owner SaaS
   async getOwnerContext() {
     const res = await ownerFetch(`${API_BASE}/owner/context`);
-    if (res.status === 401) throw new Error('Not signed in');
+    if (res.status === 401) {
+      // Diagnostic detail (e.g. "JwtTokenSignatureMismatched") is baked into
+      // the error message here on purpose while this is still being
+      // tracked down — see the "Not signed in" prefix check in
+      // OwnerSaaSView, which still shows the friendly screen but with the
+      // real reason visible underneath.
+      const body = await res.json().catch(() => ({}));
+      throw new Error(`Not signed in: ${body.error || 'no detail'}`);
+    }
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
       throw new Error(body.error || `Failed to get owner context (${res.status})`);

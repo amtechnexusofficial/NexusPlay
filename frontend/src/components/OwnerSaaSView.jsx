@@ -26,6 +26,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
   const [pendingUpiBookings, setPendingUpiBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [notSignedIn, setNotSignedIn] = useState(false);
+  const [notSignedInDetail, setNotSignedInDetail] = useState('');
   const [loadError, setLoadError] = useState('');
 
   // First-run onboarding: a new owner account has an organization but no
@@ -140,6 +141,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
     try {
       setLoading(true);
       setNotSignedIn(false);
+      setNotSignedInDetail('');
       setLoadError('');
       const ctx = await api.getOwnerContext();
       setContext(ctx);
@@ -168,8 +170,13 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
       }
     } catch (err) {
       console.error('Error fetching owner data:', err);
-      if (String(err.message) === 'Not signed in') {
+      const msg = String(err.message || '');
+      if (msg.startsWith('Not signed in')) {
         setNotSignedIn(true);
+        // Temporary diagnostic detail while a stale-token issue is being
+        // tracked down — the bit after the colon names the exact JWT
+        // failure category (e.g. signature mismatch vs expired).
+        setNotSignedInDetail(msg.split(':').slice(1).join(':').trim());
       } else {
         setLoadError(err.message || 'Could not reach the server. Check your connection and try again.');
       }
@@ -669,6 +676,11 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
           <p style={{ fontSize: 13.5, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
             You'll need to sign in with your Arena Owner account to manage venues, courts, and bookings.
           </p>
+          {notSignedInDetail && (
+            <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 14, fontFamily: 'monospace' }}>
+              Diagnostic: {notSignedInDetail}
+            </p>
+          )}
         </div>
       </div>
     );

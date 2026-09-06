@@ -213,8 +213,13 @@ export function requireAuth(requiredRole) {
     let payload;
     try {
       payload = await verify(token, c.env.JWT_SECRET);
-    } catch {
-      throw httpError(401, "Invalid or expired token");
+    } catch (err) {
+      // err.name is a specific, safe-to-expose category from hono's jwt
+      // verify (e.g. JwtTokenExpired, JwtTokenSignatureMismatched,
+      // JwtTokenInvalid) — never the secret or the token itself. Surfacing
+      // it turns "why did this 401" from a guessing game into a one-line
+      // answer.
+      throw httpError(401, `Invalid or expired token (${err.name || err.message || "unknown"})`);
     }
     if (allowed && !allowed.includes(payload.role)) {
       throw httpError(403, `Requires role: ${allowed.join(" or ")}`);
