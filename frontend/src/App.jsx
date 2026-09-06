@@ -700,6 +700,14 @@ export default function App() {
             </div>
           ) : (
             <OwnerSaaSView
+              // Forces a full remount (and thus a fresh data-fetch) whenever
+              // sign-in state changes. Without this, landing here once while
+              // signed out and then signing in afterward via the header —
+              // without ever navigating away — leaves the exact same mounted
+              // instance in place, so its one-time-on-mount fetch never
+              // reruns and it keeps showing the stale "not signed in" result
+              // forever despite a valid session now existing.
+              key={currentUser?.id || 'signed-out'}
               onNavigateToPublicPage={(slug) => {
                 navigateTo('venue-page', slug);
               }}
