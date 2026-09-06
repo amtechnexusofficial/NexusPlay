@@ -15,6 +15,13 @@ import {
 } from 'recharts';
 
 export default function OwnerSaaSView({ onNavigateToPublicPage }) {
+  // Temporary diagnostic: a random id generated exactly once per mount.
+  // If this shows the SAME value before and after signing in, the
+  // component never actually remounted (the key= fix isn't taking
+  // effect for some reason). If it's DIFFERENT, remount is working and
+  // the failure is happening fresh, inside the new instance's own fetch.
+  const [mountId] = useState(() => Math.random().toString(36).slice(2, 8));
+
   // Tabs: 'dashboard', 'live_slots', 'business_setup', 'upi_verification', 'crm', 'courts'
   const [activeTab, setActiveTab] = useState('live_slots');
   const [context, setContext] = useState(null);
@@ -700,7 +707,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
             })();
             return (
               <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 6, fontFamily: 'monospace' }}>
-                Storage writable: {storageWorks} · Token present: {hasToken ? 'yes' : 'no'}
+                Storage writable: {storageWorks} · Token present: {hasToken ? 'yes' : 'no'} · Mount ID: {mountId}
               </p>
             );
           })()}
