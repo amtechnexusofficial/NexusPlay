@@ -26,14 +26,10 @@ async function ownerFetch(url, options = {}) {
   const hadToken = !!localStorage.getItem('nexus_token');
   const res = await fetch(url, { ...options, headers: { ...(options.headers || {}), ...authHeaders() } });
   if (res.status === 401 && hadToken) {
-    // TEMPORARILY disabled: this was clearing the token and reloading the
-    // page the instant a token-bearing request got rejected — which meant
-    // whatever the REAL error was got wiped and replaced by a fresh,
-    // misleadingly-plain "Missing bearer token" on the next mount. Every
-    // "Missing bearer token" report during live debugging was actually
-    // this reload masking a different original failure. Re-enable once
-    // the real cause of that original rejection is found.
-    console.error('[ownerFetch] 401 with a token present — NOT clearing/reloading (temporarily disabled for debugging). URL:', url);
+    localStorage.removeItem('nexus_token');
+    localStorage.removeItem('nexus_user');
+    localStorage.removeItem('nexus_owner_venue');
+    window.location.reload();
   }
   return res;
 }

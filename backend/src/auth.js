@@ -1,8 +1,65 @@
-import { sign, verify } from "hono/jwt";
 import { httpError } from "./errors.js";
 
 const OTP_TTL_MINUTES = 10;
 const TOKEN_TTL_SECONDS = 60 * 60 * 24 * 30; // 30 days
+
+// --- Session tokens (hand-rolled, HS256) -----------------------------------
+// Was hono/jwt's sign()/verify() — after a long, thoroughly-confirmed live
+// debugging session (real token, correctly stored, correctly sent, still
+// rejected with JwtAlgorithmRequired no matter how many times the fix was
+// redeployed) that library is dropped entirely rather than chased further.
+// This is deliberately minimal: standard JWT shape (header.payload.signature,
+// base64url, HMAC-SHA256) for interoperability/debuggability, built only on
+// Web Crypto (already used for password hashing below, and known-good in
+// this exact Workers runtime).
+function base64UrlEncodeBytes(bytes) {
+  let str = "";
+  for (const b of bytes) str += String.fromCharCode(b);
+  return btoa(str).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function base64UrlDecodeToBytes(str) {
+  str = str.replace(/-/g, "+").replace(/_/g, "/");
+  while (str.length % 4) str += "=";
+  const bin = atob(str);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+
+async function hmacKey(secret) {
+  return crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign", "verify"]);
+}
+
+async function signToken(payload, secret) {
+  const header = { alg: "HS256", typ: "JWT" };
+  const encodedHeader = base64UrlEncodeBytes(new TextEncoder().encode(JSON.stringify(header)));
+  const encodedPayload = base64UrlEncodeBytes(new TextEncoder().encode(JSON.stringify(payload)));
+  const signingInput = `${encodedHeader}.${encodedPayload}`;
+  const key = await hmacKey(secret);
+  const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(signingInput));
+  const encodedSignature = base64UrlEncodeBytes(new Uint8Array(signature));
+  return `${signingInput}.${encodedSignature}`;
+}
+
+async function verifyToken(token, secret) {
+  const parts = (token || "").split(".");
+  if (parts.length !== 3) throw new Error("Malformed token");
+  const [encodedHeader, encodedPayload, encodedSignature] = parts;
+  const key = await hmacKey(secret);
+  const valid = await crypto.subtle.verify(
+    "HMAC",
+    key,
+    base64UrlDecodeToBytes(encodedSignature),
+    new TextEncoder().encode(`${encodedHeader}.${encodedPayload}`)
+  );
+  if (!valid) throw new Error("Signature mismatch");
+  const payload = JSON.parse(new TextDecoder().decode(base64UrlDecodeToBytes(encodedPayload)));
+  if (typeof payload.exp === "number" && Math.floor(Date.now() / 1000) >= payload.exp) {
+    throw new Error("Token expired");
+  }
+  return payload;
+}
 
 // --- Abuse limits ---------------------------------------------------------
 // Kept from the original Thidal hardening pass — same rationale: a 4-digit
@@ -122,7 +179,7 @@ export async function verifyOtp(sql, env, { phone, code, role, name, organizatio
     }
   }
 
-  const token = await sign(
+  const token = await signToken(
     {
       sub: user.id,
       phone: user.phone,
@@ -160,7 +217,7 @@ export async function registerOwner(sql, env, { email, password, name, organizat
   const [org] = await sql`insert into organizations (name) values (${organizationName || `${user.name}'s Organization`}) returning id`;
   await sql`insert into organization_members (organization_id, user_id, org_role) values (${org.id}, ${user.id}, 'owner')`;
 
-  const token = await sign(
+  const token = await signToken(
     { sub: user.id, email: user.email, role: "owner", name: user.name, organizationId: org.id, exp: Math.floor(Date.now() / 1000) + TOKEN_TTL_SECONDS },
     env.JWT_SECRET
   );
@@ -177,7 +234,7 @@ export async function loginOwnerPassword(sql, env, { email, password }) {
   const [membership] = await sql`select organization_id from organization_members where user_id = ${user.id} and org_role = 'owner' limit 1`;
   const organizationId = membership?.organization_id || null;
 
-  const token = await sign(
+  const token = await signToken(
     { sub: user.id, email: user.email, role: "owner", name: user.name, organizationId, exp: Math.floor(Date.now() / 1000) + TOKEN_TTL_SECONDS },
     env.JWT_SECRET
   );
@@ -194,7 +251,7 @@ export async function adminLogin(sql, env, { email, password }) {
   if (!user || !(await verifyPassword(password, user.password_hash))) {
     throw httpError(401, "Invalid email or password");
   }
-  const token = await sign(
+  const token = await signToken(
     { sub: user.id, email: user.email, role: "admin", name: user.name, exp: Math.floor(Date.now() / 1000) + TOKEN_TTL_SECONDS },
     env.JWT_SECRET
   );
@@ -212,18 +269,12 @@ export function requireAuth(requiredRole) {
     const token = header.slice(7);
     let payload;
     try {
-      // hono's verify() requires the algorithm as a third argument in this
-      // version — omitting it throws JwtAlgorithmRequired unconditionally,
-      // before it even looks at the signature. sign() below defaults to
-      // HS256 when not given one, so every token issued here is HS256.
-      payload = await verify(token, c.env.JWT_SECRET, "HS256");
+      payload = await verifyToken(token, c.env.JWT_SECRET);
     } catch (err) {
-      // err.name is a specific, safe-to-expose category from hono's jwt
-      // verify (e.g. JwtTokenExpired, JwtTokenSignatureMismatched,
-      // JwtTokenInvalid) — never the secret or the token itself. Surfacing
-      // it turns "why did this 401" from a guessing game into a one-line
-      // answer.
-      throw httpError(401, `Invalid or expired token (${err.name || err.message || "unknown"})`);
+      // err.message is our own, from verifyToken above (Malformed token /
+      // Signature mismatch / Token expired) — safe to expose, never the
+      // secret or the token itself.
+      throw httpError(401, `Invalid or expired token (${err.message || "unknown"})`);
     }
     if (allowed && !allowed.includes(payload.role)) {
       throw httpError(403, `Requires role: ${allowed.join(" or ")}`);
