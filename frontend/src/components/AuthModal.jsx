@@ -84,6 +84,9 @@ export function AuthModal({ isOpen, onClose, initialRole = 'player', onAuthSucce
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  // Holds the signed-in result until the user explicitly continues —
+  // see finishAuth() for why this replaced an automatic timer.
+  const [pendingAuth, setPendingAuth] = useState(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -93,8 +96,16 @@ export function AuthModal({ isOpen, onClose, initialRole = 'player', onAuthSucce
       setDevCode(null);
       setErrorMsg('');
       setSuccessMsg('');
+      setPendingAuth(null);
     }
   }, [isOpen, initialRole]);
+
+  function handleContinue() {
+    if (!pendingAuth) return;
+    const { user, role, venue } = pendingAuth;
+    onAuthSuccess && onAuthSuccess(user, role, venue);
+    onClose();
+  }
 
   if (!isOpen) return null;
 
@@ -109,10 +120,11 @@ export function AuthModal({ isOpen, onClose, initialRole = 'player', onAuthSucce
       `Welcome, ${res.user.name}! (token from server: ${res.token ? res.token.length + ' chars' : 'MISSING'}` +
       `, stored ok: ${stored === res.token ? 'yes' : 'no'})`
     );
-    setTimeout(() => {
-      onAuthSuccess && onAuthSuccess(res.user, role, venue);
-      onClose();
-    }, 2500);
+    // No auto-navigate timer on purpose right now — an automatic delay
+    // means the transition can happen before there's time to actually
+    // read/screenshot this message, making "before" and "after" reports
+    // unreliable. A manual button puts the timing under direct control.
+    setPendingAuth({ user: res.user, role, venue });
   }
 
   // --- Player: phone + OTP -------------------------------------------------
@@ -279,8 +291,14 @@ export function AuthModal({ isOpen, onClose, initialRole = 'player', onAuthSucce
             </div>
           )}
 
+          {pendingAuth && (
+            <button type="button" onClick={handleContinue} style={primaryBtnStyle}>
+              Continue to Dashboard <ArrowRight size={16} />
+            </button>
+          )}
+
           {/* ============================ PLAYER ============================ */}
-          {activeRole === 'player' && playerStep === 'phone' && (
+          {!pendingAuth && activeRole === 'player' && playerStep === 'phone' && (
             <form onSubmit={handleSendCode}>
               <Field icon={User} type="text" placeholder="Your name" value={playerName} onChange={(e) => setPlayerName(e.target.value)} />
               <Field icon={Phone} type="tel" placeholder="10-digit mobile number" value={playerPhone} onChange={(e) => setPlayerPhone(e.target.value)} maxLength={10} />
@@ -293,7 +311,7 @@ export function AuthModal({ isOpen, onClose, initialRole = 'player', onAuthSucce
             </form>
           )}
 
-          {activeRole === 'player' && playerStep === 'code' && (
+          {!pendingAuth && activeRole === 'player' && playerStep === 'code' && (
             <form onSubmit={handleVerifyCode}>
               <p style={{ fontSize: '13px', color: '#475569', marginBottom: '12px' }}>
                 Enter the 4-digit code sent to <strong>{playerPhone}</strong>.
@@ -323,7 +341,7 @@ export function AuthModal({ isOpen, onClose, initialRole = 'player', onAuthSucce
           )}
 
           {/* ============================ OWNER ============================ */}
-          {activeRole === 'owner' && (
+          {!pendingAuth && activeRole === 'owner' && (
             <div>
               <div style={{ display: 'flex', gap: '16px', marginBottom: '16px', borderBottom: '1px solid #e2e8f0' }}>
                 <button
