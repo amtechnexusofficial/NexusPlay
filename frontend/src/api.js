@@ -167,13 +167,24 @@ export const api = {
   async getOwnerContext() {
     const res = await ownerFetch(`${API_BASE}/owner/context`);
     if (res.status === 401) {
-      // Diagnostic detail (e.g. "JwtTokenSignatureMismatched") is baked into
-      // the error message here on purpose while this is still being
-      // tracked down — see the "Not signed in" prefix check in
-      // OwnerSaaSView, which still shows the friendly screen but with the
-      // real reason visible underneath.
-      const body = await res.json().catch(() => ({}));
-      throw new Error(`Not signed in: ${body.error || 'no detail'}`);
+      // Read the response as raw text first — if the body isn't JSON at
+      // all (a Cloudflare edge error page, an empty body, an HTML error
+      // page instead of the Worker's own JSON), res.json() would throw
+      // and we'd fall back to a vague generic message. Carrying the raw
+      // text guarantees the "not signed in" screen always shows *something*
+      // concrete instead of ever going blank.
+      const raw = await res.text().catch(() => '');
+      let detail = raw;
+      try {
+        const body = JSON.parse(raw);
+        detail = body.error || raw;
+      } catch {
+        // raw wasn't JSON — keep it as-is (or note there was nothing at all)
+      }
+      const err = new Error(`Not signed in: ${detail || `HTTP 401 with empty body`}`);
+      err.notSignedIn = true;
+      err.detail = detail || `HTTP 401 with empty body`;
+      throw err;
     }
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));

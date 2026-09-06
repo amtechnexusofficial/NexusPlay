@@ -14,6 +14,11 @@ import {
   LineChart, Line, CartesianGrid
 } from 'recharts';
 
+// Bump this whenever chasing a "is my fix actually live" question — shown
+// directly on the Sign In Required screen so it's visible without a
+// separate /api/health visit.
+const FRONTEND_BUILD_MARKER = 'ownerfetch-no-reload-2026-09-06-v1';
+
 export default function OwnerSaaSView({ onNavigateToPublicPage }) {
   // Temporary diagnostic: a random id generated exactly once per mount.
   // If this shows the SAME value before and after signing in, the
@@ -177,13 +182,13 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
       }
     } catch (err) {
       console.error('Error fetching owner data:', err);
-      const msg = String(err.message || '');
-      if (msg.startsWith('Not signed in')) {
+      if (err.notSignedIn) {
         setNotSignedIn(true);
         // Temporary diagnostic detail while a stale-token issue is being
-        // tracked down — the bit after the colon names the exact JWT
-        // failure category (e.g. signature mismatch vs expired).
-        setNotSignedInDetail(msg.split(':').slice(1).join(':').trim());
+        // tracked down — names the exact JWT failure category (e.g.
+        // signature mismatch vs expired) straight from the 401 body,
+        // with no string-parsing in between that could go wrong.
+        setNotSignedInDetail(err.detail || String(err.message || 'unknown'));
       } else {
         setLoadError(err.message || 'Could not reach the server. Check your connection and try again.');
       }
@@ -711,6 +716,11 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
               </p>
             );
           })()}
+          {/* Confirms which frontend build is actually live, right on this
+              screen — no separate URL visit needed to check. */}
+          <p style={{ fontSize: 11, color: '#cbd5e1', marginTop: 4, fontFamily: 'monospace' }}>
+            Frontend build: {FRONTEND_BUILD_MARKER}
+          </p>
         </div>
       </div>
     );
