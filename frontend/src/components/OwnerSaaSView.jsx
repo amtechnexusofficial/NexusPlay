@@ -681,6 +681,29 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
               Diagnostic: {notSignedInDetail}
             </p>
           )}
+          {(() => {
+            // Storage self-test: if the browser silently refuses to persist
+            // localStorage (private-browsing restrictions, some privacy
+            // browsers' shields, storage quota exhausted), sign-in can
+            // "succeed" in memory for a moment yet nothing is actually
+            // there for the very next request to read.
+            let storageWorks = 'unknown';
+            try {
+              localStorage.setItem('__nexus_probe', '1');
+              storageWorks = localStorage.getItem('__nexus_probe') === '1' ? 'yes' : 'no';
+              localStorage.removeItem('__nexus_probe');
+            } catch {
+              storageWorks = 'blocked (threw an error)';
+            }
+            const hasToken = (() => {
+              try { return !!localStorage.getItem('nexus_token'); } catch { return false; }
+            })();
+            return (
+              <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 6, fontFamily: 'monospace' }}>
+                Storage writable: {storageWorks} · Token present: {hasToken ? 'yes' : 'no'}
+              </p>
+            );
+          })()}
         </div>
       </div>
     );
