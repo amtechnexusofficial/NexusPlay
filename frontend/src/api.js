@@ -167,7 +167,10 @@ export const api = {
   async getOwnerContext() {
     const res = await ownerFetch(`${API_BASE}/owner/context`);
     if (res.status === 401) throw new Error('Not signed in');
-    if (!res.ok) throw new Error('Failed to get owner context');
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.error || `Failed to get owner context (${res.status})`);
+    }
     return res.json();
   },
 
