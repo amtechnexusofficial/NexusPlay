@@ -64,7 +64,12 @@ app.onError((err, c) => {
   return c.json({ error: err.message || "Internal error" }, status);
 });
 
-app.get("/api/health", (c) => c.json({ ok: true }));
+// BUILD_MARKER lets you confirm, from a plain browser visit to this URL
+// with no login and no app involved, exactly which commit the live
+// Worker is actually running — update the string whenever chasing a
+// "is my fix actually deployed" question.
+const BUILD_MARKER = "auth-rewrite-hs256-2026-09-06-v1";
+app.get("/api/health", (c) => c.json({ ok: true, build: BUILD_MARKER }));
 
 // ===========================================================================
 // Auth
