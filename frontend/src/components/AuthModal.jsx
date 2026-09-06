@@ -102,11 +102,17 @@ export function AuthModal({ isOpen, onClose, initialRole = 'player', onAuthSucce
     localStorage.setItem('nexus_token', res.token);
     localStorage.setItem('nexus_user', JSON.stringify(res.user));
     if (venue) localStorage.setItem('nexus_owner_venue', JSON.stringify(venue));
-    setSuccessMsg(`Welcome, ${res.user.name}!`);
+    // Temporary diagnostic: confirms the server actually returned a token
+    // in this response, independent of whatever happens to it afterward.
+    const stored = localStorage.getItem('nexus_token');
+    setSuccessMsg(
+      `Welcome, ${res.user.name}! (token from server: ${res.token ? res.token.length + ' chars' : 'MISSING'}` +
+      `, stored ok: ${stored === res.token ? 'yes' : 'no'})`
+    );
     setTimeout(() => {
       onAuthSuccess && onAuthSuccess(res.user, role, venue);
       onClose();
-    }, 400);
+    }, 2500);
   }
 
   // --- Player: phone + OTP -------------------------------------------------
