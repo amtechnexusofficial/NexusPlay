@@ -212,7 +212,11 @@ export function requireAuth(requiredRole) {
     const token = header.slice(7);
     let payload;
     try {
-      payload = await verify(token, c.env.JWT_SECRET);
+      // hono's verify() requires the algorithm as a third argument in this
+      // version — omitting it throws JwtAlgorithmRequired unconditionally,
+      // before it even looks at the signature. sign() below defaults to
+      // HS256 when not given one, so every token issued here is HS256.
+      payload = await verify(token, c.env.JWT_SECRET, "HS256");
     } catch (err) {
       // err.name is a specific, safe-to-expose category from hono's jwt
       // verify (e.g. JwtTokenExpired, JwtTokenSignatureMismatched,

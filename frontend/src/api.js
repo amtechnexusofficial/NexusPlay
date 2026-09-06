@@ -29,10 +29,7 @@ async function ownerFetch(url, options = {}) {
     localStorage.removeItem('nexus_token');
     localStorage.removeItem('nexus_user');
     localStorage.removeItem('nexus_owner_venue');
-    // TEMPORARILY disabled while tracking down a real 401 on freshly-issued
-    // tokens — reloading immediately wipes the diagnostic detail off the
-    // screen before it can be read. Re-enable once that's root-caused.
-    // window.location.reload();
+    window.location.reload();
   }
   return res;
 }
