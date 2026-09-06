@@ -18,10 +18,11 @@ function authHeaders() {
 // every owner call would then fail with a confusing "Invalid or expired
 // token" while the UI still shows as signed in, since currentUser comes
 // straight from localStorage independent of whether the token verifies.
-// Only reload when a token was actually sent and rejected — a signed-out
-// visitor with no token at all also gets a 401 (correctly), and reloading
-// for that case just re-runs the same unauthenticated request forever,
-// which is a blank-page reload loop, not a fix.
+// Clear it so a dead token isn't kept re-sent on every later call, but
+// don't reload the page here: an immediate reload races the caller's own
+// catch block (which reads the 401 body for the real failure reason) and
+// wins, so the real error never gets a chance to render — the user only
+// ever sees the post-reload "no token" state instead of why it failed.
 async function ownerFetch(url, options = {}) {
   const hadToken = !!localStorage.getItem('nexus_token');
   const res = await fetch(url, { ...options, headers: { ...(options.headers || {}), ...authHeaders() } });
@@ -29,7 +30,6 @@ async function ownerFetch(url, options = {}) {
     localStorage.removeItem('nexus_token');
     localStorage.removeItem('nexus_user');
     localStorage.removeItem('nexus_owner_venue');
-    window.location.reload();
   }
   return res;
 }
