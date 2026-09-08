@@ -66,20 +66,30 @@ async function generateSlotsForDates(sql, venueId, dates) {
     }
   }
 
-  // Neon's HTTP client doesn't support a multi-row batch insert via the
-  // tagged template, so insert one at a time; on conflict do nothing makes
-  // re-running this cheap once the grid already exists.
-  let inserted = 0;
-  for (const r of rows) {
-    const result = await sql`
-      insert into court_slots (court_id, venue_id, organization_id, date, start_time, end_time, price, status)
-      values (${r.courtId}, ${r.venueId}, ${r.organizationId}, ${r.date}, ${r.startTime}, ${r.endTime}, ${r.price}, 'open')
-      on conflict (court_id, date, start_time) do nothing
-      returning id
-    `;
-    if (result.length > 0) inserted++;
-  }
-  return inserted;
+  if (rows.length === 0) return 0;
+
+  // One insert-per-row (the previous approach) sends one HTTP subrequest
+  // per row through Neon's HTTP driver — a venue with a few courts and a
+  // full day's hours easily needs 50-100+ rows for even a single date,
+  // and Cloudflare Workers caps subrequests per invocation ("Too many
+  // subrequests by single Worker invocation"). unnest() turns the whole
+  // batch into one INSERT, so it's one subrequest regardless of row count.
+  const result = await sql`
+    insert into court_slots (court_id, venue_id, organization_id, date, start_time, end_time, price, status)
+    select * from unnest(
+      ${rows.map((r) => r.courtId)}::uuid[],
+      ${rows.map((r) => r.venueId)}::uuid[],
+      ${rows.map((r) => r.organizationId)}::uuid[],
+      ${rows.map((r) => r.date)}::date[],
+      ${rows.map((r) => r.startTime)}::text[],
+      ${rows.map((r) => r.endTime)}::text[],
+      ${rows.map((r) => r.price)}::int[],
+      ${rows.map(() => "open")}::text[]
+    )
+    on conflict (court_id, date, start_time) do nothing
+    returning id
+  `;
+  return result.length;
 }
 
 export async function generateSlotsForNextDays(sql, venueId, daysCount = 14) {
