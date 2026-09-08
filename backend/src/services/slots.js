@@ -23,25 +23,23 @@ function dateStr(d) {
   return d.toISOString().slice(0, 10);
 }
 
-// Generates the slot grid for the next `daysCount` days for every active
-// court in a venue. Steps by each court's own slot duration (not a fixed
-// hour), so 30/90/custom-minute courts don't produce overlapping slots.
-// Idempotent: `on conflict do nothing` against the (court_id, date,
+// Shared core: builds and inserts the slot grid for a given venue on an
+// explicit list of dates. Steps by each court's own slot duration (not a
+// fixed hour), so 30/90/custom-minute courts don't produce overlapping
+// slots. Idempotent: `on conflict do nothing` against the (court_id, date,
 // start_time) unique constraint means calling this repeatedly is safe.
-export async function generateSlotsForNextDays(sql, venueId, daysCount = 14) {
+// Returns the number of new slot rows actually inserted (0 is a real,
+// informative answer — e.g. the court's own open/close times leave no
+// room for even one slot).
+async function generateSlotsForDates(sql, venueId, dates) {
   const [venue] = await sql`select * from venues where id = ${venueId}`;
-  if (!venue) return;
+  if (!venue) return 0;
   const courts = await sql`select * from courts where venue_id = ${venueId} and status = 'active'`;
-  if (courts.length === 0) return;
+  if (courts.length === 0) return 0;
 
-  const today = new Date();
   const rows = [];
-
-  for (let d = 0; d < daysCount; d++) {
-    const curDate = new Date(today);
-    curDate.setDate(today.getDate() + d);
-    const date = dateStr(curDate);
-    const isWeekend = curDate.getDay() === 0 || curDate.getDay() === 6;
+  for (const date of dates) {
+    const isWeekend = [0, 6].includes(new Date(`${date}T00:00:00Z`).getUTCDay());
 
     for (const court of courts) {
       const openMinutes = timeToMinutes(court.open_time || venue.open_time);
@@ -71,13 +69,44 @@ export async function generateSlotsForNextDays(sql, venueId, daysCount = 14) {
   // Neon's HTTP client doesn't support a multi-row batch insert via the
   // tagged template, so insert one at a time; on conflict do nothing makes
   // re-running this cheap once the grid already exists.
+  let inserted = 0;
   for (const r of rows) {
-    await sql`
+    const result = await sql`
       insert into court_slots (court_id, venue_id, organization_id, date, start_time, end_time, price, status)
       values (${r.courtId}, ${r.venueId}, ${r.organizationId}, ${r.date}, ${r.startTime}, ${r.endTime}, ${r.price}, 'open')
       on conflict (court_id, date, start_time) do nothing
+      returning id
     `;
+    if (result.length > 0) inserted++;
   }
+  return inserted;
+}
+
+export async function generateSlotsForNextDays(sql, venueId, daysCount = 14) {
+  const today = new Date();
+  const dates = [];
+  for (let d = 0; d < daysCount; d++) {
+    const curDate = new Date(today);
+    curDate.setDate(today.getDate() + d);
+    dates.push(dateStr(curDate));
+  }
+  return generateSlotsForDates(sql, venueId, dates);
+}
+
+// Manual trigger for a single, explicit date — the escape hatch for when
+// the automatic 7-day rolling window (from listLiveSlots) doesn't cover
+// the date an owner is looking at (browsing further out than a week,
+// server/local date-boundary edge cases around midnight, or a court that
+// was only just added). Also doubles as a direct diagnostic: 0 slots
+// inserted for a date that should clearly have some means the court's
+// open/close times (or its venue fallback) don't leave room for even one
+// slot, not a display bug.
+export async function generateSlotsForDate(sql, organizationId, venueId, date) {
+  if (!date) throw httpError(400, "date is required");
+  const [venue] = await sql`select id from venues where id = ${venueId} and organization_id = ${organizationId}`;
+  if (!venue) throw httpError(404, "Venue not found");
+  const inserted = await generateSlotsForDates(sql, venueId, [date]);
+  return { date, slotsCreated: inserted };
 }
 
 export async function listSlots(sql, venueId, { date, courtId } = {}) {

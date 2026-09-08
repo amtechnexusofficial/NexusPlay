@@ -111,6 +111,11 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
   const [savingBiz, setSavingBiz] = useState(false);
   const [bizSuccessMsg, setBizSuccessMsg] = useState('');
 
+  // Manual "generate slots for this date" — the escape hatch for when the
+  // automatic 7-day rolling window doesn't cover the date being viewed.
+  const [generatingSlots, setGeneratingSlots] = useState(false);
+  const [generateSlotsMsg, setGenerateSlotsMsg] = useState('');
+
   // Walk-in modal
   const [showWalkInModal, setShowWalkInModal] = useState(false);
   const [walkInCourtId, setWalkInCourtId] = useState('');
@@ -235,6 +240,29 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
       console.error('Error fetching live slots:', err);
     } finally {
       setLoadingSlots(false);
+    }
+  }
+
+  // Manual escape hatch for "No slots scheduled for this date" — the
+  // automatic grid only rolls 7 days forward from today, so a date beyond
+  // that (or a court added after the last auto-generation ran) can be
+  // legitimately empty with no other way to fill it in.
+  async function handleGenerateSlotsForDate() {
+    if (!selectedVenue) return;
+    setGeneratingSlots(true);
+    setGenerateSlotsMsg('');
+    try {
+      const res = await api.generateSlotsForDate({ venueId: selectedVenue.id, date: calendarDate });
+      if (res.slotsCreated > 0) {
+        setGenerateSlotsMsg(`Created ${res.slotsCreated} slot(s) for ${calendarDate}.`);
+        loadLiveSlots(selectedVenue.id, calendarDate);
+      } else {
+        setGenerateSlotsMsg(`No new slots were created for ${calendarDate}. Either the court's operating hours (Courts tab) don't leave room for a full slot, or slots already exist for this date but aren't showing here — try Refresh above.`);
+      }
+    } catch (err) {
+      setGenerateSlotsMsg('Failed to generate slots: ' + err.message);
+    } finally {
+      setGeneratingSlots(false);
     }
   }
 
@@ -1427,7 +1455,22 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
             <div className="nexus-card" style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
               <Calendar size={32} style={{ margin: '0 auto 10px', color: '#64748b' }} />
               <div style={{ fontSize: 15, fontWeight: 700, color: '#0f172a' }}>No slots scheduled for this date</div>
-              <div style={{ fontSize: 12.5, marginTop: 4 }}>Slots are automatically generated according to court operating hours.</div>
+              <div style={{ fontSize: 12.5, marginTop: 4, marginBottom: 16 }}>
+                Slots normally generate automatically for the next 7 days — this date is either further out than that, or nothing's been generated for it yet.
+              </div>
+              <button
+                onClick={handleGenerateSlotsForDate}
+                disabled={generatingSlots}
+                className="btn-primary"
+                style={{ padding: '9px 18px', fontSize: 13 }}
+              >
+                {generatingSlots ? 'Generating...' : `Generate Slots for ${calendarDate}`}
+              </button>
+              {generateSlotsMsg && (
+                <div style={{ fontSize: 12, marginTop: 12, color: generateSlotsMsg.startsWith('Created') ? '#059669' : '#dc2626', maxWidth: 420, marginLeft: 'auto', marginRight: 'auto' }}>
+                  {generateSlotsMsg}
+                </div>
+              )}
             </div>
           ) : slotViewMode === 'cards' ? (
             /* ========================================================================= */

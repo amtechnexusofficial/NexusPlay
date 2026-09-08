@@ -21,7 +21,7 @@ import {
   updateCourt,
   deleteCourt,
 } from "./services/courts.js";
-import { listSlots, blockSlot, unblockSlot, updateSlotPrice, listLiveSlots } from "./services/slots.js";
+import { listSlots, blockSlot, unblockSlot, updateSlotPrice, listLiveSlots, generateSlotsForDate } from "./services/slots.js";
 import { holdSlot, confirmBooking, releaseHold, sweepExpiredHolds } from "./services/bookings.js";
 import { getSplitShare, paySplitShare } from "./services/splitPayments.js";
 import {
@@ -322,6 +322,13 @@ app.post("/api/owner/walk-in", ...ownerAuth, async (c) => {
 
 app.patch("/api/owner/bookings/:bookingId", ...ownerAuth, async (c) => {
   const result = await updateBookingAction(c.env, c.get("organizationId"), c.req.param("bookingId"), await c.req.json());
+  return c.json({ success: true, ...result });
+});
+
+app.post("/api/owner/slots/generate", ...ownerAuth, async (c) => {
+  const sql = getDb(c.env);
+  const { venueId, date } = await c.req.json();
+  const result = await generateSlotsForDate(sql, c.get("organizationId"), venueId, date);
   return c.json({ success: true, ...result });
 });
 

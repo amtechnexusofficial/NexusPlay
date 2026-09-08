@@ -227,6 +227,17 @@ export const api = {
     return body;
   },
 
+  async generateSlotsForDate(data) {
+    const res = await ownerFetch(`${API_BASE}/owner/slots/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error || 'Failed to generate slots');
+    return body;
+  },
+
   async blockSlot(data) {
     const res = await ownerFetch(`${API_BASE}/owner/slots/block`, {
       method: 'POST',
