@@ -233,7 +233,17 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
-    const body = await res.json();
+    // Read as text first — if the Worker doesn't have this route yet
+    // (a deploy that hasn't been promoted), the response is a plain-text
+    // "404 Not Found", not JSON, and res.json() would throw a confusing
+    // "Unexpected token" error instead of naming the real problem.
+    const raw = await res.text();
+    let body;
+    try {
+      body = JSON.parse(raw);
+    } catch {
+      throw new Error(`Server returned a non-JSON response (HTTP ${res.status}): "${raw.slice(0, 80)}" — the backend may not have this endpoint deployed yet.`);
+    }
     if (!res.ok) throw new Error(body.error || 'Failed to generate slots');
     return body;
   },
