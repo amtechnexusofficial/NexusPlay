@@ -158,7 +158,7 @@ export default function PlayerMarketplace({ onSelectVenue }) {
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 14, marginBottom: 16 }}>
           <div style={{ flex: '1 1 280px' }}>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#059669', fontSize: 11.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#4f46e5', fontSize: 11.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>
               <Sparkles size={13} /> LIVE TURF DISCOVERY & LOCAL SLOTS
             </div>
             <h1 className="font-display marketplace-hero-title" style={{ fontSize: 26, fontWeight: 800, color: '#0f172a', lineHeight: 1.25, margin: 0 }}>
@@ -263,9 +263,9 @@ export default function PlayerMarketplace({ onSelectVenue }) {
         <button
           onClick={() => setSelectedSport('all')}
           style={{
-            background: selectedSport === 'all' ? '#059669' : '#ffffff',
+            background: selectedSport === 'all' ? '#4f46e5' : '#ffffff',
             color: selectedSport === 'all' ? '#ffffff' : '#334155',
-            border: `1px solid ${selectedSport === 'all' ? '#059669' : '#cbd5e1'}`,
+            border: `1px solid ${selectedSport === 'all' ? '#4f46e5' : '#cbd5e1'}`,
             padding: '7px 16px',
             borderRadius: 8,
             fontWeight: 700,
@@ -282,9 +282,9 @@ export default function PlayerMarketplace({ onSelectVenue }) {
             key={s.id}
             onClick={() => setSelectedSport(s.id)}
             style={{
-              background: selectedSport === s.id ? '#059669' : '#ffffff',
+              background: selectedSport === s.id ? '#4f46e5' : '#ffffff',
               color: selectedSport === s.id ? '#ffffff' : '#334155',
-              border: `1px solid ${selectedSport === s.id ? '#059669' : '#cbd5e1'}`,
+              border: `1px solid ${selectedSport === s.id ? '#4f46e5' : '#cbd5e1'}`,
               padding: '7px 14px',
               borderRadius: 8,
               fontWeight: 700,
@@ -452,7 +452,7 @@ export default function PlayerMarketplace({ onSelectVenue }) {
                 </div>
 
                 <div style={{ fontSize: 12.5, color: '#64748b', display: 'flex', alignItems: 'center', gap: 5, marginTop: 6 }}>
-                  <MapPin size={13} style={{ color: '#059669', flexShrink: 0 }} />
+                  <MapPin size={13} style={{ color: '#4f46e5', flexShrink: 0 }} />
                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{venue.address}</span>
                 </div>
                 <div style={{ fontSize: 11.5, color: '#94a3b8', marginTop: 3, marginBottom: 12 }}>

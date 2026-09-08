@@ -9,7 +9,6 @@ import {
   CheckCircle2,
   ShieldCheck,
   X,
-  Trophy,
   KeyRound
 } from 'lucide-react';
 import { api } from '../api';
@@ -34,7 +33,7 @@ const primaryBtnStyle = {
   padding: '12px',
   borderRadius: '10px',
   border: 'none',
-  background: '#059669',
+  background: 'linear-gradient(135deg, #2563eb 0%, #7c3aed 55%, #ec4899 100%)',
   color: '#fff',
   fontWeight: '700',
   fontSize: '14px',
@@ -48,7 +47,7 @@ const primaryBtnStyle = {
 const linkBtnStyle = {
   background: 'none',
   border: 'none',
-  color: '#059669',
+  color: '#4f46e5',
   fontWeight: '700',
   fontSize: '12.5px',
   cursor: 'pointer',
@@ -222,9 +221,7 @@ export function AuthModal({ isOpen, onClose, initialRole = 'player', onAuthSucce
         <div style={{ background: '#f8fafc', padding: '20px 24px 16px', borderBottom: '1px solid #e2e8f0' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
-                <Trophy size={18} />
-              </div>
+              <img src="/logo-mark.png" alt="NexusPlay" style={{ width: '32px', height: '32px', borderRadius: '8px', objectFit: 'contain' }} />
               <div>
                 <h3 style={{ fontSize: '18px', fontWeight: '800', color: '#0f172a', margin: 0, letterSpacing: '-0.02em' }}>
                   {activeRole === 'player' ? 'Player Sign In' : 'Arena Owner Portal'}
@@ -251,7 +248,7 @@ export function AuthModal({ isOpen, onClose, initialRole = 'player', onAuthSucce
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', height: '42px', padding: '0 12px',
                 borderRadius: '9px', border: activeRole === 'player' ? '1px solid #cbd5e1' : '1px solid transparent',
-                background: activeRole === 'player' ? '#ffffff' : 'transparent', color: activeRole === 'player' ? '#059669' : '#64748b',
+                background: activeRole === 'player' ? '#ffffff' : 'transparent', color: activeRole === 'player' ? '#4f46e5' : '#64748b',
                 fontWeight: activeRole === 'player' ? '800' : '600', fontSize: '13px', cursor: 'pointer'
               }}
             >
@@ -264,7 +261,7 @@ export function AuthModal({ isOpen, onClose, initialRole = 'player', onAuthSucce
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', height: '42px', padding: '0 12px',
                 borderRadius: '9px', border: activeRole === 'owner' ? '1px solid #cbd5e1' : '1px solid transparent',
-                background: activeRole === 'owner' ? '#ffffff' : 'transparent', color: activeRole === 'owner' ? '#059669' : '#64748b',
+                background: activeRole === 'owner' ? '#ffffff' : 'transparent', color: activeRole === 'owner' ? '#4f46e5' : '#64748b',
                 fontWeight: activeRole === 'owner' ? '800' : '600', fontSize: '13px', cursor: 'pointer'
               }}
             >
@@ -341,14 +338,14 @@ export function AuthModal({ isOpen, onClose, initialRole = 'player', onAuthSucce
                 <button
                   type="button"
                   onClick={() => { setOwnerMode('login'); setErrorMsg(''); }}
-                  style={{ background: 'none', border: 'none', padding: '0 0 10px', fontSize: '13px', fontWeight: '700', cursor: 'pointer', borderBottom: ownerMode === 'login' ? '2px solid #059669' : '2px solid transparent', color: ownerMode === 'login' ? '#059669' : '#64748b' }}
+                  style={{ background: 'none', border: 'none', padding: '0 0 10px', fontSize: '13px', fontWeight: '700', cursor: 'pointer', borderBottom: ownerMode === 'login' ? '2px solid #4f46e5' : '2px solid transparent', color: ownerMode === 'login' ? '#4f46e5' : '#64748b' }}
                 >
                   Sign In
                 </button>
                 <button
                   type="button"
                   onClick={() => { setOwnerMode('register'); setErrorMsg(''); }}
-                  style={{ background: 'none', border: 'none', padding: '0 0 10px', fontSize: '13px', fontWeight: '700', cursor: 'pointer', borderBottom: ownerMode === 'register' ? '2px solid #059669' : '2px solid transparent', color: ownerMode === 'register' ? '#059669' : '#64748b' }}
+                  style={{ background: 'none', border: 'none', padding: '0 0 10px', fontSize: '13px', fontWeight: '700', cursor: 'pointer', borderBottom: ownerMode === 'register' ? '2px solid #4f46e5' : '2px solid transparent', color: ownerMode === 'register' ? '#4f46e5' : '#64748b' }}
                 >
                   Create Arena Account
                 </button>

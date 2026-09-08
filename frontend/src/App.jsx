@@ -220,26 +220,19 @@ export default function App() {
             style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}
             onClick={() => navigateTo('marketplace')}
           >
-            <div
-              style={{
-                width: 38,
-                height: 38,
-                borderRadius: 10,
-                background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#ffffff',
-                fontWeight: 900,
-                fontSize: 18,
-                boxShadow: '0 2px 8px rgba(5, 150, 105, 0.25)'
-              }}
-            >
-              NP
-            </div>
+            <img
+              src="/logo-mark.png"
+              alt="NexusPlay"
+              style={{ width: 38, height: 38, borderRadius: 10, flexShrink: 0, objectFit: 'contain' }}
+            />
             <div>
               <div className="font-display" style={{ fontSize: 19, fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em', lineHeight: 1.1 }}>
-                NEXUS<span style={{ color: '#059669' }}>PLAY</span>
+                NEXUS<span style={{
+                  background: 'linear-gradient(135deg, #7c3aed 0%, #ec4899 60%, #f97316 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  backgroundClip: 'text'
+                }}>PLAY</span>
               </div>
               <div className="header-tagline" style={{ fontSize: 10, color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                 Sports Operating System & Arena Network
@@ -261,7 +254,7 @@ export default function App() {
               onClick={() => navigateTo('marketplace')}
               style={{
                 background: activeView === 'marketplace' ? '#ffffff' : 'transparent',
-                color: activeView === 'marketplace' ? '#059669' : '#475569',
+                color: activeView === 'marketplace' ? '#4f46e5' : '#475569',
                 border: activeView === 'marketplace' ? '1px solid #cbd5e1' : '1px solid transparent',
                 borderRadius: 7,
                 padding: '7px 15px',
@@ -305,7 +298,7 @@ export default function App() {
               onClick={() => navigateTo('venue-page')}
               style={{
                 background: activeView === 'venue-page' ? '#ffffff' : 'transparent',
-                color: activeView === 'venue-page' ? '#059669' : '#475569',
+                color: activeView === 'venue-page' ? '#4f46e5' : '#475569',
                 border: activeView === 'venue-page' ? '1px solid #cbd5e1' : '1px solid transparent',
                 borderRadius: 7,
                 padding: '7px 15px',
@@ -329,7 +322,7 @@ export default function App() {
                 onClick={() => navigateTo('player-dashboard')}
                 style={{
                   background: activeView === 'player-dashboard' ? '#ffffff' : 'transparent',
-                  color: activeView === 'player-dashboard' ? '#059669' : '#475569',
+                  color: activeView === 'player-dashboard' ? '#4f46e5' : '#475569',
                   border: activeView === 'player-dashboard' ? '1px solid #cbd5e1' : '1px solid transparent',
                   borderRadius: 7,
                   padding: '7px 15px',
@@ -354,7 +347,7 @@ export default function App() {
                 onClick={() => navigateTo('owner')}
                 style={{
                   background: activeView === 'owner' ? '#ffffff' : 'transparent',
-                  color: activeView === 'owner' ? '#059669' : '#475569',
+                  color: activeView === 'owner' ? '#4f46e5' : '#475569',
                   border: activeView === 'owner' ? '1px solid #cbd5e1' : '1px solid transparent',
                   borderRadius: 7,
                   padding: '7px 15px',
@@ -427,7 +420,7 @@ export default function App() {
                     width: 26,
                     height: 26,
                     borderRadius: '50%',
-                    background: '#059669',
+                    background: '#7c3aed',
                     color: '#ffffff',
                     display: 'flex',
                     alignItems: 'center',
@@ -549,7 +542,7 @@ export default function App() {
                   className="btn-secondary"
                   style={{ fontSize: 12.5, padding: '7px 14px' }}
                 >
-                  <User size={14} color="#059669" />
+                  <User size={14} color="#4f46e5" />
                   <span>Player Sign In</span>
                 </button>
 
@@ -557,7 +550,7 @@ export default function App() {
                   id="header-owner-portal-btn"
                   onClick={openOwnerAuth}
                   style={{
-                    background: activeView === 'owner' ? '#059669' : '#ffffff',
+                    background: activeView === 'owner' ? '#4f46e5' : '#ffffff',
                     color: activeView === 'owner' ? '#ffffff' : '#0f172a',
                     border: '1px solid #cbd5e1',
                     borderRadius: 8,
@@ -568,11 +561,11 @@ export default function App() {
                     display: 'flex',
                     alignItems: 'center',
                     gap: 6,
-                    boxShadow: activeView === 'owner' ? '0 2px 8px rgba(5,150,105,0.25)' : 'none',
+                    boxShadow: activeView === 'owner' ? '0 2px 8px rgba(79,70,229,0.25)' : 'none',
                     transition: 'all 0.15s ease'
                   }}
                 >
-                  <Building2 size={14} color={activeView === 'owner' ? '#ffffff' : '#059669'} />
+                  <Building2 size={14} color={activeView === 'owner' ? '#ffffff' : '#4f46e5'} />
                   <span>Owner Portal</span>
                 </button>
               </>
@@ -593,7 +586,7 @@ export default function App() {
                 aria-label={`Open ${currentUser.role === 'owner' ? 'Owner Hub' : 'Player Dashboard'}`}
                 style={{
                   width: 40, height: 40, borderRadius: '50%',
-                  background: currentUser.role === 'owner' ? '#4f46e5' : '#059669',
+                  background: currentUser.role === 'owner' ? '#4f46e5' : '#7c3aed',
                   color: '#ffffff', border: 'none', cursor: 'pointer',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: 14, fontWeight: 800
@@ -608,7 +601,7 @@ export default function App() {
                 className="btn-secondary"
                 style={{ width: 40, height: 40, minHeight: 40, padding: 0, borderRadius: '50%' }}
               >
-                <User size={17} color="#059669" />
+                <User size={17} color="#4f46e5" />
               </button>
             )}
           </div>
@@ -869,7 +862,8 @@ export default function App() {
 
       {/* Footer */}
       <footer className="app-footer" style={{ background: '#ffffff', borderTop: '1px solid #e2e8f0', textAlign: 'center', fontSize: 13, color: '#64748b' }}>
-        <div style={{ maxWidth: 800, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div style={{ maxWidth: 800, margin: '0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+          <img src="/logo-mark.png" alt="NexusPlay" style={{ width: 28, height: 28, borderRadius: 7, objectFit: 'contain', marginBottom: 2 }} />
           <div style={{ fontWeight: 700, color: '#0f172a' }}>
             NexusPlay Sports Operating System & Venue Network
           </div>

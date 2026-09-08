@@ -12,12 +12,15 @@
   --border-light: #d3dbd7;
   --border-focus: #0f8a5f;
 
-  /* Brand accent — the established NexusPlay emerald, kept as-is since
-     it's used as a literal hex in most components already. */
-  --accent-neon: #059669;
-  --accent-neon-hover: #047857;
-  --accent-neon-light: #10b981;
-  --accent-glow: rgba(5, 150, 105, 0.14);
+  /* Brand accent — matches the NexusPlay mark's blue → violet → pink/orange
+     sweep. --accent-neon stays the name (it's referenced as a literal hex
+     in most components already) but now carries the brand indigo instead
+     of the old emerald. */
+  --accent-neon: #4f46e5;
+  --accent-neon-hover: #4338ca;
+  --accent-neon-light: #7c3aed;
+  --accent-glow: rgba(79, 70, 229, 0.16);
+  --brand-gradient: linear-gradient(135deg, #2563eb 0%, #7c3aed 55%, #ec4899 100%);
   --accent-amber: #b5690f;
   --accent-indigo: #4c4fd6;
   --accent-red: #c23b3b;
@@ -188,13 +191,12 @@ a { color: inherit; }
 }
 
 .btn-primary {
-  background: var(--accent-neon);
+  background: var(--brand-gradient);
   color: #ffffff;
-  border: 1px solid var(--accent-neon);
+  border: 1px solid transparent;
 }
 .btn-primary:hover:not(:disabled) {
-  background: var(--accent-neon-hover);
-  border-color: var(--accent-neon-hover);
+  filter: brightness(1.08);
   box-shadow: 0 6px 16px var(--accent-glow);
 }
 .btn-primary:active:not(:disabled) { transform: translateY(1px); }
