@@ -28,6 +28,20 @@ export async function holdSlot(env, { slotId, customerName, customerPhone, custo
       throw httpError(409, `Slot is currently ${slot.status === "booked" ? "booked" : "being reserved by another customer"}. Please pick another time.`);
     }
 
+    // court_slots.status stays 'open' while a pickup game is filling up on
+    // it (it isn't fully booked yet), so without this check a player could
+    // instant-hold the whole slot here and silently pull it out from under
+    // players who already joined and paid into the open game — bypassing
+    // the owner-reviewed refund flow in requestFullSlot/convertSlotToFullInquiry
+    // entirely. Route them through that flow instead.
+    const { rows: activeGameRows } = await client.query(
+      "select id from games where court_slot_id = $1 and status in ('open', 'confirmed')",
+      [slotId]
+    );
+    if (activeGameRows[0]) {
+      throw httpError(409, "This slot already has an open pickup game — join it or request the full slot instead of booking directly.");
+    }
+
     // Clear any stale pending booking left over from an expired hold on
     // this slot so the active-slot unique index doesn't reject the insert.
     await client.query(

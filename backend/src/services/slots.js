@@ -101,7 +101,26 @@ export async function listSlots(sql, venueId, { date, courtId } = {}) {
     await generateSlotsForNextDays(sql, venueId, 14);
     slots = await fetch();
   }
-  return slots;
+  if (slots.length === 0) return slots;
+
+  // A slot can have an open pickup game on it while court_slots.status is
+  // still 'open' (it isn't fully booked yet) — without this, a player
+  // browsing the venue page directly (instead of Open Games Hub) has no
+  // way to know 4/8 people already joined, and could instant-book the
+  // whole slot out from under them via holdSlot (see the matching guard
+  // added there).
+  const games = await sql`
+    select g.id, g.court_slot_id, g.title, g.capacity as required_players,
+           g.price_per_player as cost_per_player,
+           (select count(*)::int from game_participants gp where gp.game_id = g.id) as current_players
+    from games g
+    where g.venue_id = ${venueId} and g.status in ('open', 'confirmed')
+      and g.court_slot_id = any(${slots.map((s) => s.id)})
+  `;
+  const gameBySlot = {};
+  for (const g of games) gameBySlot[g.court_slot_id] = g;
+
+  return slots.map((s) => ({ ...s, game: gameBySlot[s.id] || null }));
 }
 
 export async function getSlotOrThrow(sql, slotId) {

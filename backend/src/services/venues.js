@@ -64,10 +64,16 @@ export async function listPublicVenues(sql, { sportId, search } = {}) {
 
   return sql`
     select v.id, v.name, v.slug, v.description, v.address, v.city, v.lat, v.lng, v.photos, v.sport_ids,
+           v.amenities, v.open_time, v.close_time,
            (select min(c.base_price) from courts c where c.venue_id = v.id and c.status = 'active') as min_price,
            (select count(*)::int from court_slots cs where cs.venue_id = v.id and cs.date = current_date and cs.status = 'open') as today_available_slots_count,
            (select round(avg(rating), 1) from reviews where venue_id = v.id)::float as avg_rating,
-           (select count(*)::int from reviews where venue_id = v.id) as review_count
+           (select count(*)::int from reviews where venue_id = v.id) as review_count,
+           -- Open pickup games happening today, still filling up — powers the
+           -- home page's "🔥 open games" badge so players can spot a venue
+           -- with a game to join without opening Open Games Hub first.
+           (select count(*)::int from games g join court_slots cs on g.court_slot_id = cs.id
+            where g.venue_id = v.id and g.status = 'open' and cs.date = current_date) as open_games_today_count
     from venues v
     where v.status = 'active' ${sportClause} ${searchClause}
     order by v.created_at desc

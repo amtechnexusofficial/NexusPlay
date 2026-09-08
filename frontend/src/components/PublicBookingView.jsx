@@ -31,6 +31,57 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
   const [copiedUpi, setCopiedUpi] = useState(false);
   const [splitCount, setSplitCount] = useState(1);
 
+  // A slot can already have an open pickup game on it (see slot.game from
+  // getVenueSlots) — direct instant booking is blocked server-side for
+  // those, so this venue page needs its own join/book-full mini flow
+  // instead of routing away to Open Games Hub.
+  const [joiningGame, setJoiningGame] = useState(false);
+  const [joinGameError, setJoinGameError] = useState('');
+  const [joinGameSuccess, setJoinGameSuccess] = useState('');
+  const [requestingFullSlot, setRequestingFullSlot] = useState(false);
+  const [fullSlotError, setFullSlotError] = useState('');
+  const [fullSlotSuccess, setFullSlotSuccess] = useState('');
+
+  async function handleJoinOpenGame() {
+    if (!selectedSlot?.game) return;
+    if (!customerName.trim() || !customerPhone.trim()) {
+      setJoinGameError('Enter your name and phone number to join.');
+      return;
+    }
+    setJoinGameError('');
+    setJoiningGame(true);
+    try {
+      const res = await api.joinGame(selectedSlot.game.id, { playerName: customerName.trim(), playerPhone: customerPhone.trim() });
+      setJoinGameSuccess(`You're in! Paid ₹${selectedSlot.game.cost_per_player}. ${res.newPlayerCount}/${selectedSlot.game.required_players} spots filled.`);
+      const res2 = await api.getVenueSlots(venue.id, selectedDate, selectedCourt?.id);
+      setSlots(res2);
+      const refreshed = res2.find(s => s.id === selectedSlot.id);
+      if (refreshed) setSelectedSlot(refreshed);
+    } catch (err) {
+      setJoinGameError(err.message || 'Failed to join this game');
+    } finally {
+      setJoiningGame(false);
+    }
+  }
+
+  async function handleRequestFullSlotDirect() {
+    if (!selectedSlot?.game) return;
+    if (!customerName.trim() || !customerPhone.trim()) {
+      setFullSlotError('Enter your name and phone number to request the full slot.');
+      return;
+    }
+    setFullSlotError('');
+    setRequestingFullSlot(true);
+    try {
+      await api.requestFullSlot(selectedSlot.game.id, { clientName: customerName.trim(), clientPhone: customerPhone.trim() });
+      setFullSlotSuccess('Request sent to the venue owner. If accepted, everyone currently registered gets refunded and you get the whole slot.');
+    } catch (err) {
+      setFullSlotError(err.message || 'Failed to submit request');
+    } finally {
+      setRequestingFullSlot(false);
+    }
+  }
+
   // Sync if currentUser changes
   useEffect(() => {
     if (currentUser) {
@@ -572,12 +623,18 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
                     const isOpen = slot.status === 'open';
                     const isHeld = slot.status === 'held';
                     const isSelected = selectedSlot?.id === slot.id;
+                    const hasOpenGame = isOpen && !!slot.game;
 
                     return (
                       <button
                         key={slot.id}
                         disabled={!isOpen}
-                        onClick={() => { setSelectedSlot(slot); setErrorMsg(''); }}
+                        onClick={() => {
+                          setSelectedSlot(slot);
+                          setErrorMsg('');
+                          setJoinGameError(''); setJoinGameSuccess('');
+                          setFullSlotError(''); setFullSlotSuccess('');
+                        }}
                         style={{
                           background: isSelected
                             ? '#059669'
@@ -616,6 +673,18 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
                         <div style={{ fontSize: 12, fontWeight: 700, marginTop: 4, color: isSelected ? '#ffffff' : isOpen ? '#059669' : undefined }}>
                           {isOpen ? `₹${slot.price}` : isHeld ? 'Temporarily Held' : 'Booked'}
                         </div>
+                        {hasOpenGame && (
+                          <div
+                            style={{
+                              fontSize: 10, fontWeight: 700, marginTop: 4, padding: '2px 6px', borderRadius: 999,
+                              background: isSelected ? 'rgba(255,255,255,0.25)' : '#fef3c7',
+                              color: isSelected ? '#ffffff' : '#92400e',
+                              display: 'inline-block'
+                            }}
+                          >
+                            {slot.game.current_players}/{slot.game.required_players} joined
+                          </div>
+                        )}
                       </button>
                     );
                   })}
@@ -631,7 +700,83 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
                 Booking Summary
               </h3>
 
-              {selectedSlot ? (
+              {selectedSlot?.game ? (
+                <div>
+                  <div style={{ background: '#f8fafc', borderRadius: 10, padding: 14, marginBottom: 16, border: '1px solid #e2e8f0' }}>
+                    <div style={{ fontSize: 13, color: '#64748b' }}>{venue.name}</div>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', marginTop: 2 }}>{selectedCourt?.name}</div>
+                    <div style={{ fontSize: 13, color: '#059669', marginTop: 4, fontWeight: 600 }}>
+                      {selectedDate} · {selectedSlot.start_time} to {selectedSlot.end_time}
+                    </div>
+                  </div>
+
+                  <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 10, padding: 14, marginBottom: 16 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 700, color: '#92400e', marginBottom: 4 }}>
+                      <Users size={15} /> {selectedSlot.game.title || 'Open Pickup Game'}
+                    </div>
+                    <div style={{ fontSize: 12.5, color: '#78350f' }}>
+                      <strong>{selectedSlot.game.current_players}/{selectedSlot.game.required_players}</strong> players have already joined at ₹{selectedSlot.game.cost_per_player}/spot. You can join a spot, or request the whole slot for yourself.
+                    </div>
+                  </div>
+
+                  {(joinGameError || fullSlotError) && (
+                    <div style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#b91c1c', padding: 10, borderRadius: 8, fontSize: 12.5, marginBottom: 14 }}>
+                      {joinGameError || fullSlotError}
+                    </div>
+                  )}
+                  {(joinGameSuccess || fullSlotSuccess) && (
+                    <div style={{ background: 'rgba(5, 150, 105, 0.1)', border: '1px solid rgba(5, 150, 105, 0.3)', color: '#065f46', padding: 10, borderRadius: 8, fontSize: 12.5, marginBottom: 14 }}>
+                      {joinGameSuccess || fullSlotSuccess}
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
+                        PHONE NUMBER *
+                      </label>
+                      <input
+                        type="tel"
+                        placeholder="+91 98765 43210"
+                        className="nexus-input"
+                        style={{ width: '100%' }}
+                        value={customerPhone}
+                        onChange={e => setCustomerPhone(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
+                        YOUR NAME *
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Player Name"
+                        className="nexus-input"
+                        style={{ width: '100%' }}
+                        value={customerName}
+                        onChange={e => setCustomerName(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    disabled={joiningGame || !!joinGameSuccess}
+                    onClick={handleJoinOpenGame}
+                    className="btn-primary"
+                    style={{ width: '100%', marginBottom: 10 }}
+                  >
+                    {joiningGame ? 'Joining...' : `Join a Spot · ₹${selectedSlot.game.cost_per_player}`}
+                  </button>
+                  <button
+                    disabled={requestingFullSlot || !!fullSlotSuccess}
+                    onClick={handleRequestFullSlotDirect}
+                    className="btn-outline"
+                    style={{ width: '100%' }}
+                  >
+                    {requestingFullSlot ? 'Sending...' : `Book Full Slot Instead · ₹${selectedSlot.price}`}
+                  </button>
+                </div>
+              ) : selectedSlot ? (
                 <div>
                   <div style={{ background: '#f8fafc', borderRadius: 10, padding: 14, marginBottom: 16, border: '1px solid #e2e8f0' }}>
                     <div style={{ fontSize: 13, color: '#64748b' }}>{venue.name}</div>

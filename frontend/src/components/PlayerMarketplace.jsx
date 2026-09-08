@@ -387,7 +387,22 @@ export default function PlayerMarketplace({ onSelectVenue }) {
                 </div>
 
                 {/* Available slots today — real count, not a preview list */}
-                <div style={{ position: 'absolute', bottom: 10, right: 10 }}>
+                <div style={{ position: 'absolute', bottom: 10, right: 10, display: 'flex', flexDirection: 'column', gap: 5, alignItems: 'flex-end' }}>
+                  {venue.open_games_today_count > 0 && (
+                    <span
+                      style={{
+                        background: '#f59e0b',
+                        color: '#ffffff',
+                        fontWeight: 700,
+                        fontSize: 11.5,
+                        padding: '4px 9px',
+                        borderRadius: 6,
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.35)'
+                      }}
+                    >
+                      🔥 {venue.open_games_today_count} open game{venue.open_games_today_count === 1 ? '' : 's'} — join now
+                    </span>
+                  )}
                   <span
                     style={{
                       background: 'rgba(15, 23, 42, 0.88)',
@@ -436,9 +451,12 @@ export default function PlayerMarketplace({ onSelectVenue }) {
                   </button>
                 </div>
 
-                <div style={{ fontSize: 12.5, color: '#64748b', display: 'flex', alignItems: 'center', gap: 5, marginTop: 6, marginBottom: 12 }}>
+                <div style={{ fontSize: 12.5, color: '#64748b', display: 'flex', alignItems: 'center', gap: 5, marginTop: 6 }}>
                   <MapPin size={13} style={{ color: '#059669', flexShrink: 0 }} />
                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{venue.address}</span>
+                </div>
+                <div style={{ fontSize: 11.5, color: '#94a3b8', marginTop: 3, marginBottom: 12 }}>
+                  {venue.open_time && venue.close_time ? `Open ${venue.open_time} – ${venue.close_time}` : ' '}
                 </div>
 
                 {/* Amenities pills */}
