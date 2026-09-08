@@ -451,3 +451,25 @@ alter table users alter column phone drop not null;
 alter table users drop constraint if exists users_role_check;
 alter table users add constraint users_role_check
   check (role in ('admin', 'owner', 'player'));
+
+-- ===========================================================================
+-- Migration: court_slots.venue_id was never actually defined anywhere in
+-- this file — the CREATE TABLE above only ever had organization_id and
+-- court_id — even though every query and insert against court_slots
+-- throughout the codebase (slot generation, listLiveSlots, listSlots,
+-- holdSlot, walk-ins, the venue-scoped indexes) has always assumed it
+-- exists. On a database that was never manually patched for this, every
+-- one of those fails with "column venue_id of relation court_slots does
+-- not exist" the moment it actually reaches an insert or a `cs.venue_id`
+-- filter — which is most of the owner dashboard's slot management.
+-- ===========================================================================
+
+alter table court_slots add column if not exists venue_id uuid references venues(id) on delete cascade;
+
+-- Backfill any slots that were created before this column existed (via
+-- court_id, which every slot always had).
+update court_slots cs set venue_id = c.venue_id
+from courts c
+where cs.court_id = c.id and cs.venue_id is null;
+
+create index if not exists idx_court_slots_venue_date on court_slots(venue_id, date, status);
