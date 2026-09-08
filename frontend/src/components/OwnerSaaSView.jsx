@@ -284,8 +284,9 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
 
   function exportBillingCsv() {
     if (!billingData?.transactions?.length) return;
-    const headers = ['Date', 'Time', 'Court', 'Customer', 'Phone', 'Status', 'Payment Status', 'Method', 'Amount Paid', 'Total Amount', 'Source'];
+    const headers = ['Invoice No.', 'Date', 'Time', 'Court', 'Customer', 'Phone', 'Status', 'Payment Status', 'Method', 'Amount Paid', 'Total Amount', 'Source'];
     const rows = billingData.transactions.map(t => [
+      `INV-${(t.date || '').replace(/-/g, '')}-${(t.id || '').replace(/-/g, '').slice(0, 6).toUpperCase()}`,
       t.date, t.start_time, t.court_name || '', t.customer_name || '', t.customer_phone || '',
       t.status, t.payment_status, t.payment_provider || '', t.amount_paid, t.total_amount, t.source
     ]);
@@ -555,11 +556,25 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
 
   async function handleWalkInSubmit(e) {
     e.preventDefault();
+    const court = selectedVenue.courts?.find(c => c.id === walkInCourtId) || selectedVenue.courts?.[0];
+    if (!court) {
+      alert('This venue has no courts yet. Add a court first (Courts tab) before taking a walk-in booking.');
+      return;
+    }
+    // The modal only collects a start time — derive an end time from the
+    // court's own slot length so the booking isn't a zero-duration slot.
+    const duration = court.slot_duration_minutes || 60;
+    const [h, m] = walkInStartTime.split(':').map(Number);
+    const endMinutes = h * 60 + m + duration;
+    const endTime = `${String(Math.floor(endMinutes / 60) % 24).padStart(2, '0')}:${String(endMinutes % 60).padStart(2, '0')}`;
+
     try {
-      await api.createWalkInBooking({
-        courtId: walkInCourtId || selectedVenue.courts?.[0]?.id,
+      const res = await api.createWalkInBooking({
+        venueId: selectedVenue.id,
+        courtId: court.id,
         date: walkInDate,
         startTime: walkInStartTime,
+        endTime,
         customerName: walkInCustomerName,
         customerPhone: walkInCustomerPhone,
         totalAmount: Number(walkInAmount),
@@ -570,7 +585,22 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
         loadLiveSlots(selectedVenue.id, calendarDate);
         api.getOwnerBookings({ venueId: selectedVenue.id }).then(setBookings);
       }
-      alert('Walk-in booking confirmed.');
+      // Show the invoice immediately instead of a plain alert — this is
+      // exactly the moment an owner wants to print/hand one to the guest.
+      setReceiptBooking({
+        id: res.bookingId || res.id,
+        date: walkInDate,
+        start_time: walkInStartTime,
+        end_time: endTime,
+        court_name: court.name,
+        customer_name: walkInCustomerName,
+        customer_phone: walkInCustomerPhone,
+        payment_provider: walkInPaymentMode,
+        payment_status: walkInPaymentMode === 'cash' ? 'cash' : 'paid',
+        status: 'confirmed',
+        amount_paid: Number(walkInAmount),
+        total_amount: Number(walkInAmount)
+      });
     } catch (err) {
       alert('Failed to create walk-in: ' + err.message);
     }
@@ -1191,6 +1221,21 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
             </div>
           </div>
 
+          {selectedVenue && (!selectedVenue.courts || selectedVenue.courts.length === 0) ? (
+            <div className="nexus-card" style={{ padding: 32, textAlign: 'center', border: '1px dashed #cbd5e1', background: '#f8fafc' }}>
+              <Building size={28} style={{ color: '#4f46e5', marginBottom: 10 }} />
+              <h3 style={{ fontSize: 16, fontWeight: 800, color: '#0f172a', marginBottom: 6 }}>
+                Add your first court to start allocating slots
+              </h3>
+              <p style={{ fontSize: 13, color: '#64748b', maxWidth: 440, margin: '0 auto 16px' }}>
+                Slots, pricing and player bookings are all generated from a court — this venue doesn't have one yet, which is why there's nothing to manage here. Add a court (name, sport, capacity and price) and slots for the next 7 days will appear here automatically.
+              </p>
+              <button onClick={() => setActiveTab('courts')} className="btn-primary" style={{ padding: '10px 20px' }}>
+                Go to Courts &amp; Add One
+              </button>
+            </div>
+          ) : (
+          <>
           {/* Quick Date Chips (Touch-Friendly Horizontal Scroll) */}
           <div className="scroll-pills" style={{ marginBottom: 16 }}>
             {[0, 1, 2, 3, 4, 5, 6].map(offset => {
@@ -1510,6 +1555,16 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                           <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
                             {slot.full_inquiry_phone || slot.booking?.customer_phone || ''}
                           </div>
+                          {slot.booking && (
+                            <button
+                              type="button"
+                              onClick={() => setReceiptBooking({ ...slot.booking, date: slot.date, start_time: slot.start_time, end_time: slot.end_time, court_name: slot.court_name })}
+                              className="btn-secondary"
+                              style={{ marginTop: 8, padding: '4px 10px', fontSize: 11 }}
+                            >
+                              <Receipt size={11} /> Invoice
+                            </button>
+                          )}
                         </div>
                       ) : isBlocked ? (
                         <div style={{ background: 'rgba(100, 116, 139, 0.08)', padding: 10, borderRadius: 8, border: '1px solid rgba(100, 116, 139, 0.2)' }}>
@@ -1882,6 +1937,17 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                                   Unblock
                                 </button>
                               )}
+
+                              {isBooked && slot.booking && (
+                                <button
+                                  type="button"
+                                  onClick={() => setReceiptBooking({ ...slot.booking, date: slot.date, start_time: slot.start_time, end_time: slot.end_time, court_name: slot.court_name })}
+                                  className="btn-secondary"
+                                  style={{ fontSize: 11, padding: '4px 8px' }}
+                                >
+                                  <Receipt size={11} /> Invoice
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -1891,6 +1957,8 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                 </table>
               </div>
             </div>
+          )}
+          </>
           )}
         </div>
       )}
@@ -2662,6 +2730,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                 <thead>
                   <tr style={{ background: '#f8fafc', borderBottom: '1px solid var(--border-card)', color: 'var(--text-muted)', fontSize: 11.5 }}>
                     <th style={{ padding: '12px 16px' }}>DATE</th>
+                    <th style={{ padding: '12px 16px' }}>INVOICE NO.</th>
                     <th style={{ padding: '12px 16px' }}>COURT</th>
                     <th style={{ padding: '12px 16px' }}>CUSTOMER</th>
                     <th style={{ padding: '12px 16px' }}>METHOD</th>
@@ -2675,6 +2744,9 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                     <tr key={t.id} style={{ borderBottom: '1px solid var(--border-card)' }}>
                       <td style={{ padding: '12px 16px', color: '#0f172a' }}>
                         {t.date} <span style={{ color: 'var(--text-muted)', fontSize: 11.5 }}>{t.start_time}</span>
+                      </td>
+                      <td style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontSize: 11.5, fontFamily: 'monospace' }}>
+                        INV-{(t.date || '').replace(/-/g, '')}-{(t.id || '').replace(/-/g, '').slice(0, 6).toUpperCase()}
                       </td>
                       <td style={{ padding: '12px 16px', color: 'var(--text-secondary)' }}>{t.court_name || '—'}</td>
                       <td style={{ padding: '12px 16px', color: '#0f172a' }}>
@@ -2700,14 +2772,14 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                           className="btn-secondary"
                           style={{ padding: '5px 10px', fontSize: 11.5 }}
                         >
-                          <Receipt size={12} /> Receipt
+                          <Receipt size={12} /> Invoice
                         </button>
                       </td>
                     </tr>
                   ))}
                   {!loadingBilling && (billingData?.transactions || []).length === 0 && (
                     <tr>
-                      <td colSpan={7} style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>
+                      <td colSpan={8} style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>
                         No transactions in this date range.
                       </td>
                     </tr>
@@ -2719,8 +2791,22 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
         </div>
       )}
 
-      {/* MODAL: PRINTABLE RECEIPT */}
-      {receiptBooking && (
+      {/* MODAL: TAX INVOICE — every booking (walk-in, online, or full-slot
+          inquiry accept) can pull one of these up. No dedicated invoice
+          sequence table exists, so the invoice number is derived
+          deterministically from the booking's own id + date — stable and
+          unique without a schema change, and it's identical every time the
+          same booking's invoice is reopened. */}
+      {receiptBooking && (() => {
+        const invoiceNo = `INV-${(receiptBooking.date || '').replace(/-/g, '')}-${(receiptBooking.id || '').replace(/-/g, '').slice(0, 6).toUpperCase()}`;
+        const amount = Number(receiptBooking.amount_paid || receiptBooking.total_amount || 0);
+        const hasGstin = !!selectedVenue?.gstin;
+        // Amount is treated as GST-inclusive (standard for a walk-in/UPI
+        // price already quoted to the customer) — 18% split evenly as
+        // 9% CGST + 9% SGST for an intra-state supply.
+        const baseAmount = hasGstin ? Math.round((amount / 1.18) * 100) / 100 : amount;
+        const gstAmount = hasGstin ? Math.round((amount - baseAmount) * 100) / 100 : 0;
+        return (
         <div
           onClick={() => setReceiptBooking(null)}
           style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 20 }}
@@ -2728,35 +2814,73 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
           <div
             onClick={(e) => e.stopPropagation()}
             className="nexus-card"
-            style={{ maxWidth: 360, width: '100%', padding: 26, background: '#ffffff' }}
+            style={{ maxWidth: 400, width: '100%', padding: 26, background: '#ffffff' }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
               <div>
-                <div style={{ fontSize: 16, fontWeight: 800, color: '#0f172a' }}>{selectedVenue?.name}</div>
-                <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>Booking Receipt</div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: '#0f172a' }}>{selectedVenue?.organization_name || selectedVenue?.name}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                  {[selectedVenue?.address, selectedVenue?.city, selectedVenue?.pincode].filter(Boolean).join(', ')}
+                </div>
+                {hasGstin && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>GSTIN: {selectedVenue.gstin}</div>}
+                <div style={{ fontSize: 11.5, color: '#4f46e5', fontWeight: 700, marginTop: 6 }}>TAX INVOICE</div>
               </div>
               <button onClick={() => setReceiptBooking(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
                 <X size={18} />
               </button>
             </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 14 }}>
+              <div>
+                <div style={{ color: 'var(--text-muted)', fontSize: 10.5, textTransform: 'uppercase', fontWeight: 700 }}>Invoice No.</div>
+                <div style={{ fontWeight: 700, color: '#0f172a' }}>{invoiceNo}</div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ color: 'var(--text-muted)', fontSize: 10.5, textTransform: 'uppercase', fontWeight: 700 }}>Bill To</div>
+                <div style={{ fontWeight: 700, color: '#0f172a' }}>{receiptBooking.customer_name || 'Player'}</div>
+                <div style={{ color: 'var(--text-muted)' }}>{receiptBooking.customer_phone}</div>
+              </div>
+            </div>
+
             <div style={{ borderTop: '1px dashed #e2e8f0', borderBottom: '1px dashed #e2e8f0', padding: '14px 0', display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13, marginBottom: 14 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text-muted)' }}>Receipt ID</span><span style={{ fontWeight: 600 }}>{receiptBooking.id?.slice(0, 8)}</span></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text-muted)' }}>Booking Ref</span><span style={{ fontWeight: 600 }}>{receiptBooking.id?.slice(0, 8)}</span></div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text-muted)' }}>Date</span><span>{receiptBooking.date} · {receiptBooking.start_time}-{receiptBooking.end_time}</span></div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text-muted)' }}>Court</span><span>{receiptBooking.court_name}</span></div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text-muted)' }}>Customer</span><span>{receiptBooking.customer_name || 'Player'}</span></div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text-muted)' }}>Phone</span><span>{receiptBooking.customer_phone}</span></div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text-muted)' }}>Payment Method</span><span style={{ textTransform: 'uppercase' }}>{receiptBooking.payment_provider || receiptBooking.payment_status}</span></div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text-muted)' }}>Status</span><span style={{ textTransform: 'capitalize' }}>{receiptBooking.status}</span></div>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 18, fontWeight: 800, color: '#0f172a', marginBottom: 18 }}>
-              <span>Amount Paid</span><span>₹{receiptBooking.amount_paid}</span>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, marginBottom: 14 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Court Booking Charges</span><span>₹{baseAmount.toFixed(2)}</span>
+              </div>
+              {hasGstin && (
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)', fontSize: 12 }}>
+                    <span>CGST @ 9%</span><span>₹{(gstAmount / 2).toFixed(2)}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)', fontSize: 12 }}>
+                    <span>SGST @ 9%</span><span>₹{(gstAmount / 2).toFixed(2)}</span>
+                  </div>
+                </>
+              )}
             </div>
-            <button onClick={() => window.print()} className="btn-primary" style={{ width: '100%', padding: '10px' }}>
-              Print Receipt
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 18, fontWeight: 800, color: '#0f172a', marginBottom: 4, borderTop: '1px solid #e2e8f0', paddingTop: 10 }}>
+              <span>Total {hasGstin ? '(incl. GST)' : ''}</span><span>₹{amount.toFixed(2)}</span>
+            </div>
+            {!hasGstin && (
+              <div style={{ fontSize: 10.5, color: '#94a3b8', marginBottom: 14 }}>
+                No GSTIN on file for this venue — add one under Business Setup to show a GST breakdown on invoices.
+              </div>
+            )}
+            <button onClick={() => window.print()} className="btn-primary" style={{ width: '100%', padding: '10px', marginTop: hasGstin ? 4 : 0 }}>
+              Print Invoice
             </button>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* ========================================================================= */}
       {/* MODAL: ACCEPT FULL-TIME INQUIRY (USER EXPLICIT REQUIREMENT) */}
@@ -3030,6 +3154,21 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
             </p>
 
             <form onSubmit={handleWalkInSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {selectedVenue?.courts?.length > 1 && (
+                <div>
+                  <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>COURT</label>
+                  <select
+                    className="nexus-input"
+                    style={{ width: '100%' }}
+                    value={walkInCourtId || selectedVenue.courts[0].id}
+                    onChange={e => setWalkInCourtId(e.target.value)}
+                  >
+                    {selectedVenue.courts.map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                 <div>
                   <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>DATE</label>
