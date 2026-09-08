@@ -3019,7 +3019,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
           <div
             onClick={(e) => e.stopPropagation()}
             className="nexus-card"
-            style={{ maxWidth: 400, width: '100%', padding: 26, background: '#ffffff' }}
+            style={{ maxHeight: '90vh', overflowY: 'auto', maxWidth: 400, width: '100%', padding: 26, background: '#ffffff' }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
               <div>
@@ -3092,7 +3092,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
       {/* ========================================================================= */}
       {showInquiryModal && inquirySlot && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 20 }}>
-          <div className="nexus-card animate-fade-in" style={{ maxWidth: 520, width: '100%', padding: 26, background: '#ffffff', border: '1px solid rgba(99, 102, 241, 0.4)' }}>
+          <div className="nexus-card animate-fade-in" style={{ maxHeight: '90vh', overflowY: 'auto', maxWidth: 520, width: '100%', padding: 26, background: '#ffffff', border: '1px solid rgba(99, 102, 241, 0.4)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
               <div style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(99, 102, 241, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#818cf8' }}>
                 <Sparkles size={20} />
@@ -3260,7 +3260,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
       {/* MODAL: EDIT SLOT PRICE */}
       {editingPriceSlot && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 20 }}>
-          <div className="nexus-card animate-fade-in" style={{ maxWidth: 380, width: '100%', padding: 22, background: '#ffffff' }}>
+          <div className="nexus-card animate-fade-in" style={{ maxHeight: '90vh', overflowY: 'auto', maxWidth: 380, width: '100%', padding: 22, background: '#ffffff' }}>
             <h3 style={{ fontSize: 16, fontWeight: 700, color: '#0f172a', marginBottom: 4 }}>
               Set Slot Price
             </h3>
@@ -3299,7 +3299,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
       {/* MODAL: RESCHEDULE BOOKING */}
       {showRescheduleModal && rescheduleBooking && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 20 }}>
-          <div className="nexus-card animate-fade-in" style={{ maxWidth: 380, width: '100%', padding: 22, background: '#ffffff' }}>
+          <div className="nexus-card animate-fade-in" style={{ maxHeight: '90vh', overflowY: 'auto', maxWidth: 380, width: '100%', padding: 22, background: '#ffffff' }}>
             <h3 style={{ fontSize: 16, fontWeight: 700, color: '#0f172a', marginBottom: 4 }}>
               Reschedule Booking
             </h3>
@@ -3362,7 +3362,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
       {/* MODAL: WALK-IN BOOKING */}
       {showWalkInModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 20 }}>
-          <div className="nexus-card animate-fade-in" style={{ maxWidth: 460, width: '100%', padding: 24, background: '#ffffff' }}>
+          <div className="nexus-card animate-fade-in" style={{ maxHeight: '90vh', overflowY: 'auto', maxWidth: 460, width: '100%', padding: 24, background: '#ffffff' }}>
             <h3 style={{ fontSize: 18, fontWeight: 800, color: '#0f172a', marginBottom: 6 }}>
               New Walk-in Booking
             </h3>
@@ -3484,7 +3484,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
       {/* MODAL: BLOCK SLOT */}
       {showBlockModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 20 }}>
-          <div className="nexus-card animate-fade-in" style={{ maxWidth: 440, width: '100%', padding: 24, background: '#ffffff' }}>
+          <div className="nexus-card animate-fade-in" style={{ maxHeight: '90vh', overflowY: 'auto', maxWidth: 440, width: '100%', padding: 24, background: '#ffffff' }}>
             <h3 style={{ fontSize: 18, fontWeight: 800, color: '#0f172a', marginBottom: 6 }}>
               Block Slot for Maintenance
             </h3>
@@ -3547,7 +3547,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
       {/* MODAL: ADD COURT */}
       {showCourtModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 20 }}>
-          <div className="nexus-card animate-fade-in" style={{ maxWidth: 460, width: '100%', padding: 24, background: '#ffffff' }}>
+          <div className="nexus-card animate-fade-in" style={{ maxHeight: '90vh', overflowY: 'auto', maxWidth: 460, width: '100%', padding: 24, background: '#ffffff' }}>
             <h3 style={{ fontSize: 18, fontWeight: 800, color: '#0f172a', marginBottom: 6 }}>
               Add Court / Pitch
             </h3>
@@ -3668,7 +3668,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
       {/* MODAL: TURF QR CODE */}
       {showQrModal && selectedVenue && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 20 }}>
-          <div className="nexus-card animate-fade-in" style={{ maxWidth: 360, width: '100%', padding: 26, background: '#ffffff', textAlign: 'center' }}>
+          <div className="nexus-card animate-fade-in" style={{ maxHeight: '90vh', overflowY: 'auto', maxWidth: 360, width: '100%', padding: 26, background: '#ffffff', textAlign: 'center' }}>
             <h3 style={{ fontSize: 18, fontWeight: 800, color: '#0f172a', marginBottom: 4 }}>
               {selectedVenue.name}
             </h3>
@@ -3698,7 +3698,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
       {/* MODAL: OWNER HOST OPEN GAME ON COURT SLOT */}
       {showOwnerHostModal && ownerHostSlot && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 20 }}>
-          <div className="nexus-card animate-fade-in" style={{ maxWidth: 480, width: '100%', padding: 24, background: '#ffffff' }}>
+          <div className="nexus-card animate-fade-in" style={{ maxHeight: '90vh', overflowY: 'auto', maxWidth: 480, width: '100%', padding: 24, background: '#ffffff' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
               <div style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(16, 185, 129, 0.2)', color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <Trophy size={18} />
