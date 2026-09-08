@@ -2781,8 +2781,32 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
             {/* Explanatory summary of the 6/8 player conversion */}
             <div style={{ background: 'rgba(245, 158, 11, 0.08)', border: '1px solid rgba(245, 158, 11, 0.25)', padding: 12, borderRadius: 8, fontSize: 12, color: '#fbbf24', marginBottom: 16 }}>
               <strong>Automatic Player Credit & Slot Lock:</strong> This slot currently has{' '}
-              <strong>{inquirySlot.game?.current_players || 6} of {inquirySlot.game?.required_players || 8} players</strong> registered. Accepting this inquiry converts the slot into an exclusive full-turf reservation. The previously registered players will receive a notification and their fee will be credited back.
+              <strong>{inquirySlot.game?.current_players ?? 0} of {inquirySlot.game?.required_players ?? 8} players</strong> registered. Accepting this inquiry converts the slot into an exclusive full-turf reservation. Every player below gets notified automatically — but NexusPlay doesn't hold their money, so you'll need to actually send each of them their refund yourself (UPI transfer to their number, or ask them for their UPI ID on WhatsApp) once you accept.
             </div>
+
+            {inquirySlot.game?.participants?.length > 0 && (
+              <div style={{ border: '1px solid #fde68a', borderRadius: 8, marginBottom: 16, overflow: 'hidden' }}>
+                <div style={{ background: '#fffbeb', padding: '6px 12px', fontSize: 11, fontWeight: 700, color: '#92400e', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                  Refund these {inquirySlot.game.participants.length} players
+                </div>
+                {inquirySlot.game.participants.map((p, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      padding: '8px 12px', fontSize: 12.5,
+                      borderTop: idx > 0 ? '1px solid #fef3c7' : 'none'
+                    }}
+                  >
+                    <span style={{ fontWeight: 600, color: '#0f172a' }}>{p.name}</span>
+                    <span style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                      <a href={`tel:${p.phone}`} style={{ color: '#4f46e5', fontFamily: 'monospace', textDecoration: 'none' }}>{p.phone}</a>
+                      <strong style={{ color: '#059669' }}>₹{p.share_amount}</strong>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
 
             <form onSubmit={handleConfirmFullInquiry} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div>

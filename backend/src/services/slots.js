@@ -201,5 +201,46 @@ export async function listLiveSlots(sql, organizationId, venueId, date) {
     if (b.court_slot_id) bookingBySlot[b.court_slot_id] = b;
   }
 
-  return { date: targetDate, venueId, slots: slots.map((s) => ({ ...s, booking: bookingBySlot[s.id] || null })) };
+  // Open/confirmed pickup games on this venue's slots — the owner dashboard
+  // shows "4/8 joined" and, when reviewing a full-slot inquiry, needs each
+  // registered player's name + phone so the owner knows who to actually
+  // refund (there's no payment gateway holding this money to auto-refund).
+  const games = await sql`
+    select g.*, g.capacity as required_players, g.price_per_player as cost_per_player
+    from games g
+    join court_slots cs on g.court_slot_id = cs.id
+    where g.organization_id = ${organizationId} and g.venue_id = ${venueId} and cs.date = ${targetDate}
+      and g.status in ('open', 'confirmed')
+  `;
+  const gameBySlot = {};
+  for (const g of games) gameBySlot[g.court_slot_id] = g;
+
+  if (games.length > 0) {
+    const gameIds = games.map((g) => g.id);
+    const participants = await sql`
+      select gp.game_id, gp.share_amount, c.name, c.phone
+      from game_participants gp
+      join customers c on gp.customer_id = c.id
+      where gp.game_id = any(${gameIds})
+      order by gp.joined_at asc
+    `;
+    const participantsByGame = {};
+    for (const p of participants) {
+      (participantsByGame[p.game_id] ||= []).push(p);
+    }
+    for (const g of games) {
+      g.current_players = (participantsByGame[g.id] || []).length;
+      g.participants = participantsByGame[g.id] || [];
+    }
+  }
+
+  return {
+    date: targetDate,
+    venueId,
+    slots: slots.map((s) => ({
+      ...s,
+      booking: bookingBySlot[s.id] || null,
+      game: gameBySlot[s.id] || null,
+    })),
+  };
 }
