@@ -84,6 +84,8 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
   const [inquiryPaymentMode, setInquiryPaymentMode] = useState('cash');
   const [inquiryNotes, setInquiryNotes] = useState('Corporate private match booking');
   const [submittingInquiry, setSubmittingInquiry] = useState(false);
+  const [inquiryFeedback, setInquiryFeedback] = useState(''); // { type: 'error'|'success', text }
+  const [inquiryFeedbackType, setInquiryFeedbackType] = useState('error');
 
   // Slot Price Editing Inline Modal
   const [editingPriceSlot, setEditingPriceSlot] = useState(null);
@@ -128,6 +130,8 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
   const [walkInCustomerPhone, setWalkInCustomerPhone] = useState('');
   const [walkInAmount, setWalkInAmount] = useState(1200);
   const [walkInPaymentMode, setWalkInPaymentMode] = useState('cash');
+  const [walkInSubmitting, setWalkInSubmitting] = useState(false);
+  const [walkInFeedback, setWalkInFeedback] = useState('');
 
   // Slot blocking modal
   const [showBlockModal, setShowBlockModal] = useState(false);
@@ -505,6 +509,8 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
   const [ownerHostSkill, setOwnerHostSkill] = useState('All Levels');
   const [ownerHostRules, setOwnerHostRules] = useState('Turf shoes only. Bibs and match ball provided by arena.');
   const [isPublishingOwnerGame, setIsPublishingOwnerGame] = useState(false);
+  const [ownerHostFeedback, setOwnerHostFeedback] = useState('');
+  const [ownerHostFeedbackType, setOwnerHostFeedbackType] = useState('error');
 
   // Accept Full-Time Inquiry on a Slot (e.g. 6/8 players)
   function handleOpenInquiryModal(slot) {
@@ -514,6 +520,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
     setInquiryAmount(slot.full_inquiry_amount || slot.price || 1600);
     setInquiryPaymentMode('cash');
     setInquiryNotes(slot.full_inquiry_notes || 'Private team reservation inquiry approved by owner');
+    setInquiryFeedback('');
     setShowInquiryModal(true);
   }
 
@@ -536,12 +543,14 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
     setOwnerHostCost(Math.ceil((slot.price || 1200) / 10));
     setOwnerHostSkill('All Levels');
     setOwnerHostRules('Turf shoes only. Bibs and match ball provided by arena.');
+    setOwnerHostFeedback('');
     setShowOwnerHostModal(true);
   }
 
   async function handleOwnerHostSubmit(e) {
     e.preventDefault();
     if (!ownerHostSlot || !selectedVenue) return;
+    setOwnerHostFeedback('');
     try {
       setIsPublishingOwnerGame(true);
       await api.createGame({
@@ -560,11 +569,13 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
         endTime: ownerHostSlot.end_time,
         rules: ownerHostRules
       });
-      setShowOwnerHostModal(false);
-      alert(`🎉 Open game session posted on ${ownerHostSlot.court_name} (${ownerHostSlot.start_time} - ${ownerHostSlot.end_time})! Players can now discover and join.`);
       loadLiveSlots(selectedVenue.id, calendarDate);
+      setOwnerHostFeedbackType('success');
+      setOwnerHostFeedback(`Open game posted on ${ownerHostSlot.court_name} (${ownerHostSlot.start_time} - ${ownerHostSlot.end_time})! Players can now discover and join.`);
+      setTimeout(() => { setShowOwnerHostModal(false); setOwnerHostFeedback(''); }, 1800);
     } catch (err) {
-      alert('Failed to host open game: ' + err.message);
+      setOwnerHostFeedbackType('error');
+      setOwnerHostFeedback('Failed to host open game: ' + (err.message || 'Unknown error'));
     } finally {
       setIsPublishingOwnerGame(false);
     }
@@ -573,6 +584,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
   async function handleConfirmFullInquiry(e) {
     e.preventDefault();
     if (!inquirySlot) return;
+    setInquiryFeedback('');
 
     try {
       setSubmittingInquiry(true);
@@ -584,14 +596,16 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
         notes: inquiryNotes.trim()
       });
 
-      setShowInquiryModal(false);
-      alert(`✅ ${res.message || 'Full-time inquiry accepted!'}`);
       if (selectedVenue) {
         loadLiveSlots(selectedVenue.id, calendarDate);
         api.getOwnerBookings({ venueId: selectedVenue.id }).then(setBookings);
       }
+      setInquiryFeedbackType('success');
+      setInquiryFeedback(res.message || 'Full-time inquiry accepted!');
+      setTimeout(() => { setShowInquiryModal(false); setInquiryFeedback(''); }, 1800);
     } catch (err) {
-      alert('Error accepting inquiry: ' + err.message);
+      setInquiryFeedbackType('error');
+      setInquiryFeedback('Error accepting inquiry: ' + (err.message || 'Unknown error'));
     } finally {
       setSubmittingInquiry(false);
     }
@@ -632,9 +646,10 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
 
   async function handleWalkInSubmit(e) {
     e.preventDefault();
+    setWalkInFeedback('');
     const court = selectedVenue.courts?.find(c => c.id === walkInCourtId) || selectedVenue.courts?.[0];
     if (!court) {
-      alert('This venue has no courts yet. Add a court first (Courts tab) before taking a walk-in booking.');
+      setWalkInFeedback('This venue has no courts yet. Add a court first (Courts tab) before taking a walk-in booking.');
       return;
     }
     // The modal only collects a start time — derive an end time from the
@@ -644,6 +659,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
     const endMinutes = h * 60 + m + duration;
     const endTime = `${String(Math.floor(endMinutes / 60) % 24).padStart(2, '0')}:${String(endMinutes % 60).padStart(2, '0')}`;
 
+    setWalkInSubmitting(true);
     try {
       const res = await api.createWalkInBooking({
         venueId: selectedVenue.id,
@@ -678,7 +694,9 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
         total_amount: Number(walkInAmount)
       });
     } catch (err) {
-      alert('Failed to create walk-in: ' + err.message);
+      setWalkInFeedback('Failed to create walk-in: ' + (err.message || 'Unknown error'));
+    } finally {
+      setWalkInSubmitting(false);
     }
   }
 
@@ -3089,6 +3107,17 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
               </div>
             </div>
 
+            {inquiryFeedback && (
+              <div style={{
+                background: inquiryFeedbackType === 'success' ? 'rgba(5, 150, 105, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                border: `1px solid ${inquiryFeedbackType === 'success' ? 'rgba(5, 150, 105, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
+                color: inquiryFeedbackType === 'success' ? '#065f46' : '#b91c1c',
+                padding: 10, borderRadius: 8, fontSize: 12.5, marginBottom: 14
+              }}>
+                {inquiryFeedback}
+              </div>
+            )}
+
             {/* Explanatory summary of the 6/8 player conversion */}
             <div style={{ background: 'rgba(245, 158, 11, 0.08)', border: '1px solid rgba(245, 158, 11, 0.25)', padding: 12, borderRadius: 8, fontSize: 12, color: '#fbbf24', marginBottom: 16 }}>
               <strong>Automatic Player Credit & Slot Lock:</strong> This slot currently has{' '}
@@ -3200,7 +3229,8 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                   type="button"
                   className="btn-secondary"
                   style={{ flex: 1 }}
-                  onClick={() => setShowInquiryModal(false)}
+                  onClick={() => { setShowInquiryModal(false); setInquiryFeedback(''); }}
+                  disabled={submittingInquiry}
                 >
                   Cancel
                 </button>
@@ -3340,6 +3370,12 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
               Instantly reserve a slot for a guest present at the turf counter.
             </p>
 
+            {walkInFeedback && (
+              <div style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#b91c1c', padding: 10, borderRadius: 8, fontSize: 12.5, marginBottom: 14 }}>
+                {walkInFeedback}
+              </div>
+            )}
+
             <form onSubmit={handleWalkInSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {selectedVenue?.courts?.length > 1 && (
                 <div>
@@ -3433,11 +3469,11 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
               </div>
 
               <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
-                <button type="button" className="btn-secondary" style={{ flex: 1 }} onClick={() => setShowWalkInModal(false)}>
+                <button type="button" className="btn-secondary" style={{ flex: 1 }} onClick={() => { setShowWalkInModal(false); setWalkInFeedback(''); }} disabled={walkInSubmitting}>
                   Cancel
                 </button>
-                <button type="submit" className="btn-primary" style={{ flex: 1.5 }}>
-                  Confirm Walk-in
+                <button type="submit" className="btn-primary" style={{ flex: 1.5 }} disabled={walkInSubmitting}>
+                  {walkInSubmitting ? 'Confirming...' : 'Confirm Walk-in'}
                 </button>
               </div>
             </form>
@@ -3675,6 +3711,17 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
               {ownerHostSlot.court_name} · {ownerHostSlot.date} ({ownerHostSlot.start_time} - {ownerHostSlot.end_time})
             </p>
 
+            {ownerHostFeedback && (
+              <div style={{
+                background: ownerHostFeedbackType === 'success' ? 'rgba(5, 150, 105, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                border: `1px solid ${ownerHostFeedbackType === 'success' ? 'rgba(5, 150, 105, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
+                color: ownerHostFeedbackType === 'success' ? '#065f46' : '#b91c1c',
+                padding: 10, borderRadius: 8, fontSize: 12.5, marginBottom: 14
+              }}>
+                {ownerHostFeedback}
+              </div>
+            )}
+
             <form onSubmit={handleOwnerHostSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div>
                 <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>MATCH TITLE *</label>
@@ -3765,7 +3812,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
               </div>
 
               <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
-                <button type="button" className="btn-secondary" style={{ flex: 1 }} onClick={() => setShowOwnerHostModal(false)}>
+                <button type="button" className="btn-secondary" style={{ flex: 1 }} onClick={() => { setShowOwnerHostModal(false); setOwnerHostFeedback(''); }} disabled={isPublishingOwnerGame}>
                   Cancel
                 </button>
                 <button type="submit" disabled={isPublishingOwnerGame} className="btn-primary" style={{ flex: 1.5 }}>
