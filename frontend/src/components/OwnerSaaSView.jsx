@@ -106,6 +106,9 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
   const [bizLng, setBizLng] = useState('77.6245');
   const [bizRules, setBizRules] = useState('');
   const [bizAmenities, setBizAmenities] = useState([]);
+  const [bizPhotos, setBizPhotos] = useState([]);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [photoUploadError, setPhotoUploadError] = useState('');
   const [bizUpiId, setBizUpiId] = useState('');
   const [bizUpiName, setBizUpiName] = useState('');
   const [savingBiz, setSavingBiz] = useState(false);
@@ -226,6 +229,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
       'FIFA Approved Artificial Turf', 'LED Floodlights (500 Lux)', 'Shower & Locker Rooms',
       'Free Parking (Car & 2-Wheeler)', 'Cafeteria & Energy Drinks', 'Bibs & Match Balls', 'First Aid Kit'
     ]);
+    setBizPhotos(Array.isArray(v.photos) ? v.photos : []);
     setBizUpiId(v.upi_id || 'koramangala.sports@okaxis');
     setBizUpiName(v.upi_name || v.name);
   }
@@ -332,6 +336,49 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
     URL.revokeObjectURL(url);
   }
 
+  // Photo changes save immediately (not gated behind the big form's Save
+  // button further down) — otherwise "I uploaded a photo but the preview
+  // still shows the old one on the real marketplace" is a very likely
+  // support question if someone uploads and navigates away without
+  // noticing the unrelated Save button.
+  async function persistPhotos(nextPhotos) {
+    if (!selectedVenue) return;
+    await api.updateVenueProfile(selectedVenue.id, { photos: nextPhotos });
+    setSelectedVenue(prev => prev ? { ...prev, photos: nextPhotos, min_price: prev.min_price } : prev);
+  }
+
+  async function handlePhotoUpload(e) {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    setPhotoUploadError('');
+    setUploadingPhoto(true);
+    try {
+      const uploaded = [];
+      for (const file of files) {
+        const res = await api.uploadImage(file);
+        uploaded.push(res.url);
+      }
+      const next = [...bizPhotos, ...uploaded];
+      setBizPhotos(next);
+      await persistPhotos(next);
+    } catch (err) {
+      setPhotoUploadError(err.message || 'Failed to upload photo');
+    } finally {
+      setUploadingPhoto(false);
+      e.target.value = '';
+    }
+  }
+
+  async function handleRemovePhoto(url) {
+    const next = bizPhotos.filter(p => p !== url);
+    setBizPhotos(next);
+    try {
+      await persistPhotos(next);
+    } catch (err) {
+      setPhotoUploadError('Failed to remove photo: ' + err.message);
+    }
+  }
+
   // Save Full Business Details
   async function handleSaveBusinessDetails(e) {
     e.preventDefault();
@@ -356,6 +403,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
         lng: parseFloat(bizLng) || 77.6245,
         rules: bizRules.trim(),
         amenities: bizAmenities,
+        photos: bizPhotos,
         upi_id: bizUpiId.trim(),
         upi_name: bizUpiName.trim()
       });
@@ -2083,6 +2131,102 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                     {directLinkCopied ? <CheckCircle2 size={13} /> : <Copy size={13} />}
                     {directLinkCopied ? 'Copied' : 'Copy Link'}
                   </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Photos + a live preview of exactly how this venue's card
+              renders on the marketplace — players never see any of this
+              form directly, so it's easy to publish with no photo and
+              never notice the card looks bare until a player mentions it. */}
+          {selectedVenue && (
+            <div className="nexus-card" style={{ padding: 22, marginBottom: 20 }}>
+              <h3 style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', marginBottom: 4 }}>
+                Photos &amp; Marketplace Preview
+              </h3>
+              <p style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginBottom: 16 }}>
+                The first photo here is what players see on your venue's card across the marketplace, search, and your direct link.
+              </p>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 24, alignItems: 'start' }}>
+                <div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 12 }}>
+                    {bizPhotos.map((url, i) => (
+                      <div key={url} style={{ position: 'relative', width: 100, height: 75 }}>
+                        <img
+                          src={url}
+                          alt={`Venue photo ${i + 1}`}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 8, border: i === 0 ? '2px solid #4f46e5' : '1px solid #e2e8f0' }}
+                        />
+                        {i === 0 && (
+                          <span style={{ position: 'absolute', top: 3, left: 3, background: '#4f46e5', color: '#fff', fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 4 }}>
+                            COVER
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleRemovePhoto(url)}
+                          title="Remove photo"
+                          style={{ position: 'absolute', top: -6, right: -6, width: 20, height: 20, borderRadius: '50%', background: '#dc2626', color: '#fff', border: '2px solid #fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                        >
+                          <X size={11} />
+                        </button>
+                      </div>
+                    ))}
+                    <label
+                      style={{
+                        width: 100, height: 75, borderRadius: 8, border: '1.5px dashed #cbd5e1',
+                        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                        cursor: uploadingPhoto ? 'wait' : 'pointer', color: '#64748b', fontSize: 10.5, gap: 3, background: '#f8fafc'
+                      }}
+                    >
+                      <Plus size={16} />
+                      {uploadingPhoto ? 'Uploading...' : 'Add Photo'}
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        multiple
+                        onChange={handlePhotoUpload}
+                        disabled={uploadingPhoto}
+                        style={{ display: 'none' }}
+                      />
+                    </label>
+                  </div>
+                  {photoUploadError && (
+                    <div style={{ fontSize: 11.5, color: '#dc2626' }}>{photoUploadError}</div>
+                  )}
+                  <div style={{ fontSize: 11, color: '#94a3b8' }}>
+                    JPEG, PNG or WEBP. First photo is the cover shown everywhere.
+                  </div>
+                </div>
+
+                {/* Mini replica of the actual PlayerMarketplace card */}
+                <div>
+                  <div style={{ fontSize: 10.5, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 8 }}>
+                    Live Preview
+                  </div>
+                  <div className="nexus-card" style={{ overflow: 'hidden', border: '1px solid #e2e8f0' }}>
+                    <div style={{ position: 'relative', height: 110, background: '#e2e8f0' }}>
+                      <img
+                        src={bizPhotos[0] || 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=600&q=80'}
+                        alt="Preview"
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      />
+                    </div>
+                    <div style={{ padding: 12 }}>
+                      <div style={{ fontSize: 13.5, fontWeight: 800, color: '#0f172a' }}>{bizName || 'Your Venue Name'}</div>
+                      <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>{bizAddress || 'Address'}</div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, paddingTop: 8, borderTop: '1px solid #e2e8f0' }}>
+                        <span style={{ fontSize: 13, fontWeight: 800, color: '#0f172a' }}>
+                          ₹{selectedVenue?.min_price || 800}<span style={{ fontSize: 10, color: '#64748b', fontWeight: 400 }}>/hr</span>
+                        </span>
+                        <span style={{ fontSize: 10.5, color: '#fff', background: '#4f46e5', borderRadius: 6, padding: '4px 8px' }}>
+                          Select Slot
+                        </span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

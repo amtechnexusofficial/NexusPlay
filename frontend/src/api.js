@@ -57,7 +57,13 @@ export const api = {
   // Public Venue Page & Slots
   async getPublicVenue(slugOrId) {
     const res = await fetch(`${API_BASE}/public/venues/${slugOrId}`);
-    if (!res.ok) throw new Error('Venue not found');
+    if (!res.ok) {
+      // A real server error (schema drift, a crash) used to be swallowed
+      // as the same generic "Venue not found" as a genuinely missing/
+      // unpublished venue — indistinguishable to whoever's debugging it.
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.error || `Venue not found (HTTP ${res.status})`);
+    }
     return res.json();
   },
 
@@ -309,6 +315,20 @@ export const api = {
     });
     const body = await res.json();
     if (!res.ok) throw new Error(body.error || 'Failed to update venue profile');
+    return body;
+  },
+
+  async uploadImage(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+    // No Content-Type header here — the browser sets it (with the right
+    // multipart boundary) automatically when the body is a FormData.
+    const res = await ownerFetch(`${API_BASE}/uploads`, {
+      method: 'POST',
+      body: formData
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.error || 'Failed to upload image');
     return body;
   },
 

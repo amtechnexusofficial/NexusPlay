@@ -442,6 +442,7 @@ export async function updateVenueProfile(sql, organizationId, venueId, body) {
     phone: body.phone,
     email: body.email,
     amenities: body.amenities,
+    photos: body.photos,
     openTime: body.open_time ?? body.openTime,
     closeTime: body.close_time ?? body.closeTime,
     upiId: body.upi_id,

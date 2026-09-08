@@ -30,11 +30,16 @@ export default function PlayerMarketplace({ onSelectVenue }) {
   const [locationPermissionGranted, setLocationPermissionGranted] = useState(false);
   const [sortBy, setSortBy] = useState('distance'); // 'distance', 'price_asc', 'slots_desc', 'rating'
   const [copiedSlug, setCopiedSlug] = useState(null);
+  // A failed fetch here used to only go to console.error — the page just
+  // rendered an empty grid with zero indication anything went wrong,
+  // which is indistinguishable from "there are genuinely no venues yet".
+  const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
     async function load() {
       try {
         setLoading(true);
+        setLoadError('');
         const [vData, sData] = await Promise.all([
           api.getMarketplaceVenues(),
           api.getSports()
@@ -43,6 +48,7 @@ export default function PlayerMarketplace({ onSelectVenue }) {
         setSports(sData);
       } catch (err) {
         console.error('Error fetching marketplace:', err);
+        setLoadError(err.message || 'Could not reach the server.');
       } finally {
         setLoading(false);
       }
@@ -303,6 +309,24 @@ export default function PlayerMarketplace({ onSelectVenue }) {
       </div>
 
       {/* Venues Grid */}
+      {loading ? (
+        <div className="nexus-card" style={{ padding: 40, textAlign: 'center', color: '#64748b' }}>
+          Loading turfs...
+        </div>
+      ) : loadError ? (
+        <div className="nexus-card" style={{ padding: 32, textAlign: 'center', border: '1px solid #fecaca', background: '#fef2f2' }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: '#b91c1c', marginBottom: 6 }}>
+            Couldn't load turfs
+          </div>
+          <div style={{ fontSize: 12.5, color: '#7f1d1d' }}>{loadError}</div>
+        </div>
+      ) : filteredVenues.length === 0 ? (
+        <div className="nexus-card" style={{ padding: 40, textAlign: 'center', color: '#64748b' }}>
+          {venues.length === 0
+            ? 'No turfs are published yet — once an owner publishes a venue, it appears here automatically.'
+            : 'No turfs match your current search/filter.'}
+        </div>
+      ) : (
       <div className="marketplace-grid">
         {filteredVenues.map(venue => {
           const uniqueLink = `${window.location.origin}/?venue=${venue.slug || venue.id}`;
@@ -504,6 +528,7 @@ export default function PlayerMarketplace({ onSelectVenue }) {
           );
         })}
       </div>
+      )}
     </div>
   );
 }
