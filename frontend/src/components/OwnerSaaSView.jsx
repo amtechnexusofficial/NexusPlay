@@ -17,7 +17,8 @@ import {
 // Bump this whenever chasing a "is my fix actually live" question — shown
 // directly on the Sign In Required screen so it's visible without a
 // separate /api/health visit.
-const FRONTEND_BUILD_MARKER = 'ownerfetch-no-reload-2026-09-06-v1';
+const FRONTEND_BUILD_MARKER = 'owner-auth-health-2026-09-08-v3';
+const EXPECTED_BACKEND_BUILD = 'webcrypto-jwt-2026-09-08-v3';
 
 export default function OwnerSaaSView({ onNavigateToPublicPage }) {
   // Temporary diagnostic: a random id generated exactly once per mount.
@@ -39,6 +40,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
   const [loading, setLoading] = useState(true);
   const [notSignedIn, setNotSignedIn] = useState(false);
   const [notSignedInDetail, setNotSignedInDetail] = useState('');
+  const [backendHealth, setBackendHealth] = useState(null);
   const [loadError, setLoadError] = useState('');
 
   // First-run onboarding: a new owner account has an organization but no
@@ -189,6 +191,9 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
         // signature mismatch vs expired) straight from the 401 body,
         // with no string-parsing in between that could go wrong.
         setNotSignedInDetail(err.detail || String(err.message || 'unknown'));
+        api.getHealth()
+          .then((h) => setBackendHealth(h))
+          .catch((healthErr) => setBackendHealth({ ok: false, error: healthErr.message }));
       } else {
         setLoadError(err.message || 'Could not reach the server. Check your connection and try again.');
       }
@@ -678,6 +683,14 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
   // with nothing signed in is expected (e.g. opening ?view=owner
   // directly) — don't imply anything is broken.
   if (notSignedIn) {
+    const backendBuild = backendHealth?.build || null;
+    const backendStale =
+      backendBuild && backendBuild !== EXPECTED_BACKEND_BUILD;
+    const classicJwtBug =
+      typeof notSignedInDetail === 'string' &&
+      notSignedInDetail.includes('JwtAlgorithmRequired') &&
+      !notSignedInDetail.includes('webcrypto:');
+
     return (
       <div style={{ maxWidth: 420, margin: '80px auto', padding: '0 16px', textAlign: 'center' }}>
         <div className="nexus-card" style={{ padding: 32 }}>
@@ -688,6 +701,14 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
           <p style={{ fontSize: 13.5, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
             You'll need to sign in with your Arena Owner account to manage venues, courts, and bookings.
           </p>
+          {(classicJwtBug || backendStale) && (
+            <p style={{ fontSize: 12.5, color: '#b45309', background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 8, padding: '10px 12px', marginTop: 14, lineHeight: 1.5, textAlign: 'left' }}>
+              The API Worker serving this site is still an old build that rejects every owner session
+              with <code>JwtAlgorithmRequired</code>. Redeploy the Worker with{' '}
+              <code>cd backend && npx wrangler deploy</code> (not <code>versions upload</code>), then
+              confirm <code>/api/health</code> returns build <code>{EXPECTED_BACKEND_BUILD}</code>.
+            </p>
+          )}
           {notSignedInDetail && (
             <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 14, fontFamily: 'monospace' }}>
               Diagnostic: {notSignedInDetail}
@@ -716,10 +737,18 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
               </p>
             );
           })()}
-          {/* Confirms which frontend build is actually live, right on this
-              screen — no separate URL visit needed to check. */}
           <p style={{ fontSize: 11, color: '#cbd5e1', marginTop: 4, fontFamily: 'monospace' }}>
             Frontend build: {FRONTEND_BUILD_MARKER}
+          </p>
+          <p style={{ fontSize: 11, color: '#cbd5e1', marginTop: 2, fontFamily: 'monospace' }}>
+            Backend build:{' '}
+            {backendHealth
+              ? (backendHealth.build || backendHealth.error || JSON.stringify(backendHealth))
+              : 'checking…'}
+            {backendHealth?.auth ? ` · auth: ${backendHealth.auth}` : ''}
+            {backendHealth && typeof backendHealth.jwtConfigured === 'boolean'
+              ? ` · jwt: ${backendHealth.jwtConfigured ? 'ok' : 'MISSING'}`
+              : ''}
           </p>
         </div>
       </div>

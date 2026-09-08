@@ -82,14 +82,14 @@ export async function createVenue(sql, organizationId, input) {
   const slug = await uniqueSlug(sql, input.name);
   const [venue] = await sql`
     insert into venues (
-      organization_id, name, slug, description, address, lat, lng, phone, email,
+      organization_id, name, slug, description, address, city, lat, lng, phone, email,
       photos, amenities, sport_ids, open_time, close_time, status, upi_id, upi_name, upi_qr_image
     ) values (
       ${organizationId}, ${input.name}, ${slug}, ${input.description || null}, ${input.address},
-      ${input.lat ?? null}, ${input.lng ?? null}, ${input.phone || null}, ${input.email || null},
+      ${input.city || null}, ${input.lat ?? null}, ${input.lng ?? null}, ${input.phone || null}, ${input.email || null},
       ${JSON.stringify(input.photos || [])}, ${JSON.stringify(input.amenities || [])},
       ${input.sportIds || []}, ${input.openTime || "06:00"}, ${input.closeTime || "23:00"},
-      ${input.status || "draft"}, ${input.upiId || null}, ${input.upiName || null}, ${input.upiQrImage || null}
+      ${input.status || "draft"}, ${input.upiId || input.upi_id || null}, ${input.upiName || input.upi_name || null}, ${input.upiQrImage || input.upi_qr_image || null}
     )
     returning *
   `;

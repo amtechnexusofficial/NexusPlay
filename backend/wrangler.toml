@@ -3,9 +3,12 @@ main = "src/index.js"
 compatibility_date = "2024-11-01"
 compatibility_flags = ["nodejs_compat"]
 
-# Runs every minute. Currently a no-op placeholder (see index.js
-# `scheduled`) — Phase 3 (booking flow) wires this up to sweep expired
-# booking holds back to open slots.
+# Deploy with: npx wrangler deploy
+# Do NOT use `wrangler versions upload` alone — that uploads a version
+# without promoting it, leaving the previous Worker (and bugs like
+# JwtAlgorithmRequired) live in production.
+#
+# Runs every minute. Releases expired booking holds (see index.js scheduled).
 [triggers]
 crons = ["* * * * *"]
 

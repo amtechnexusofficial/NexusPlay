@@ -110,20 +110,14 @@ export function AuthModal({ isOpen, onClose, initialRole = 'player', onAuthSucce
   if (!isOpen) return null;
 
   function finishAuth(res, role, venue) {
+    if (!res?.token) {
+      setErrorMsg('Sign-in succeeded but the server did not return a session token. Check that the Worker is deployed and JWT_SECRET is set.');
+      return;
+    }
     localStorage.setItem('nexus_token', res.token);
     localStorage.setItem('nexus_user', JSON.stringify(res.user));
     if (venue) localStorage.setItem('nexus_owner_venue', JSON.stringify(venue));
-    // Temporary diagnostic: confirms the server actually returned a token
-    // in this response, independent of whatever happens to it afterward.
-    const stored = localStorage.getItem('nexus_token');
-    setSuccessMsg(
-      `Welcome, ${res.user.name}! (token from server: ${res.token ? res.token.length + ' chars' : 'MISSING'}` +
-      `, stored ok: ${stored === res.token ? 'yes' : 'no'})`
-    );
-    // No auto-navigate timer on purpose right now — an automatic delay
-    // means the transition can happen before there's time to actually
-    // read/screenshot this message, making "before" and "after" reports
-    // unreliable. A manual button puts the timing under direct control.
+    setSuccessMsg(`Welcome, ${res.user.name}!`);
     setPendingAuth({ user: res.user, role, venue });
   }
 

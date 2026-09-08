@@ -5,6 +5,10 @@
 // a proxy, but will 404 in production if the env var isn't set.
 const API_BASE = `${(import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')}/api`;
 
+export function getApiBase() {
+  return API_BASE;
+}
+
 // Owner-scoped routes require a bearer token (see backend's requireAuth) —
 // this was previously missing from every owner.* call below, which meant
 // they'd all 401 against a real deployed backend.
@@ -13,25 +17,13 @@ function authHeaders() {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-// A stored token can go stale (naturally expired after 30 days, or —
-// during setup — signed before JWT_SECRET was configured correctly) and
-// every owner call would then fail with a confusing "Invalid or expired
-// token" while the UI still shows as signed in, since currentUser comes
-// straight from localStorage independent of whether the token verifies.
-// Clear it so a dead token isn't kept re-sent on every later call, but
-// don't reload the page here: an immediate reload races the caller's own
-// catch block (which reads the 401 body for the real failure reason) and
-// wins, so the real error never gets a chance to render — the user only
-// ever sees the post-reload "no token" state instead of why it failed.
+// Do not clear the session inside the fetch wrapper. Clearing + reloading
+// here raced the caller's catch block and wiped the real 401 reason
+// (JwtAlgorithmRequired) before the diagnostic UI could show it. Callers
+// that decide the session is dead should clear explicitly (or the user
+// signs in again, which overwrites the token).
 async function ownerFetch(url, options = {}) {
-  const hadToken = !!localStorage.getItem('nexus_token');
-  const res = await fetch(url, { ...options, headers: { ...(options.headers || {}), ...authHeaders() } });
-  if (res.status === 401 && hadToken) {
-    localStorage.removeItem('nexus_token');
-    localStorage.removeItem('nexus_user');
-    localStorage.removeItem('nexus_owner_venue');
-  }
-  return res;
+  return fetch(url, { ...options, headers: { ...(options.headers || {}), ...authHeaders() } });
 }
 
 // Admin sessions are deliberately kept out of the player/owner token —
@@ -42,6 +34,12 @@ function adminAuthHeaders() {
 }
 
 export const api = {
+  async getHealth() {
+    const res = await fetch(`${API_BASE}/health`);
+    if (!res.ok) throw new Error(`Health check failed (${res.status})`);
+    return res.json();
+  },
+
   // Catalog & Marketplace
   async getSports() {
     const res = await fetch(`${API_BASE}/sports`);

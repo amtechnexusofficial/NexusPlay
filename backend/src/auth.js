@@ -3,15 +3,23 @@ import { httpError } from "./errors.js";
 const OTP_TTL_MINUTES = 10;
 const TOKEN_TTL_SECONDS = 60 * 60 * 24 * 30; // 30 days
 
-// --- Session tokens (hand-rolled, HS256) -----------------------------------
-// Was hono/jwt's sign()/verify() — after a long, thoroughly-confirmed live
-// debugging session (real token, correctly stored, correctly sent, still
-// rejected with JwtAlgorithmRequired no matter how many times the fix was
-// redeployed) that library is dropped entirely rather than chased further.
-// This is deliberately minimal: standard JWT shape (header.payload.signature,
-// base64url, HMAC-SHA256) for interoperability/debuggability, built only on
-// Web Crypto (already used for password hashing below, and known-good in
-// this exact Workers runtime).
+// --- Session tokens (hand-rolled HS256 via Web Crypto) ---------------------
+// Do NOT use hono/jwt here. In this project's Workers runtime,
+// `verify(token, secret)` without an algorithm threw JwtAlgorithmRequired
+// on every authenticated request, and even `verify(token, secret, "HS256")`
+// kept failing after redeploys that never actually reached production
+// traffic (`wrangler versions upload` without a promote). This path uses
+// only crypto.subtle — same primitive already used for password hashing.
+function requireJwtSecret(secret) {
+  if (typeof secret !== "string" || secret.length < 16) {
+    throw httpError(
+      500,
+      "JWT_SECRET is not configured on this Worker. Set it with: wrangler secret put JWT_SECRET"
+    );
+  }
+  return secret;
+}
+
 function base64UrlEncodeBytes(bytes) {
   let str = "";
   for (const b of bytes) str += String.fromCharCode(b);
@@ -28,25 +36,41 @@ function base64UrlDecodeToBytes(str) {
 }
 
 async function hmacKey(secret) {
-  return crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign", "verify"]);
+  return crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign", "verify"]
+  );
 }
 
 async function signToken(payload, secret) {
+  const keyMaterial = requireJwtSecret(secret);
   const header = { alg: "HS256", typ: "JWT" };
   const encodedHeader = base64UrlEncodeBytes(new TextEncoder().encode(JSON.stringify(header)));
   const encodedPayload = base64UrlEncodeBytes(new TextEncoder().encode(JSON.stringify(payload)));
   const signingInput = `${encodedHeader}.${encodedPayload}`;
-  const key = await hmacKey(secret);
+  const key = await hmacKey(keyMaterial);
   const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(signingInput));
-  const encodedSignature = base64UrlEncodeBytes(new Uint8Array(signature));
-  return `${signingInput}.${encodedSignature}`;
+  return `${signingInput}.${base64UrlEncodeBytes(new Uint8Array(signature))}`;
 }
 
 async function verifyToken(token, secret) {
+  const keyMaterial = requireJwtSecret(secret);
   const parts = (token || "").split(".");
   if (parts.length !== 3) throw new Error("Malformed token");
   const [encodedHeader, encodedPayload, encodedSignature] = parts;
-  const key = await hmacKey(secret);
+
+  let header;
+  try {
+    header = JSON.parse(new TextDecoder().decode(base64UrlDecodeToBytes(encodedHeader)));
+  } catch {
+    throw new Error("Malformed token header");
+  }
+  if (header.alg !== "HS256") throw new Error(`Unsupported alg: ${header.alg || "none"}`);
+
+  const key = await hmacKey(keyMaterial);
   const valid = await crypto.subtle.verify(
     "HMAC",
     key,
@@ -54,6 +78,7 @@ async function verifyToken(token, secret) {
     new TextEncoder().encode(`${encodedHeader}.${encodedPayload}`)
   );
   if (!valid) throw new Error("Signature mismatch");
+
   const payload = JSON.parse(new TextDecoder().decode(base64UrlDecodeToBytes(encodedPayload)));
   if (typeof payload.exp === "number" && Math.floor(Date.now() / 1000) >= payload.exp) {
     throw new Error("Token expired");
@@ -271,10 +296,12 @@ export function requireAuth(requiredRole) {
     try {
       payload = await verifyToken(token, c.env.JWT_SECRET);
     } catch (err) {
-      // err.message is our own, from verifyToken above (Malformed token /
-      // Signature mismatch / Token expired) — safe to expose, never the
-      // secret or the token itself.
-      throw httpError(401, `Invalid or expired token (${err.message || "unknown"})`);
+      // Prefix with "webcrypto:" so a live deployment of THIS file is
+      // unambiguous in the owner dashboard diagnostic. If you still see
+      // bare JwtAlgorithmRequired with no webcrypto: prefix, the Worker
+      // serving traffic is an old build that still imports hono/jwt.
+      if (err.status === 500) throw err;
+      throw httpError(401, `Invalid or expired token (webcrypto: ${err.message || "unknown"})`);
     }
     if (allowed && !allowed.includes(payload.role)) {
       throw httpError(403, `Requires role: ${allowed.join(" or ")}`);

@@ -84,12 +84,17 @@ cp .dev.vars.example .dev.vars   # fill in DATABASE_URL, JWT_SECRET; set DEV_MOD
 npm run dev                       # http://localhost:8787
 ```
 
-Deploy:
+Deploy (must use `wrangler deploy` — not `versions upload` alone, or
+production keeps serving the previous Worker):
 ```bash
 npx wrangler secret put DATABASE_URL
 npx wrangler secret put JWT_SECRET
-npm run deploy
+npx wrangler deploy
 ```
+After deploy, open `/api/health` and confirm `build` is
+`webcrypto-jwt-2026-09-08-v3` and `auth` is `webcrypto-hs256`. If you still
+see owner login bounce with `JwtAlgorithmRequired`, the live Worker was not
+promoted — re-run `npx wrangler deploy` from `backend/`.
 
 **About OTP / SMS**: stubbed — `src/auth.js`'s `sendOtpSms()` logs the
 code to the console, and with `DEV_MODE=true` the API response includes

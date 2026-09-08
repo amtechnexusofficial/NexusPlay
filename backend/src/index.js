@@ -68,8 +68,19 @@ app.onError((err, c) => {
 // with no login and no app involved, exactly which commit the live
 // Worker is actually running — update the string whenever chasing a
 // "is my fix actually deployed" question.
-const BUILD_MARKER = "auth-rewrite-hs256-2026-09-06-v1";
-app.get("/api/health", (c) => c.json({ ok: true, build: BUILD_MARKER }));
+//
+// If production /api/health does not return this exact build string, the
+// Worker was not actually promoted (common with `wrangler versions upload`
+// without a subsequent promote / `wrangler deploy`).
+const BUILD_MARKER = "webcrypto-jwt-2026-09-08-v3";
+app.get("/api/health", (c) =>
+  c.json({
+    ok: true,
+    build: BUILD_MARKER,
+    auth: "webcrypto-hs256",
+    jwtConfigured: typeof c.env.JWT_SECRET === "string" && c.env.JWT_SECRET.length >= 16,
+  })
+);
 
 // ===========================================================================
 // Auth

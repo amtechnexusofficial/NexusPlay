@@ -83,6 +83,8 @@ create table if not exists venues (
   slug             text not null unique,
   description      text,
   address          text,
+  city             text,
+  pincode          text,
   lat              double precision,
   lng              double precision,
   phone            text,
@@ -93,6 +95,15 @@ create table if not exists venues (
   open_time        text not null default '06:00',
   close_time       text not null default '23:00',
   status           text not null default 'active' check (status in ('active', 'inactive', 'draft')),
+  -- Business profile / direct UPI (also added via ALTER below for DBs
+  -- created from an older schema.sql — create table if not exists never
+  -- mutates an already-existing table).
+  gstin            text,
+  business_type    text,
+  rules            text,
+  upi_id           text,
+  upi_name         text,
+  upi_qr_image     text,
   created_at       timestamptz not null default now()
 );
 create index if not exists idx_venues_org on venues(organization_id);

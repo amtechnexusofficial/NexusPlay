@@ -4,10 +4,19 @@ compatibility_date = "2024-11-01"
 compatibility_flags = ["nodejs_compat"]
 
 # This file mirrors backend/wrangler.toml. It exists because the
-# Cloudflare Workers Build runs `npx wrangler versions upload` with the
-# repo root as its working directory (not backend/), so Wrangler needs a
-# config here to find the entry point. Keep both files in sync — the
-# `main` path is the only difference between them.
+# Cloudflare Workers Build may run with the repo root as its working
+# directory (not backend/), so Wrangler needs a config here to find the
+# entry point. Keep both files in sync — the `main` path is the only
+# difference between them.
+#
+# CRITICAL: the deploy command must be `npx wrangler deploy` (promotes
+# to 100% production traffic). `wrangler versions upload` alone leaves
+# the previous Worker live — that is why JwtAlgorithmRequired kept
+# appearing after "successful" redeploys. In the Cloudflare dashboard
+# → Workers → Settings → Builds, set Deploy command to:
+#   npx wrangler deploy
+# Or deploy manually from this repo:
+#   cd backend && npx wrangler deploy
 
 # Runs every minute. Currently a no-op placeholder (see index.js
 # `scheduled`) — Phase 3 (booking flow) wires this up to sweep expired
