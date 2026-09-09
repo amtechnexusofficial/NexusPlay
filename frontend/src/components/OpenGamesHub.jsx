@@ -431,7 +431,7 @@ export default function OpenGamesHub({ onNavigateToVenue, onNavigateToDashboard,
       {/* MODAL 1: Join Individual Spot */}
       {activeJoinGame && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 16 }}>
-          <div className="nexus-card animate-fade-in" style={{ maxWidth: 460, width: '100%', padding: 24, background: '#ffffff', border: '1px solid #e2e8f0', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
+          <div className="nexus-card animate-fade-in" style={{ maxHeight: '90vh', overflowY: 'auto', maxWidth: 460, width: '100%', padding: 24, background: '#ffffff', border: '1px solid #e2e8f0', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
             <h2 className="font-display" style={{ fontSize: 20, fontWeight: 800, color: '#0f172a', marginBottom: 4 }}>
               Join Pickup Spot
             </h2>
@@ -589,7 +589,7 @@ export default function OpenGamesHub({ onNavigateToVenue, onNavigateToDashboard,
       {/* MODAL 2: Book Full Slot (Exclusive Group Booking) */}
       {activeFullSlotGame && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 16 }}>
-          <div className="nexus-card animate-fade-in" style={{ maxWidth: 500, width: '100%', padding: 24, background: '#ffffff', border: '1px solid #e2e8f0', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
+          <div className="nexus-card animate-fade-in" style={{ maxHeight: '90vh', overflowY: 'auto', maxWidth: 500, width: '100%', padding: 24, background: '#ffffff', border: '1px solid #e2e8f0', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
               <div style={{ width: 32, height: 32, borderRadius: 8, background: '#d1fae5', color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <Shield size={18} />
@@ -627,7 +627,7 @@ export default function OpenGamesHub({ onNavigateToVenue, onNavigateToDashboard,
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+                <div className="mobile-grid-1" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
                   <div>
                     <label style={{ display: 'block', fontSize: 11.5, fontWeight: 600, color: '#64748b', marginBottom: 4 }}>
                       ORGANIZER / CAPTAIN NAME *
