@@ -2,6 +2,7 @@ import { httpError } from "../errors.js";
 import { withTransaction } from "../db.js";
 import { findOrCreateCustomerInTx } from "./customers.js";
 import { notifyInTx, notify } from "./notifications.js";
+import { filterCurrentSlots } from "./slots.js";
 
 // Public discovery feed: every open or filling-up pickup game, enriched
 // with venue/court/sport display fields and its current roster.
@@ -34,9 +35,11 @@ export async function listGames(sql, { sportId, venueId, date } = {}) {
       and (${dateParam}::date is null or cs.date = ${dateParam}::date)
     order by cs.date asc, cs.start_time asc
   `;
-  if (games.length === 0) return [];
+  // Hide games whose slot start has already passed.
+  const upcoming = filterCurrentSlots(games);
+  if (upcoming.length === 0) return [];
 
-  const gameIds = games.map((g) => g.id);
+  const gameIds = upcoming.map((g) => g.id);
   const participants = await sql`
     select gp.*, c.name, c.phone
     from game_participants gp join customers c on gp.customer_id = c.id
@@ -46,7 +49,7 @@ export async function listGames(sql, { sportId, venueId, date } = {}) {
   for (const p of participants) {
     (byGame[p.game_id] ||= []).push(p);
   }
-  return games.map((g) => ({ ...g, participants: byGame[g.id] || [] }));
+  return upcoming.map((g) => ({ ...g, participants: byGame[g.id] || [] }));
 }
 
 // Organizer picks a slot and puts it up as an open game — other players

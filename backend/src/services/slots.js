@@ -23,6 +23,45 @@ function dateStr(d) {
   return d.toISOString().slice(0, 10);
 }
 
+// Neon may return `date` as "YYYY-MM-DD", a Date, or an ISO timestamp.
+// Always normalize to YYYY-MM-DD before comparing against start_time.
+function toDateOnly(date) {
+  if (!date) return null;
+  if (date instanceof Date && !Number.isNaN(date.getTime())) {
+    // DATE columns arrive as UTC midnight; take the UTC calendar day so
+    // we don't shift into the previous IST day.
+    return date.toISOString().slice(0, 10);
+  }
+  const match = String(date).match(/^(\d{4}-\d{2}-\d{2})/);
+  return match ? match[1] : null;
+}
+
+function toHhmm(startTime) {
+  if (!startTime) return null;
+  if (typeof startTime === "string") return startTime.slice(0, 5);
+  // Rare: some drivers return a Date/time object for TIME columns.
+  if (startTime instanceof Date && !Number.isNaN(startTime.getTime())) {
+    return startTime.toISOString().slice(11, 16);
+  }
+  const match = String(startTime).match(/(\d{2}:\d{2})/);
+  return match ? match[1] : null;
+}
+
+// Venues are India-based; Workers run in UTC. Slot dates/times are stored
+// without a timezone, so interpret them as Asia/Kolkata when deciding
+// whether a start time has already passed.
+export function isSlotStartInPast(date, startTime, now = new Date()) {
+  const day = toDateOnly(date);
+  const hhmm = toHhmm(startTime);
+  if (!day || !hhmm) return false;
+  const ms = Date.parse(`${day}T${hhmm}:00+05:30`);
+  return Number.isFinite(ms) && ms <= now.getTime();
+}
+
+export function filterCurrentSlots(slots, now = new Date()) {
+  return (slots || []).filter((s) => !isSlotStartInPast(s.date, s.start_time, now));
+}
+
 // Shared core: builds and inserts the slot grid for a given venue on an
 // explicit list of dates. Steps by each court's own slot duration (not a
 // fixed hour), so 30/90/custom-minute courts don't produce overlapping
@@ -199,17 +238,35 @@ export async function regenerateSlotsForCourt(sql, organizationId, courtId, days
 export async function listSlots(sql, venueId, { date, courtId } = {}) {
   const queryDate = date || dateStr(new Date());
 
+  // Keep the "not yet started" rule in SQL (Asia/Kolkata) so Neon date/time
+  // driver quirks can't silently leave expired morning slots visible.
+  // For a future queryDate the first OR branch is true and every slot that
+  // day is returned; for today only start_time > now remains.
   const fetch = () =>
     courtId
       ? sql`
           select s.*, c.name as court_name, c.sport_id
           from court_slots s join courts c on s.court_id = c.id
           where s.venue_id = ${venueId} and s.date = ${queryDate} and s.court_id = ${courtId}
+            and (
+              ${queryDate}::date > (timezone('Asia/Kolkata', now()))::date
+              or (
+                ${queryDate}::date = (timezone('Asia/Kolkata', now()))::date
+                and s.start_time::time > (timezone('Asia/Kolkata', now()))::time
+              )
+            )
           order by s.start_time asc`
       : sql`
           select s.*, c.name as court_name, c.sport_id
           from court_slots s join courts c on s.court_id = c.id
           where s.venue_id = ${venueId} and s.date = ${queryDate}
+            and (
+              ${queryDate}::date > (timezone('Asia/Kolkata', now()))::date
+              or (
+                ${queryDate}::date = (timezone('Asia/Kolkata', now()))::date
+                and s.start_time::time > (timezone('Asia/Kolkata', now()))::time
+              )
+            )
           order by s.start_time asc`;
 
   let slots = await fetch();
@@ -236,7 +293,8 @@ export async function listSlots(sql, venueId, { date, courtId } = {}) {
   const gameBySlot = {};
   for (const g of games) gameBySlot[g.court_slot_id] = g;
 
-  return slots.map((s) => ({ ...s, game: gameBySlot[s.id] || null }));
+  // JS backstop in case a driver returns odd date/time shapes.
+  return filterCurrentSlots(slots.map((s) => ({ ...s, game: gameBySlot[s.id] || null })));
 }
 
 export async function getSlotOrThrow(sql, slotId) {
@@ -391,10 +449,17 @@ export async function listLiveSlots(sql, organizationId, venueId, date) {
   return {
     date: targetDate,
     venueId,
-    slots: slots.map((s) => ({
-      ...s,
-      booking: bookingBySlot[s.id] || null,
-      game: gameBySlot[s.id] || null,
-    })),
+    // Hide past open/blocked slots (nothing left to sell), but keep past
+    // booked/held ones so the owner can still see today's completed activity.
+    slots: slots
+      .map((s) => ({
+        ...s,
+        booking: bookingBySlot[s.id] || null,
+        game: gameBySlot[s.id] || null,
+      }))
+      .filter((s) => {
+        if (!isSlotStartInPast(s.date, s.start_time)) return true;
+        return s.status === "booked" || s.status === "held" || !!s.booking || !!s.game;
+      }),
   };
 }

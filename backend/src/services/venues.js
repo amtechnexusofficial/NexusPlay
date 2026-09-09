@@ -46,7 +46,7 @@ export async function getPublicVenue(sql, slugOrId) {
   const [venue] = await sql`
     select id, name, slug, description, address, lat, lng, phone, email,
            photos, amenities, sport_ids, open_time, close_time, advance_payment_percent,
-           upi_id, upi_name, upi_qr_image,
+           upi_id, upi_name, upi_qr_image, rules, cancellation_policy,
            (select round(avg(rating), 1) from reviews where venue_id = venues.id)::float as avg_rating,
            (select count(*)::int from reviews where venue_id = venues.id) as review_count
     from venues
@@ -76,14 +76,21 @@ export async function listPublicVenues(sql, { sportId, search } = {}) {
     select v.id, v.name, v.slug, v.description, v.address, v.city, v.lat, v.lng, v.photos, v.sport_ids,
            v.amenities, v.open_time, v.close_time,
            (select min(c.base_price) from courts c where c.venue_id = v.id and c.status = 'active') as min_price,
-           (select count(*)::int from court_slots cs where cs.venue_id = v.id and cs.date = current_date and cs.status = 'open') as today_available_slots_count,
+           (select count(*)::int from court_slots cs
+            where cs.venue_id = v.id and cs.status = 'open'
+              and cs.date = (timezone('Asia/Kolkata', now()))::date
+              and cs.start_time::time > (timezone('Asia/Kolkata', now()))::time
+           ) as today_available_slots_count,
            (select round(avg(rating), 1) from reviews where venue_id = v.id)::float as avg_rating,
            (select count(*)::int from reviews where venue_id = v.id) as review_count,
            -- Open pickup games happening today, still filling up — powers the
            -- home page's "🔥 open games" badge so players can spot a venue
            -- with a game to join without opening Open Games Hub first.
            (select count(*)::int from games g join court_slots cs on g.court_slot_id = cs.id
-            where g.venue_id = v.id and g.status = 'open' and cs.date = current_date) as open_games_today_count
+            where g.venue_id = v.id and g.status = 'open'
+              and cs.date = (timezone('Asia/Kolkata', now()))::date
+              and cs.start_time::time > (timezone('Asia/Kolkata', now()))::time
+           ) as open_games_today_count
     from venues v
     where v.status = 'active'
       and (${sportIdParam}::uuid is null or ${sportIdParam}::uuid = any(v.sport_ids))
@@ -128,6 +135,7 @@ export async function updateVenue(sql, organizationId, venueId, input) {
       gstin = ${input.gstin ?? existing.gstin},
       business_type = ${input.businessType ?? existing.business_type},
       rules = ${input.rules ?? existing.rules},
+      cancellation_policy = ${input.cancellationPolicy ?? existing.cancellation_policy},
       lat = ${input.lat ?? existing.lat},
       lng = ${input.lng ?? existing.lng},
       phone = ${input.phone ?? existing.phone},

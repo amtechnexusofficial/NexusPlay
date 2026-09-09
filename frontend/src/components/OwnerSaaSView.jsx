@@ -107,6 +107,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
   const [bizLat, setBizLat] = useState('12.9352');
   const [bizLng, setBizLng] = useState('77.6245');
   const [bizRules, setBizRules] = useState('');
+  const [bizCancellationPolicy, setBizCancellationPolicy] = useState('');
   const [bizAmenities, setBizAmenities] = useState([]);
   const [bizPhotos, setBizPhotos] = useState([]);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
@@ -238,7 +239,8 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
     setBizCloseTime(v.close_time || '23:30');
     setBizLat(String(v.lat || '12.9352'));
     setBizLng(String(v.lng || '77.6245'));
-    setBizRules(v.rules || '1. Turf shoes or rubber studs only (No metal spikes).\n2. Arrive 10 minutes prior to slot start.\n3. Zero food or chewing gum on the artificial turf.\n4. Free cancellation up to 4 hours before slot time.');
+    setBizRules(v.rules || '1. Turf shoes or rubber studs only (No metal spikes).\n2. Arrive 10 minutes prior to slot start.\n3. Zero food or chewing gum on the artificial turf.');
+    setBizCancellationPolicy(v.cancellation_policy || 'Free cancellation up to 4 hours before slot start. Cancellations within 4 hours are non-refundable. Reschedules allowed once if requested at least 4 hours ahead.');
     setBizAmenities(Array.isArray(v.amenities) ? v.amenities : [
       'FIFA Approved Artificial Turf', 'LED Floodlights (500 Lux)', 'Shower & Locker Rooms',
       'Free Parking (Car & 2-Wheeler)', 'Cafeteria & Energy Drinks', 'Bibs & Match Balls', 'First Aid Kit'
@@ -254,7 +256,18 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
     try {
       setLoadingSlots(true);
       const res = await api.getOwnerLiveSlots(vId, date);
-      setLiveSlots(res.slots || []);
+      const now = Date.now();
+      const slots = (res.slots || []).filter((s) => {
+        const day = String(s.date || '').slice(0, 10);
+        const hhmm = String(s.start_time || '').slice(0, 5);
+        if (!day || !hhmm) return true;
+        const ms = Date.parse(`${day}T${hhmm}:00+05:30`);
+        const past = Number.isFinite(ms) && ms <= now;
+        if (!past) return true;
+        // Keep past booked/held so today's completed activity stays visible.
+        return s.status === 'booked' || s.status === 'held' || !!s.booking || !!s.game;
+      });
+      setLiveSlots(slots);
     } catch (err) {
       console.error('Error fetching live slots:', err);
     } finally {
@@ -417,6 +430,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
         lat: parseFloat(bizLat) || 12.9352,
         lng: parseFloat(bizLng) || 77.6245,
         rules: bizRules.trim(),
+        cancellation_policy: bizCancellationPolicy.trim(),
         amenities: bizAmenities,
         photos: bizPhotos,
         upi_id: bizUpiId.trim(),
@@ -2682,19 +2696,37 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                   House Rules & Cancellation Policy
                 </h3>
 
-                <div>
+                <div style={{ marginBottom: 16 }}>
                   <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
-                    GROUND POLICIES & FOOTWEAR REQUIREMENTS
+                    HOUSE RULES / GROUND POLICIES
                   </label>
                   <textarea
-                    rows={5}
+                    rows={4}
                     className="nexus-input"
                     style={{ width: '100%', resize: 'vertical' }}
                     value={bizRules}
                     onChange={e => setBizRules(e.target.value)}
+                    placeholder="Footwear, arrival time, food on turf, etc."
                   />
                   <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
-                    Shown to players during slot selection and in confirmation SMS / WhatsApp alerts.
+                    Shown on your public booking page under House Rules.
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
+                    CANCELLATION & RESCHEDULE POLICY *
+                  </label>
+                  <textarea
+                    rows={4}
+                    className="nexus-input"
+                    style={{ width: '100%', resize: 'vertical' }}
+                    value={bizCancellationPolicy}
+                    onChange={e => setBizCancellationPolicy(e.target.value)}
+                    placeholder="e.g. Free cancellation up to 4 hours before slot start…"
+                  />
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                    Players see this clearly before they pay — keep it specific about refund windows and reschedules.
                   </div>
                 </div>
               </div>

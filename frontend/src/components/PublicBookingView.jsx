@@ -189,7 +189,15 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
       try {
         const courtId = selectedCourt ? selectedCourt.id : undefined;
         const res = await api.getVenueSlots(venue.id, selectedDate, courtId);
-        setSlots(res);
+        // Client-side backstop: hide slots whose start time has passed (IST).
+        const now = Date.now();
+        setSlots((Array.isArray(res) ? res : []).filter((s) => {
+          const day = String(s.date || '').slice(0, 10);
+          const hhmm = String(s.start_time || '').slice(0, 5);
+          if (!day || !hhmm) return true;
+          const ms = Date.parse(`${day}T${hhmm}:00+05:30`);
+          return !(Number.isFinite(ms) && ms <= now);
+        }));
       } catch (err) {
         console.error('Error fetching slots:', err);
       }
@@ -423,6 +431,31 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
               </span>
             ))}
           </div>
+
+          {(venue.cancellation_policy || venue.rules) && (
+            <div style={{ display: 'grid', gridTemplateColumns: venue.cancellation_policy && venue.rules ? '1fr 1fr' : '1fr', gap: 12, marginTop: 18 }}>
+              {venue.cancellation_policy && (
+                <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 12, padding: '14px 16px' }}>
+                  <div style={{ fontSize: 11, fontWeight: 800, color: '#92400e', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
+                    Cancellation Policy
+                  </div>
+                  <div style={{ fontSize: 13.5, color: '#78350f', lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>
+                    {venue.cancellation_policy}
+                  </div>
+                </div>
+              )}
+              {venue.rules && (
+                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: '14px 16px' }}>
+                  <div style={{ fontSize: 11, fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
+                    House Rules
+                  </div>
+                  <div style={{ fontSize: 13.5, color: '#334155', lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>
+                    {venue.rules}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -1138,6 +1171,12 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
                               Found in your UPI receipt (GPay / PhonePe / Paytm / BHIM)
                             </div>
                           </div>
+
+                          {venue.cancellation_policy && (
+                            <div style={{ marginTop: 12, padding: '10px 12px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, fontSize: 12, color: '#92400e', lineHeight: 1.45 }}>
+                              <strong>Cancellation:</strong> {venue.cancellation_policy}
+                            </div>
+                          )}
                         </div>
                         );
                       })()}

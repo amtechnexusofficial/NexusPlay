@@ -552,6 +552,7 @@ export async function updateVenueProfile(sql, organizationId, venueId, body) {
     gstin: body.gstin,
     businessType: body.business_type,
     rules: body.rules,
+    cancellationPolicy: body.cancellation_policy,
     lat: body.lat,
     lng: body.lng,
     phone: body.phone,

@@ -101,6 +101,7 @@ create table if not exists venues (
   gstin            text,
   business_type    text,
   rules            text,
+  cancellation_policy text,
   upi_id           text,
   upi_name         text,
   upi_qr_image     text,
@@ -375,6 +376,7 @@ alter table venues add column if not exists pincode text;
 alter table venues add column if not exists gstin text;
 alter table venues add column if not exists business_type text;
 alter table venues add column if not exists rules text;
+alter table venues add column if not exists cancellation_policy text;
 
 alter table court_slots add column if not exists block_reason text;
 alter table bookings add column if not exists upi_utr text;

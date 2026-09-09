@@ -3,6 +3,7 @@ import { withTransaction } from "../db.js";
 import { findOrCreateCustomerInTx, recordCustomerBookingInTx } from "./customers.js";
 import { getPaymentProvider } from "./payments.js";
 import { notifyInTx } from "./notifications.js";
+import { isSlotStartInPast } from "./slots.js";
 
 const HOLD_MINUTES = 10;
 
@@ -23,6 +24,9 @@ export async function holdSlot(env, { slotId, customerName, customerPhone, custo
     if (!slot) throw httpError(404, "Slot not found");
 
     const now = Date.now();
+    if (isSlotStartInPast(slot.date, slot.start_time, new Date(now))) {
+      throw httpError(409, "This slot's start time has already passed. Please pick a later time.");
+    }
     const isAvailable = slot.status === "open" || (slot.status === "held" && slot.hold_expires_at && new Date(slot.hold_expires_at).getTime() < now);
     if (!isAvailable) {
       throw httpError(409, `Slot is currently ${slot.status === "booked" ? "booked" : "being reserved by another customer"}. Please pick another time.`);
