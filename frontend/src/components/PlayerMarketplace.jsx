@@ -126,9 +126,9 @@ export default function PlayerMarketplace({ onSelectVenue }) {
   const filteredVenues = enrichedVenues.filter(v => {
     const matchesSport = selectedSport === 'all' || v.sport_ids?.includes(selectedSport);
     const matchesSearch = !searchQuery ||
-      v.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      v.address.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (v.city && v.city.toLowerCase().includes(searchQuery.toLowerCase()));
+      (v.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (v.address || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (v.city || '').toLowerCase().includes(searchQuery.toLowerCase());
     return matchesSport && matchesSearch;
   });
 
