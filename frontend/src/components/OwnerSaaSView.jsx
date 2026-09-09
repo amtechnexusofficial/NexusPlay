@@ -113,6 +113,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
   const [photoUploadError, setPhotoUploadError] = useState('');
   const [bizUpiId, setBizUpiId] = useState('');
   const [bizUpiName, setBizUpiName] = useState('');
+  const [bizAdvancePercent, setBizAdvancePercent] = useState(100);
   const [savingBiz, setSavingBiz] = useState(false);
   const [bizSuccessMsg, setBizSuccessMsg] = useState('');
 
@@ -236,6 +237,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
     setBizPhotos(Array.isArray(v.photos) ? v.photos : []);
     setBizUpiId(v.upi_id || 'koramangala.sports@okaxis');
     setBizUpiName(v.upi_name || v.name);
+    setBizAdvancePercent(v.advance_payment_percent ?? 100);
   }
 
   async function loadLiveSlots(vId, date) {
@@ -409,7 +411,8 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
         amenities: bizAmenities,
         photos: bizPhotos,
         upi_id: bizUpiId.trim(),
-        upi_name: bizUpiName.trim()
+        upi_name: bizUpiName.trim(),
+        advance_payment_percent: Math.min(100, Math.max(1, Number(bizAdvancePercent) || 100))
       });
 
       setBizSuccessMsg('Business details updated successfully! Changes are live on your public booking page.');
@@ -2526,6 +2529,31 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                       onChange={e => setBizUpiName(e.target.value)}
                     />
                   </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
+                      ADVANCE PAYMENT REQUIRED TO LOCK A SLOT
+                    </label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <input
+                        type="range"
+                        min={10}
+                        max={100}
+                        step={10}
+                        value={bizAdvancePercent}
+                        onChange={e => setBizAdvancePercent(Number(e.target.value))}
+                        style={{ flex: 1 }}
+                      />
+                      <span style={{ fontSize: 14, fontWeight: 800, color: '#059669', minWidth: 48, textAlign: 'right' }}>
+                        {bizAdvancePercent}%
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6, background: '#f8fafc', padding: 8, borderRadius: 6 }}>
+                      {bizAdvancePercent >= 100
+                        ? 'Players pay the full slot price via UPI to lock it — no balance left at the venue.'
+                        : `Players only pay ${bizAdvancePercent}% of the slot price up front to lock it. The remaining ${100 - bizAdvancePercent}% is collected at the venue when they arrive.`}
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -2640,7 +2668,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                 <tbody>
                   {(Array.isArray(bookings) ? bookings : []).slice(0, 10).map(b => {
                     const isActive = b.status === 'confirmed' || b.status === 'pending_payment';
-                    const needsCashCollection = isActive && (b.payment_status === 'pending' || b.payment_status === 'cash') && b.payment_status !== 'paid';
+                    const needsCashCollection = isActive && ['pending', 'cash', 'partially_paid'].includes(b.payment_status);
                     return (
                       <tr key={b.id} style={{ borderBottom: '1px solid var(--border-card)' }}>
                         <td style={{ padding: '12px 16px', fontWeight: 600, color: '#0f172a' }}>
@@ -2653,12 +2681,17 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                           <div style={{ fontWeight: 600, color: '#0f172a' }}>{b.customer_name || 'Guest'}</div>
                           <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{b.customer_phone}</div>
                         </td>
-                        <td style={{ padding: '12px 16px', fontWeight: 700, color: '#059669' }}>
-                          ₹{b.total_amount}
+                        <td style={{ padding: '12px 16px' }}>
+                          <div style={{ fontWeight: 700, color: '#059669' }}>₹{b.total_amount}</div>
+                          {b.amount_paid < b.total_amount && (
+                            <div style={{ fontSize: 10.5, color: '#92400e', fontWeight: 600 }}>
+                              ₹{b.amount_paid} paid · ₹{b.total_amount - b.amount_paid} due
+                            </div>
+                          )}
                         </td>
                         <td style={{ padding: '12px 16px' }}>
                           <span className={b.status === 'confirmed' ? 'badge-emerald' : 'badge-slate'} style={{ fontSize: 11 }}>
-                            {b.status} {b.payment_mode === 'upi' ? '· UPI' : ''}
+                            {b.payment_status === 'partially_paid' ? 'Advance Paid' : b.status} {b.payment_mode === 'upi' ? '· UPI' : ''}
                           </span>
                         </td>
                         <td style={{ padding: '12px 16px' }}>
@@ -2667,10 +2700,10 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                               {needsCashCollection && (
                                 <button
                                   onClick={() => handleMarkCashPaid(b)}
-                                  title="Mark cash payment received"
+                                  title={b.payment_status === 'partially_paid' ? `Mark the remaining ₹${b.total_amount - b.amount_paid} balance as collected` : 'Mark cash payment received'}
                                   style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', color: '#059669', borderRadius: 6, padding: '5px 9px', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
                                 >
-                                  Mark Paid
+                                  {b.payment_status === 'partially_paid' ? 'Mark Balance Paid' : 'Mark Paid'}
                                 </button>
                               )}
                               <button
@@ -3089,8 +3122,13 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 18, fontWeight: 800, color: '#0f172a', marginBottom: 4, borderTop: '1px solid #e2e8f0', paddingTop: 10 }}>
-              <span>Total {hasGstin ? '(incl. GST)' : ''}</span><span>₹{amount.toFixed(2)}</span>
+              <span>{Number(receiptBooking.amount_paid) < Number(receiptBooking.total_amount) ? 'Advance Paid' : 'Total'} {hasGstin ? '(incl. GST)' : ''}</span><span>₹{amount.toFixed(2)}</span>
             </div>
+            {Number(receiptBooking.amount_paid) < Number(receiptBooking.total_amount) && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#92400e', fontWeight: 700, marginBottom: 10 }}>
+                <span>Balance Due at Venue</span><span>₹{(Number(receiptBooking.total_amount) - Number(receiptBooking.amount_paid)).toFixed(2)}</span>
+              </div>
+            )}
             {!hasGstin && (
               <div style={{ fontSize: 10.5, color: '#94a3b8', marginBottom: 14 }}>
                 No GSTIN on file for this venue — add one under Business Setup to show a GST breakdown on invoices.

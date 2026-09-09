@@ -509,3 +509,28 @@ set sport_ids = (
   ) as s
 )
 where exists (select 1 from courts c where c.venue_id = v.id);
+
+-- ===========================================================================
+-- Migration: owner-configurable advance/deposit payment, and drop "pay at
+-- turf" from the online booking flow.
+--
+-- Every online direct booking previously required either the full slot
+-- price paid up front via UPI, or "Pay at Turf" — book instantly with
+-- nothing collected at all, no deposit, nothing stopping a no-show. Real
+-- turf operators commonly just want a deposit to hold the slot (e.g. 20%),
+-- with the balance settled in person — a middle ground "pay at turf" never
+-- offered. advance_payment_percent lets each venue's owner set that
+-- percentage (100 = today's "pay in full", the default so nothing changes
+-- for a venue that never touches this setting); bookings.advance_amount
+-- freezes what that percentage worked out to at hold time, so a later
+-- change to the venue setting can't retroactively alter a booking that's
+-- already in flight.
+-- ===========================================================================
+
+alter table venues add column if not exists advance_payment_percent integer not null default 100;
+alter table venues drop constraint if exists venues_advance_payment_percent_check;
+alter table venues add constraint venues_advance_payment_percent_check
+  check (advance_payment_percent between 1 and 100);
+
+alter table bookings add column if not exists advance_amount integer;
+update bookings set advance_amount = total_amount where advance_amount is null;

@@ -39,9 +39,14 @@ export async function getVenueForOrg(sql, organizationId, venueId) {
 // Public: used by the shareable venue page and marketplace search — no
 // organization check, but only ever returns active venues.
 export async function getPublicVenue(sql, slugOrId) {
+  // upi_id/upi_name were missing here despite every booking screen reading
+  // venue.upi_id for its QR code — every player was silently shown the
+  // frontend's hardcoded placeholder UPI ID instead of this venue's real
+  // one, no matter what the owner set in Business Setup.
   const [venue] = await sql`
     select id, name, slug, description, address, lat, lng, phone, email,
-           photos, amenities, sport_ids, open_time, close_time,
+           photos, amenities, sport_ids, open_time, close_time, advance_payment_percent,
+           upi_id, upi_name, upi_qr_image,
            (select round(avg(rating), 1) from reviews where venue_id = venues.id)::float as avg_rating,
            (select count(*)::int from reviews where venue_id = venues.id) as review_count
     from venues
@@ -96,13 +101,15 @@ export async function createVenue(sql, organizationId, input) {
   const [venue] = await sql`
     insert into venues (
       organization_id, name, slug, description, address, city, lat, lng, phone, email,
-      photos, amenities, sport_ids, open_time, close_time, status, upi_id, upi_name, upi_qr_image
+      photos, amenities, sport_ids, open_time, close_time, status, upi_id, upi_name, upi_qr_image,
+      advance_payment_percent
     ) values (
       ${organizationId}, ${input.name}, ${slug}, ${input.description || null}, ${input.address},
       ${input.city || null}, ${input.lat ?? null}, ${input.lng ?? null}, ${input.phone || null}, ${input.email || null},
       ${JSON.stringify(input.photos || [])}, ${JSON.stringify(input.amenities || [])},
       ${input.sportIds || []}, ${input.openTime || "06:00"}, ${input.closeTime || "23:00"},
-      ${input.status || "draft"}, ${input.upiId || input.upi_id || null}, ${input.upiName || input.upi_name || null}, ${input.upiQrImage || input.upi_qr_image || null}
+      ${input.status || "draft"}, ${input.upiId || input.upi_id || null}, ${input.upiName || input.upi_name || null}, ${input.upiQrImage || input.upi_qr_image || null},
+      ${input.advancePaymentPercent ?? 100}
     )
     returning *
   `;
@@ -133,7 +140,8 @@ export async function updateVenue(sql, organizationId, venueId, input) {
       status = ${input.status ?? existing.status},
       upi_id = ${input.upiId ?? existing.upi_id},
       upi_name = ${input.upiName ?? existing.upi_name},
-      upi_qr_image = ${input.upiQrImage ?? existing.upi_qr_image}
+      upi_qr_image = ${input.upiQrImage ?? existing.upi_qr_image},
+      advance_payment_percent = ${input.advancePaymentPercent ?? existing.advance_payment_percent}
     where id = ${venueId} and organization_id = ${organizationId}
     returning *
   `;

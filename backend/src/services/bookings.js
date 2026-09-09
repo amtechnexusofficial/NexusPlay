@@ -58,20 +58,29 @@ export async function holdSlot(env, { slotId, customerName, customerPhone, custo
     const holdExpiresAt = new Date(now + HOLD_MINUTES * 60 * 1000).toISOString();
     await client.query("update court_slots set status = 'held', hold_expires_at = $1 where id = $2", [holdExpiresAt, slotId]);
 
+    const { rows: venueRows } = await client.query("select * from venues where id = $1", [slot.venue_id]);
+    const venue = venueRows[0];
+    // The owner decides how much of the slot price actually needs to be
+    // paid to lock it (advance_payment_percent, default 100 = full price,
+    // same as before this existed) — a deposit-only booking still owes
+    // the rest at the venue, but the slot is reserved either way. Frozen
+    // onto the booking row at hold time so a later change to the venue's
+    // setting can't retroactively change what an in-flight booking owes.
+    const advancePercent = venue?.advance_payment_percent ?? 100;
+    const advanceAmount = advancePercent >= 100 ? slot.price : Math.max(1, Math.round((slot.price * advancePercent) / 100));
+
     const { rows: bookingRows } = await client.query(
-      `insert into bookings (organization_id, venue_id, court_id, court_slot_id, customer_id, source, status, payment_status, total_amount, amount_paid, hold_expires_at, notes)
-       values ($1, $2, $3, $4, $5, 'online', 'pending_payment', 'pending', $6, 0, $7, $8)
+      `insert into bookings (organization_id, venue_id, court_id, court_slot_id, customer_id, source, status, payment_status, total_amount, amount_paid, advance_amount, hold_expires_at, notes)
+       values ($1, $2, $3, $4, $5, 'online', 'pending_payment', 'pending', $6, 0, $7, $8, $9)
        returning *`,
-      [slot.organization_id, slot.venue_id, slot.court_id, slotId, customer.id, slot.price, holdExpiresAt, `Locked for ${(customerName || "Customer").trim()}`]
+      [slot.organization_id, slot.venue_id, slot.court_id, slotId, customer.id, slot.price, advanceAmount, holdExpiresAt, `Locked for ${(customerName || "Customer").trim()}`]
     );
 
-    const { rows: venueRows } = await client.query("select * from venues where id = $1", [slot.venue_id]);
-
-    return { booking: bookingRows[0], slot: { ...slot, status: "held", hold_expires_at: holdExpiresAt }, venue: venueRows[0] };
+    return { booking: bookingRows[0], slot: { ...slot, status: "held", hold_expires_at: holdExpiresAt }, venue };
   });
 
   const paymentOrder = await getPaymentProvider(paymentMethod === "razorpay" ? "razorpay" : "upi", env).createOrder({
-    amount: slot.price,
+    amount: booking.advance_amount,
     currency: "INR",
     bookingId: booking.id,
     customer: { name: customerName, phone: customerPhone, email: customerEmail },
@@ -88,7 +97,16 @@ export async function holdSlot(env, { slotId, customerName, customerPhone, custo
     });
   }
 
-  return { bookingId: booking.id, holdExpiresAt: booking.hold_expires_at, lockMinutes: HOLD_MINUTES, slot, venue, paymentOrder };
+  return {
+    bookingId: booking.id,
+    holdExpiresAt: booking.hold_expires_at,
+    lockMinutes: HOLD_MINUTES,
+    slot,
+    venue,
+    paymentOrder,
+    advanceAmount: booking.advance_amount,
+    totalAmount: booking.total_amount,
+  };
 }
 
 // Step 2: customer submits payment (UPI UTR) or chooses pay-at-venue. The
@@ -106,7 +124,11 @@ export async function confirmBooking(env, { bookingId, paymentProvider = "upi", 
     if (booking.status === "confirmed") return { booking, paymentStatus: booking.payment_status, idempotent: true };
     if (booking.status !== "pending_payment") throw httpError(409, `Booking is ${booking.status}, cannot confirm`);
 
-    const isPayAtVenue = paymentProvider === "cash";
+    // "Pay at Turf" (booking instantly with nothing collected at all) has
+    // been removed from the online flow — a player either pays the full
+    // amount or the venue's configured advance via UPI. Cash still exists
+    // as a provider, but only for the owner's own in-person walk-in flow
+    // (services/owner.js), which doesn't go through this function.
     const isRazorpay = paymentProvider === "razorpay";
     const cleanUtr = utr.trim();
 
@@ -119,7 +141,7 @@ export async function confirmBooking(env, { bookingId, paymentProvider = "upi", 
         paymentId: razorpayPaymentId,
         signature: razorpaySignature,
       });
-    } else if (!isPayAtVenue) {
+    } else {
       await getPaymentProvider("upi").verifyPayment({ utr: cleanUtr }).catch(() => {
         // A malformed UTR still lets the booking through as 'pending' —
         // the owner's manual verification is the real gate, this just
@@ -127,12 +149,12 @@ export async function confirmBooking(env, { bookingId, paymentProvider = "upi", 
       });
     }
 
-    const paymentStatus = isRazorpay ? "paid" : isPayAtVenue ? "cash" : cleanUtr ? "pending_verification" : "pending";
-    const amountPaid = isPayAtVenue ? 0 : booking.total_amount;
+    // amount_paid is the advance frozen onto the booking at hold time, not
+    // necessarily the full total_amount — see holdSlot.
+    const amountPaid = isRazorpay ? booking.total_amount : booking.advance_amount ?? booking.total_amount;
+    const paymentStatus = isRazorpay ? "paid" : cleanUtr ? "pending_verification" : "pending";
     const notes = isRazorpay
       ? `Paid online via Razorpay | Payment ID: ${razorpayPaymentId}`
-      : isPayAtVenue
-      ? "Pay at venue reception desk"
       : cleanUtr
       ? `Submitted via owner UPI QR | UTR: ${cleanUtr}`
       : "Awaiting owner UPI verification";
@@ -145,7 +167,7 @@ export async function confirmBooking(env, { bookingId, paymentProvider = "upi", 
       [paymentStatus, amountPaid, notes, cleanUtr || null, bookingId]
     );
 
-    const provider = isRazorpay ? "razorpay" : isPayAtVenue ? "cash" : "upi";
+    const provider = isRazorpay ? "razorpay" : "upi";
     await client.query(
       `insert into payments (organization_id, booking_id, provider, provider_payment_id, provider_order_id, amount, status, method)
        values ($1, $2, $3, $4, $5, $6, $7, $8)`,
@@ -155,7 +177,7 @@ export async function confirmBooking(env, { bookingId, paymentProvider = "upi", 
         provider,
         isRazorpay ? razorpayPaymentId : null,
         isRazorpay ? booking.razorpay_order_id : null,
-        booking.total_amount,
+        amountPaid,
         isRazorpay ? "captured" : "created",
         provider,
       ]
@@ -168,6 +190,7 @@ export async function confirmBooking(env, { bookingId, paymentProvider = "upi", 
     const slot = slotRows[0];
     const venue = venueRows[0];
 
+    const balanceDue = booking.total_amount - amountPaid;
     await notifyInTx(client, {
       organizationId: booking.organization_id,
       recipientPhone: customer.phone,
@@ -175,8 +198,8 @@ export async function confirmBooking(env, { bookingId, paymentProvider = "upi", 
       message: isRazorpay
         ? `Payment received! Your slot at ${venue.name} on ${slot.date} (${slot.start_time} - ${slot.end_time}) is confirmed.`
         : cleanUtr
-        ? `Your slot at ${venue.name} on ${slot.date} (${slot.start_time} - ${slot.end_time}) is locked! UTR #${cleanUtr} submitted to the venue owner for credit confirmation.`
-        : `Your slot at ${venue.name} on ${slot.date} (${slot.start_time} - ${slot.end_time}) is reserved. Pay at the venue desk on arrival.`,
+        ? `Your slot at ${venue.name} on ${slot.date} (${slot.start_time} - ${slot.end_time}) is locked! UTR #${cleanUtr} submitted to the venue owner for credit confirmation.${balanceDue > 0 ? ` Balance of ₹${balanceDue} due at the venue.` : ""}`
+        : `Your slot at ${venue.name} on ${slot.date} (${slot.start_time} - ${slot.end_time}) is reserved. Complete your UPI payment to confirm.`,
     });
 
     if (isRazorpay) {
@@ -188,12 +211,12 @@ export async function confirmBooking(env, { bookingId, paymentProvider = "upi", 
       });
     }
 
-    if (!isPayAtVenue && !isRazorpay && cleanUtr) {
+    if (!isRazorpay && cleanUtr) {
       await notifyInTx(client, {
         organizationId: booking.organization_id,
         recipientPhone: venue.phone,
         type: "payment_confirmation",
-        message: `UPI payment to verify (₹${booking.total_amount}): ${customer.name || customer.phone} submitted UTR #${cleanUtr} for the slot on ${slot.date} at ${slot.start_time}. Check your bank credit and confirm in the owner dashboard.`,
+        message: `UPI payment to verify (₹${amountPaid}${balanceDue > 0 ? ` advance, ₹${balanceDue} balance at venue` : ""}): ${customer.name || customer.phone} submitted UTR #${cleanUtr} for the slot on ${slot.date} at ${slot.start_time}. Check your bank credit and confirm in the owner dashboard.`,
       });
     }
 

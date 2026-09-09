@@ -419,23 +419,34 @@ export async function verifyUpiPayment(env, organizationId, bookingId, { action 
     const venueName = venueRows[0]?.name || "the venue";
 
     if (action === "verify_credit") {
+      // amount_paid was already set correctly at confirmBooking time (the
+      // venue's advance amount, which can be less than total_amount for a
+      // deposit-only booking) — this used to unconditionally overwrite it
+      // to the full total_amount, which silently turned every deposit
+      // into a "fully paid" record even though only the deposit actually
+      // came in.
+      const creditedAmount = booking.advance_amount ?? booking.total_amount;
+      const isFullyPaid = creditedAmount >= booking.total_amount;
       const { rows: updated } = await client.query(
-        `update bookings set payment_status = 'paid', status = 'confirmed', amount_paid = total_amount,
+        `update bookings set payment_status = $2, status = 'confirmed', amount_paid = $3,
            notes = coalesce(notes || ' | ', '') || 'Bank credit verified by owner', updated_at = now()
          where id = $1 returning *`,
-        [bookingId]
+        [bookingId, isFullyPaid ? "paid" : "partially_paid", creditedAmount]
       );
       await client.query("update payments set status = 'captured' where booking_id = $1", [bookingId]);
       // Customer CRM stats (total_spend/total_bookings) were already
       // incremented when the booking was confirmed in bookings.js — this
       // step only flips the verification status, it doesn't re-count.
+      const balanceDue = booking.total_amount - creditedAmount;
       await notifyInTx(client, {
         organizationId,
         recipientPhone: customer?.phone,
         type: "payment_confirmation",
-        message: `Your payment of ₹${booking.total_amount} (UTR: ${booking.upi_utr || "direct"}) has been verified by ${venueName}. Your slot is 100% confirmed!`,
+        message: isFullyPaid
+          ? `Your payment of ₹${creditedAmount} (UTR: ${booking.upi_utr || "direct"}) has been verified by ${venueName}. Your slot is 100% confirmed!`
+          : `Your advance of ₹${creditedAmount} (UTR: ${booking.upi_utr || "direct"}) has been verified by ${venueName}. Your slot is confirmed — pay the remaining ₹${balanceDue} balance at the venue.`,
       });
-      return { status: "paid", booking: updated[0], message: "UPI payment verified and credited to venue" };
+      return { status: isFullyPaid ? "paid" : "partially_paid", booking: updated[0], message: "UPI payment verified and credited to venue" };
     }
 
     if (action === "reject") {
@@ -544,6 +555,7 @@ export async function updateVenueProfile(sql, organizationId, venueId, body) {
     upiId: body.upi_id,
     upiName: body.upi_name,
     upiQrImage: body.upi_qr_image,
+    advancePaymentPercent: body.advance_payment_percent,
     // A new venue defaults to 'draft' (see createVenue) and there was
     // previously no way to flip it — it simply never showed up on the
     // marketplace or even its own direct link. updateVenue's `??` means
