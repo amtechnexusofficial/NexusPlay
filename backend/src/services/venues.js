@@ -57,10 +57,15 @@ export async function getPublicVenue(sql, slugOrId) {
 // review_count are real now (services/reviews.js) — null until a venue
 // has at least one review, which the UI treats as "not yet rated".
 export async function listPublicVenues(sql, { sportId, search } = {}) {
-  const sportClause = sportId ? sql`and ${sportId} = any(v.sport_ids)` : sql``;
-  const searchClause = search
-    ? sql`and (v.name ilike ${"%" + search + "%"} or v.address ilike ${"%" + search + "%"} or v.city ilike ${"%" + search + "%"})`
-    : sql``;
+  // Previously composed via two separately-built sql`` fragments spliced
+  // into a parent template (sql`where ... ${clauseA} ${clauseB}`), with
+  // each clause conditionally an *empty* fragment (sql``) when its filter
+  // wasn't in use — the marketplace's default, no-filter load hits this
+  // exact case (both empty) and was throwing "syntax error at or near
+  // $1". Rewritten as plain scalar parameters with inline null-checks
+  // instead, which needs no fragment splicing at all.
+  const sportIdParam = sportId || null;
+  const searchParam = search ? `%${search}%` : null;
 
   return sql`
     select v.id, v.name, v.slug, v.description, v.address, v.city, v.lat, v.lng, v.photos, v.sport_ids,
@@ -75,7 +80,9 @@ export async function listPublicVenues(sql, { sportId, search } = {}) {
            (select count(*)::int from games g join court_slots cs on g.court_slot_id = cs.id
             where g.venue_id = v.id and g.status = 'open' and cs.date = current_date) as open_games_today_count
     from venues v
-    where v.status = 'active' ${sportClause} ${searchClause}
+    where v.status = 'active'
+      and (${sportIdParam}::uuid is null or ${sportIdParam}::uuid = any(v.sport_ids))
+      and (${searchParam}::text is null or v.name ilike ${searchParam} or v.address ilike ${searchParam} or v.city ilike ${searchParam})
     order by v.created_at desc
   `;
 }

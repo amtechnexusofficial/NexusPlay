@@ -6,9 +6,13 @@ import { notifyInTx, notify } from "./notifications.js";
 // Public discovery feed: every open or filling-up pickup game, enriched
 // with venue/court/sport display fields and its current roster.
 export async function listGames(sql, { sportId, venueId, date } = {}) {
-  const sportClause = sportId ? sql`and g.sport_id = ${sportId}` : sql``;
-  const venueClause = venueId ? sql`and g.venue_id = ${venueId}` : sql``;
-  const dateClause = date ? sql`and cs.date = ${date}` : sql``;
+  // Scalar params + inline null-checks, not composed empty sql`` fragments
+  // (see venues.js listPublicVenues for why — same fix, same reason: the
+  // Open Games Hub's default call here has all three filters undefined,
+  // hitting the exact "everything empty" case that broke the marketplace.
+  const sportIdParam = sportId || null;
+  const venueIdParam = venueId || null;
+  const dateParam = date || null;
 
   const games = await sql`
     select g.*, cs.date, cs.start_time, cs.end_time,
@@ -23,7 +27,10 @@ export async function listGames(sql, { sportId, venueId, date } = {}) {
     join courts c on g.court_id = c.id
     join sports sp on g.sport_id = sp.id
     left join customers oc on g.organizer_customer_id = oc.id
-    where g.status in ('open', 'confirmed') ${sportClause} ${venueClause} ${dateClause}
+    where g.status in ('open', 'confirmed')
+      and (${sportIdParam}::uuid is null or g.sport_id = ${sportIdParam}::uuid)
+      and (${venueIdParam}::uuid is null or g.venue_id = ${venueIdParam}::uuid)
+      and (${dateParam}::date is null or cs.date = ${dateParam}::date)
     order by cs.date asc, cs.start_time asc
   `;
   if (games.length === 0) return [];

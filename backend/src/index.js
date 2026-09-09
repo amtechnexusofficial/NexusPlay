@@ -82,7 +82,7 @@ app.onError((err, c) => {
 // If production /api/health does not return this exact build string, the
 // Worker was not actually promoted (common with `wrangler versions upload`
 // without a subsequent promote / `wrangler deploy`).
-const BUILD_MARKER = "batch-slot-insert-2026-09-08-v5";
+const BUILD_MARKER = "fix-empty-fragment-queries-2026-09-09-v6";
 app.get("/api/health", (c) =>
   c.json({
     ok: true,

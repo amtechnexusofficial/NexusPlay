@@ -31,32 +31,37 @@ export async function getContext(sql, organizationId, user) {
 // ===========================================================================
 
 export async function getAnalytics(sql, organizationId, venueId) {
-  // Always qualified with the `b` alias so it's unambiguous once joined
-  // against courts/court_slots, which also have their own venue_id.
-  const venueClause = venueId ? sql`and b.venue_id = ${venueId}` : sql``;
+  // Scalar param + inline null-check, not a composed empty sql`` fragment
+  // (see venues.js listPublicVenues for why) — "all venues" analytics
+  // (no venueId) hits the empty-fragment case on every query below.
+  const venueIdParam = venueId || null;
 
   const [today] = await sql`
     select coalesce(sum(amount_paid), 0)::int as revenue, count(*)::int as bookings
     from bookings b
     where organization_id = ${organizationId} and status in ('confirmed', 'completed')
-      and created_at::date = current_date ${venueClause}
+      and created_at::date = current_date
+      and (${venueIdParam}::uuid is null or b.venue_id = ${venueIdParam}::uuid)
   `;
   const [week] = await sql`
     select coalesce(sum(amount_paid), 0)::int as revenue, count(*)::int as bookings
     from bookings b
     where organization_id = ${organizationId} and status in ('confirmed', 'completed')
-      and created_at >= now() - interval '7 days' ${venueClause}
+      and created_at >= now() - interval '7 days'
+      and (${venueIdParam}::uuid is null or b.venue_id = ${venueIdParam}::uuid)
   `;
   const [month] = await sql`
     select coalesce(sum(amount_paid), 0)::int as revenue, count(*)::int as bookings
     from bookings b
     where organization_id = ${organizationId} and status in ('confirmed', 'completed')
-      and created_at >= now() - interval '30 days' ${venueClause}
+      and created_at >= now() - interval '30 days'
+      and (${venueIdParam}::uuid is null or b.venue_id = ${venueIdParam}::uuid)
   `;
   const [total] = await sql`
     select coalesce(sum(amount_paid), 0)::int as revenue, count(*)::int as bookings
     from bookings b
-    where organization_id = ${organizationId} and status in ('confirmed', 'completed') ${venueClause}
+    where organization_id = ${organizationId} and status in ('confirmed', 'completed')
+      and (${venueIdParam}::uuid is null or b.venue_id = ${venueIdParam}::uuid)
   `;
 
   const [occupancy] = await sql`
@@ -64,28 +69,32 @@ export async function getAnalytics(sql, organizationId, venueId) {
       count(*) filter (where status = 'booked')::int as booked,
       count(*)::int as total
     from court_slots
-    where organization_id = ${organizationId} and date = current_date ${venueId ? sql`and venue_id = ${venueId}` : sql``}
+    where organization_id = ${organizationId} and date = current_date
+      and (${venueIdParam}::uuid is null or venue_id = ${venueIdParam}::uuid)
   `;
   const occupancyRate = occupancy.total > 0 ? Math.round((occupancy.booked / occupancy.total) * 100) : 0;
 
   const revenueByCourt = await sql`
     select c.id as court_id, c.name as court_name, coalesce(sum(b.amount_paid), 0)::int as revenue, count(b.id)::int as bookings
     from bookings b join courts c on b.court_id = c.id
-    where b.organization_id = ${organizationId} and b.status in ('confirmed', 'completed') ${venueClause}
+    where b.organization_id = ${organizationId} and b.status in ('confirmed', 'completed')
+      and (${venueIdParam}::uuid is null or b.venue_id = ${venueIdParam}::uuid)
     group by c.id, c.name order by revenue desc
   `;
 
   const revenueBySport = await sql`
     select s.name as sport, coalesce(sum(b.amount_paid), 0)::int as revenue, count(b.id)::int as bookings
     from bookings b join courts c on b.court_id = c.id join sports s on c.sport_id = s.id
-    where b.organization_id = ${organizationId} and b.status in ('confirmed', 'completed') ${venueClause}
+    where b.organization_id = ${organizationId} and b.status in ('confirmed', 'completed')
+      and (${venueIdParam}::uuid is null or b.venue_id = ${venueIdParam}::uuid)
     group by s.name order by revenue desc
   `;
 
   const peakHours = await sql`
     select cs.start_time, count(*)::int as bookings
     from bookings b join court_slots cs on b.court_slot_id = cs.id
-    where b.organization_id = ${organizationId} and b.status in ('confirmed', 'completed') ${venueClause}
+    where b.organization_id = ${organizationId} and b.status in ('confirmed', 'completed')
+      and (${venueIdParam}::uuid is null or b.venue_id = ${venueIdParam}::uuid)
     group by cs.start_time order by bookings desc limit 3
   `;
 
@@ -110,8 +119,8 @@ export async function getAnalytics(sql, organizationId, venueId) {
 // ===========================================================================
 
 export async function listBookings(sql, organizationId, { venueId, date } = {}) {
-  const venueClause = venueId ? sql`and b.venue_id = ${venueId}` : sql``;
-  const dateClause = date ? sql`and cs.date = ${date}` : sql``;
+  const venueIdParam = venueId || null;
+  const dateParam = date || null;
   // Booking date/time live on court_slots, not bookings — a booking is one
   // slot, so this join is 1:1 (safe against fan-out).
   return sql`
@@ -123,7 +132,9 @@ export async function listBookings(sql, organizationId, { venueId, date } = {}) 
     left join customers c on b.customer_id = c.id
     left join courts crt on b.court_id = crt.id
     left join venues v on b.venue_id = v.id
-    where b.organization_id = ${organizationId} ${venueClause} ${dateClause}
+    where b.organization_id = ${organizationId}
+      and (${venueIdParam}::uuid is null or b.venue_id = ${venueIdParam}::uuid)
+      and (${dateParam}::date is null or cs.date = ${dateParam}::date)
     order by cs.date desc, cs.start_time desc
     limit 200
   `;
@@ -141,7 +152,7 @@ export async function getBillingReport(sql, organizationId, { venueId, dateFrom,
   const thirtyDaysAgo = new Date(Date.now() - 29 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   const from = dateFrom || thirtyDaysAgo;
   const to = dateTo || today;
-  const venueClause = venueId ? sql`and b.venue_id = ${venueId}` : sql``;
+  const venueIdParam = venueId || null;
 
   const transactions = await sql`
     select b.id, b.status, b.payment_status, b.total_amount, b.amount_paid, b.source,
@@ -155,7 +166,8 @@ export async function getBillingReport(sql, organizationId, { venueId, dateFrom,
     left join customers c on b.customer_id = c.id
     left join courts crt on b.court_id = crt.id
     left join venues v on b.venue_id = v.id
-    where b.organization_id = ${organizationId} ${venueClause}
+    where b.organization_id = ${organizationId}
+      and (${venueIdParam}::uuid is null or b.venue_id = ${venueIdParam}::uuid)
       and cs.date >= ${from} and cs.date <= ${to}
     order by cs.date desc, cs.start_time desc
     limit 500
@@ -174,7 +186,8 @@ export async function getBillingReport(sql, organizationId, { venueId, dateFrom,
         and (select p.provider from payments p where p.booking_id = b.id order by p.created_at desc limit 1) = 'razorpay'), 0)::int as razorpay_revenue
     from bookings b
     join court_slots cs on b.court_slot_id = cs.id
-    where b.organization_id = ${organizationId} ${venueClause}
+    where b.organization_id = ${organizationId}
+      and (${venueIdParam}::uuid is null or b.venue_id = ${venueIdParam}::uuid)
       and cs.date >= ${from} and cs.date <= ${to}
   `;
 
@@ -354,7 +367,7 @@ export async function listCustomers(sql, organizationId) {
 // ===========================================================================
 
 export async function listPendingUpi(sql, organizationId, venueId) {
-  const venueClause = venueId ? sql`and b.venue_id = ${venueId}` : sql``;
+  const venueIdParam = venueId || null;
   return sql`
     select b.*, cs.date, cs.start_time, cs.end_time,
            c.name as customer_name, c.phone as customer_phone, c.email as customer_email,
@@ -364,7 +377,8 @@ export async function listPendingUpi(sql, organizationId, venueId) {
     left join customers c on b.customer_id = c.id
     left join courts crt on b.court_id = crt.id
     left join venues v on b.venue_id = v.id
-    where b.organization_id = ${organizationId} and b.payment_status = 'pending_verification' ${venueClause}
+    where b.organization_id = ${organizationId} and b.payment_status = 'pending_verification'
+      and (${venueIdParam}::uuid is null or b.venue_id = ${venueIdParam}::uuid)
     order by b.created_at desc
   `;
 }
