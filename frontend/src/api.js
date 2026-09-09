@@ -321,6 +321,24 @@ export const api = {
     return body;
   },
 
+  async deleteCourt(courtId) {
+    const res = await ownerFetch(`${API_BASE}/courts/${courtId}`, { method: 'DELETE' });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error || 'Failed to delete court');
+    return body;
+  },
+
+  async regenerateCourtSlots(courtId, days = 7) {
+    const res = await ownerFetch(`${API_BASE}/courts/${courtId}/regenerate-slots`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ days })
+    });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error || 'Failed to regenerate slots');
+    return body;
+  },
+
   // A brand-new owner account has an organization but zero venues — this
   // is the one-time "create your first venue" call that unblocks
   // everything else (courts, slots, the public booking page).

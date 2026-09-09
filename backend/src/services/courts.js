@@ -81,8 +81,21 @@ export async function updateCourt(sql, organizationId, courtId, input) {
   return updated;
 }
 
+// court_slots (and through it bookings/games) cascades on court delete —
+// refuse rather than silently wiping real activity. Safe case this
+// exists for: an accidental duplicate court (e.g. a double-submitted Add
+// Court) with nothing but its own freshly-generated, still-open slots.
 export async function deleteCourt(sql, organizationId, courtId) {
   await getCourtForOrg(sql, organizationId, courtId);
+  const [activeSlot] = await sql`
+    select id from court_slots where court_id = ${courtId} and status in ('booked', 'held')
+  `;
+  if (activeSlot) throw httpError(409, "This court has a real booking or an active hold — cancel it first");
+  const [activeGame] = await sql`
+    select g.id from games g join court_slots cs on g.court_slot_id = cs.id
+    where cs.court_id = ${courtId} and g.status in ('open', 'confirmed')
+  `;
+  if (activeGame) throw httpError(409, "This court has an active open game — cancel it first");
   await sql`delete from courts where id = ${courtId} and organization_id = ${organizationId}`;
   return { ok: true };
 }

@@ -119,6 +119,83 @@ export async function generateSlotsForDate(sql, organizationId, venueId, date) {
   return { date, slotsCreated: inserted };
 }
 
+// Owner changed a court's operating hours or slot duration/interval in
+// the Courts tab — existing slot rows don't retroactively change
+// (generateSlotsForDates only fills gaps via "on conflict do nothing"),
+// so switching e.g. 60-minute slots to 30-minute ones would otherwise
+// leave the old 60-minute grid sitting there untouched alongside new
+// 30-minute slots wherever a gap happened to exist. This clears the
+// grid out first for the given window — only 'open' rows; a booked,
+// held, or intentionally blocked slot is never touched — and rebuilds
+// it from the court's current settings.
+export async function regenerateSlotsForCourt(sql, organizationId, courtId, days = 7) {
+  const [court] = await sql`select * from courts where id = ${courtId} and organization_id = ${organizationId}`;
+  if (!court) throw httpError(404, "Court not found");
+  const [venue] = await sql`select * from venues where id = ${court.venue_id}`;
+
+  const today = new Date();
+  const dates = [];
+  for (let d = 0; d < days; d++) {
+    const cur = new Date(today);
+    cur.setDate(today.getDate() + d);
+    dates.push(dateStr(cur));
+  }
+  const startDate = dates[0];
+  const endDate = dates[dates.length - 1];
+
+  const [{ n: keptBooked }] = await sql`
+    select count(*)::int as n from court_slots
+    where court_id = ${courtId} and date between ${startDate} and ${endDate} and status in ('booked', 'held')
+  `;
+
+  const removed = await sql`
+    delete from court_slots
+    where court_id = ${courtId} and date between ${startDate} and ${endDate} and status = 'open'
+    returning id
+  `;
+
+  const openMinutes = timeToMinutes(court.open_time || venue.open_time);
+  const closeMinutes = timeToMinutes(court.close_time || venue.close_time);
+  const duration = court.slot_duration_minutes || 60;
+
+  const rows = [];
+  for (const date of dates) {
+    const isWeekend = [0, 6].includes(new Date(`${date}T00:00:00Z`).getUTCDay());
+    for (let start = openMinutes; start + duration <= closeMinutes; start += duration) {
+      let price = court.base_price;
+      if (isWeekend && court.weekend_price) {
+        price = court.weekend_price;
+      } else if (court.peak_price && isPeakTime(start, court.peak_hours)) {
+        price = court.peak_price;
+      }
+      rows.push({
+        date,
+        startTime: minutesToTime(start),
+        endTime: minutesToTime(start + duration),
+        price,
+      });
+    }
+  }
+
+  let inserted = 0;
+  if (rows.length > 0) {
+    const result = await sql`
+      insert into court_slots (court_id, venue_id, organization_id, date, start_time, end_time, price, status)
+      select ${courtId}::uuid, ${court.venue_id}::uuid, ${organizationId}::uuid, *, 'open'::text from unnest(
+        ${rows.map((r) => r.date)}::date[],
+        ${rows.map((r) => r.startTime)}::text[],
+        ${rows.map((r) => r.endTime)}::text[],
+        ${rows.map((r) => r.price)}::int[]
+      )
+      on conflict (court_id, date, start_time) do nothing
+      returning id
+    `;
+    inserted = result.length;
+  }
+
+  return { removed: removed.length, inserted, keptBooked, days };
+}
+
 export async function listSlots(sql, venueId, { date, courtId } = {}) {
   const queryDate = date || dateStr(new Date());
 

@@ -152,7 +152,12 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
   const [newCourtBasePrice, setNewCourtBasePrice] = useState(1000);
   const [newCourtPeakPrice, setNewCourtPeakPrice] = useState(1500);
   const [newCourtWeekendPrice, setNewCourtWeekendPrice] = useState(1800);
+  const [newCourtOpenTime, setNewCourtOpenTime] = useState('06:00');
+  const [newCourtCloseTime, setNewCourtCloseTime] = useState('23:00');
+  const [newCourtSlotDuration, setNewCourtSlotDuration] = useState(60);
+  const [savingCourt, setSavingCourt] = useState(false);
   const [courtStatusBusyId, setCourtStatusBusyId] = useState(null);
+  const [courtDeleteBusyId, setCourtDeleteBusyId] = useState(null);
 
   // Link copy toast
   const [copiedLink, setCopiedLink] = useState(false);
@@ -437,6 +442,9 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
     setNewCourtBasePrice(1000);
     setNewCourtPeakPrice(1500);
     setNewCourtWeekendPrice(1800);
+    setNewCourtOpenTime(selectedVenue?.open_time || '06:00');
+    setNewCourtCloseTime(selectedVenue?.close_time || '23:00');
+    setNewCourtSlotDuration(60);
     setShowCourtModal(true);
   }
 
@@ -448,6 +456,9 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
     setNewCourtBasePrice(court.base_price ?? 1000);
     setNewCourtPeakPrice(court.peak_price ?? court.base_price ?? 1500);
     setNewCourtWeekendPrice(court.weekend_price ?? court.base_price ?? 1800);
+    setNewCourtOpenTime(court.open_time || selectedVenue?.open_time || '06:00');
+    setNewCourtCloseTime(court.close_time || selectedVenue?.close_time || '23:00');
+    setNewCourtSlotDuration(court.slot_duration_minutes || 60);
     setShowCourtModal(true);
   }
 
@@ -464,6 +475,22 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
       alert('Failed to update court status: ' + err.message);
     } finally {
       setCourtStatusBusyId(null);
+    }
+  }
+
+  // Guarded server-side (refuses if the court has a real booking or an
+  // active game) — safe to offer here for cleaning up e.g. an
+  // accidental duplicate from a double-submitted Add Court.
+  async function handleDeleteCourt(court) {
+    if (!window.confirm(`Delete "${court.name}"? This only works if it has no bookings or active games, and can't be undone.`)) return;
+    setCourtDeleteBusyId(court.id);
+    try {
+      await api.deleteCourt(court.id);
+      await loadData(selectedVenue.id);
+    } catch (err) {
+      alert('Failed to delete court: ' + err.message);
+    } finally {
+      setCourtDeleteBusyId(null);
     }
   }
 
@@ -2949,11 +2976,14 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                   </div>
                 </div>
 
-                <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginBottom: 14 }}>
-                  Slot Duration: {c.slot_duration_minutes} minutes per interval
+                <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginBottom: 4 }}>
+                  Open {c.open_time || selectedVenue.open_time || '06:00'} - {c.close_time || selectedVenue.close_time || '23:00'} · {c.slot_duration_minutes}-minute slots
+                </div>
+                <div style={{ fontSize: 10.5, color: 'var(--text-faint)', marginBottom: 14 }}>
+                  Added {c.created_at ? new Date(c.created_at).toLocaleString() : ''} · ID {c.id.slice(0, 8)}
                 </div>
 
-                <div style={{ display: 'flex', gap: 8 }}>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
                   <button
                     onClick={() => handleOpenEditCourt(c)}
                     className="btn-secondary"
@@ -2970,6 +3000,14 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                     {courtStatusBusyId === c.id ? 'Updating...' : isActive ? 'Unpublish' : 'Publish to Marketplace'}
                   </button>
                 </div>
+                <button
+                  onClick={() => handleDeleteCourt(c)}
+                  disabled={courtDeleteBusyId === c.id}
+                  title="Only works if this court has no bookings or active games — for cleaning up a duplicate"
+                  style={{ width: '100%', background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)', color: '#dc2626', borderRadius: 6, padding: '6px 10px', fontSize: 11, cursor: 'pointer' }}
+                >
+                  {courtDeleteBusyId === c.id ? 'Deleting...' : 'Delete Court'}
+                </button>
               </div>
               );
             })}
@@ -3726,6 +3764,8 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
             <form
               onSubmit={async e => {
                 e.preventDefault();
+                if (savingCourt) return; // guards against a double-click firing this twice and creating a duplicate court
+                setSavingCourt(true);
                 try {
                   if (editingCourt) {
                     await api.updateCourt(editingCourt.id, {
@@ -3733,9 +3773,27 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                       capacity: Number(newCourtCapacity),
                       basePrice: Number(newCourtBasePrice),
                       peakPrice: Number(newCourtPeakPrice),
-                      weekendPrice: Number(newCourtWeekendPrice)
+                      weekendPrice: Number(newCourtWeekendPrice),
+                      openTime: newCourtOpenTime,
+                      closeTime: newCourtCloseTime,
+                      slotDurationMinutes: Number(newCourtSlotDuration)
                     });
-                    alert('Court updated successfully.');
+
+                    // Existing slot rows don't retroactively change just
+                    // because the court's schedule did — only offer to
+                    // rebuild the upcoming grid when the schedule that
+                    // drives it actually changed.
+                    const scheduleChanged =
+                      newCourtOpenTime !== (editingCourt.open_time || selectedVenue?.open_time || '06:00') ||
+                      newCourtCloseTime !== (editingCourt.close_time || selectedVenue?.close_time || '23:00') ||
+                      Number(newCourtSlotDuration) !== (editingCourt.slot_duration_minutes || 60);
+
+                    if (scheduleChanged && window.confirm('Schedule changed. Apply the new open/close time and slot length to the next 7 days now? (Already-booked or blocked slots are left untouched.)')) {
+                      const res = await api.regenerateCourtSlots(editingCourt.id, 7);
+                      alert(`Court updated. Rebuilt the next 7 days: removed ${res.removed} old open slot(s), added ${res.inserted} new one(s)${res.keptBooked > 0 ? `. ${res.keptBooked} already-booked/held slot(s) in that window were left as-is.` : '.'}`);
+                    } else {
+                      alert('Court updated successfully.');
+                    }
                   } else {
                     await api.createCourt({
                       venueId: selectedVenue.id,
@@ -3744,7 +3802,10 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                       capacity: Number(newCourtCapacity),
                       basePrice: Number(newCourtBasePrice),
                       peakPrice: Number(newCourtPeakPrice),
-                      weekendPrice: Number(newCourtWeekendPrice)
+                      weekendPrice: Number(newCourtWeekendPrice),
+                      openTime: newCourtOpenTime,
+                      closeTime: newCourtCloseTime,
+                      slotDurationMinutes: Number(newCourtSlotDuration)
                     });
                     alert('Court created successfully.');
                   }
@@ -3753,6 +3814,8 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                   loadData(selectedVenue.id);
                 } catch (err) {
                   alert(`Failed to ${editingCourt ? 'update' : 'create'} court: ` + err.message);
+                } finally {
+                  setSavingCourt(false);
                 }
               }}
               style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
@@ -3801,6 +3864,48 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                 </div>
               </div>
 
+              <div className="mobile-grid-1" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>OPENING TIME</label>
+                  <input
+                    type="time"
+                    className="nexus-input"
+                    style={{ width: '100%' }}
+                    value={newCourtOpenTime}
+                    onChange={e => setNewCourtOpenTime(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>CLOSING TIME</label>
+                  <input
+                    type="time"
+                    className="nexus-input"
+                    style={{ width: '100%' }}
+                    value={newCourtCloseTime}
+                    onChange={e => setNewCourtCloseTime(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>SLOT LENGTH / INTERVAL</label>
+                <select
+                  value={newCourtSlotDuration}
+                  onChange={e => setNewCourtSlotDuration(Number(e.target.value))}
+                  className="nexus-input"
+                  style={{ width: '100%' }}
+                >
+                  <option value={30}>30 minutes</option>
+                  <option value={45}>45 minutes</option>
+                  <option value={60}>60 minutes (1 hour)</option>
+                  <option value={90}>90 minutes</option>
+                  <option value={120}>120 minutes (2 hours)</option>
+                </select>
+                <div style={{ fontSize: 10.5, color: 'var(--text-muted)', marginTop: 4 }}>
+                  E.g. 06:00-23:00 at 30 minutes gives slots like 06:00-06:30, 06:30-07:00, and so on.
+                </div>
+              </div>
+
               <div className="mobile-grid-1" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
                 <div>
                   <label style={{ display: 'block', fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>BASE (₹)</label>
@@ -3838,11 +3943,11 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
               </div>
 
               <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
-                <button type="button" className="btn-secondary" style={{ flex: 1 }} onClick={() => { setShowCourtModal(false); setEditingCourt(null); }}>
+                <button type="button" disabled={savingCourt} className="btn-secondary" style={{ flex: 1 }} onClick={() => { setShowCourtModal(false); setEditingCourt(null); }}>
                   Cancel
                 </button>
-                <button type="submit" className="btn-primary" style={{ flex: 1.5 }}>
-                  {editingCourt ? 'Save Changes' : 'Save Court'}
+                <button type="submit" disabled={savingCourt} className="btn-primary" style={{ flex: 1.5 }}>
+                  {savingCourt ? 'Saving...' : editingCourt ? 'Save Changes' : 'Save Court'}
                 </button>
               </div>
             </form>

@@ -21,7 +21,7 @@ import {
   updateCourt,
   deleteCourt,
 } from "./services/courts.js";
-import { listSlots, blockSlot, unblockSlot, updateSlotPrice, deleteSlot, listLiveSlots, generateSlotsForDate } from "./services/slots.js";
+import { listSlots, blockSlot, unblockSlot, updateSlotPrice, deleteSlot, listLiveSlots, generateSlotsForDate, regenerateSlotsForCourt } from "./services/slots.js";
 import { holdSlot, confirmBooking, releaseHold, sweepExpiredHolds } from "./services/bookings.js";
 import { getSplitShare, paySplitShare } from "./services/splitPayments.js";
 import {
@@ -83,7 +83,7 @@ app.onError((err, c) => {
 // If production /api/health does not return this exact build string, the
 // Worker was not actually promoted (common with `wrangler versions upload`
 // without a subsequent promote / `wrangler deploy`).
-const BUILD_MARKER = "court-edit-publish-slot-remove-game-refund-2026-09-10-v11";
+const BUILD_MARKER = "court-schedule-editor-delete-court-2026-09-10-v12";
 app.get("/api/health", (c) =>
   c.json({
     ok: true,
@@ -452,6 +452,17 @@ app.patch("/api/courts/:courtId", ...ownerAuth, async (c) => {
 app.delete("/api/courts/:courtId", ...ownerAuth, async (c) => {
   const sql = getDb(c.env);
   return c.json(await deleteCourt(sql, c.get("organizationId"), c.req.param("courtId")));
+});
+
+// Re-applies a court's current open/close time + slot duration to its
+// upcoming slot grid — see regenerateSlotsForCourt for why this is
+// needed on top of updateCourt (existing slot rows don't retroactively
+// change just because the court's settings did).
+app.post("/api/courts/:courtId/regenerate-slots", ...ownerAuth, async (c) => {
+  const sql = getDb(c.env);
+  const { days } = await c.req.json().catch(() => ({}));
+  const result = await regenerateSlotsForCourt(sql, c.get("organizationId"), c.req.param("courtId"), Number(days) || 7);
+  return c.json({ success: true, ...result });
 });
 
 // ===========================================================================
