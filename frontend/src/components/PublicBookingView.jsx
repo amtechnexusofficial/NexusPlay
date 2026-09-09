@@ -9,6 +9,7 @@ import {
 
 export default function PublicBookingView({ slug = 'nexus-central-koramangala', onBack, currentUser }) {
   const [venue, setVenue] = useState(null);
+  const [sports, setSports] = useState([]);
   const [selectedSport, setSelectedSport] = useState(null);
   const [selectedCourt, setSelectedCourt] = useState(null);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
@@ -172,6 +173,7 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
           setSelectedCourt(data.courts[0]);
         }
         loadReviews(slug);
+        api.getSports().then(setSports).catch(() => setSports([]));
       } catch (err) {
         setErrorMsg('Failed to load venue: ' + err.message);
       } finally {
@@ -511,30 +513,33 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
                 1. Select Sport
               </label>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-                {(Array.isArray(venue.sport_ids) ? venue.sport_ids : []).map(sport => (
-                  <button
-                    key={sport}
-                    onClick={() => {
-                      setSelectedSport(sport);
-                      const matchingCourt = (Array.isArray(venue.courts) ? venue.courts : []).find(c => c.sport_id === sport);
-                      if (matchingCourt) setSelectedCourt(matchingCourt);
-                    }}
-                    style={{
-                      background: selectedSport === sport ? 'var(--accent-neon)' : 'var(--bg-card)',
-                      color: selectedSport === sport ? '#042f1f' : 'var(--text-primary)',
-                      border: `1px solid ${selectedSport === sport ? 'var(--accent-neon)' : 'var(--border-card)'}`,
-                      borderRadius: 12,
-                      padding: '10px 18px',
-                      fontSize: 14,
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      textTransform: 'capitalize',
-                      transition: 'all 0.15s'
-                    }}
-                  >
-                    {sport}
-                  </button>
-                ))}
+                {(Array.isArray(venue.sport_ids) ? venue.sport_ids : []).map(sport => {
+                  const sportInfo = sports.find(s => s.id === sport);
+                  return (
+                    <button
+                      key={sport}
+                      onClick={() => {
+                        setSelectedSport(sport);
+                        const matchingCourt = (Array.isArray(venue.courts) ? venue.courts : []).find(c => c.sport_id === sport);
+                        if (matchingCourt) setSelectedCourt(matchingCourt);
+                      }}
+                      style={{
+                        background: selectedSport === sport ? 'var(--accent-neon)' : 'var(--bg-card)',
+                        color: selectedSport === sport ? '#042f1f' : 'var(--text-primary)',
+                        border: `1px solid ${selectedSport === sport ? 'var(--accent-neon)' : 'var(--border-card)'}`,
+                        borderRadius: 12,
+                        padding: '10px 18px',
+                        fontSize: 14,
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        textTransform: 'capitalize',
+                        transition: 'all 0.15s'
+                      }}
+                    >
+                      {sportInfo ? `${sportInfo.icon} ${sportInfo.name}` : 'Sport'}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 

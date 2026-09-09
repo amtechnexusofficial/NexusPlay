@@ -83,7 +83,7 @@ app.onError((err, c) => {
 // If production /api/health does not return this exact build string, the
 // Worker was not actually promoted (common with `wrangler versions upload`
 // without a subsequent promote / `wrangler deploy`).
-const BUILD_MARKER = "sync-venue-sport-ids-from-courts-2026-09-09-v8";
+const BUILD_MARKER = "show-sport-name-not-uuid-2026-09-09-v9";
 app.get("/api/health", (c) =>
   c.json({
     ok: true,
