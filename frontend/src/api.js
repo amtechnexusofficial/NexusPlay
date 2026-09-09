@@ -56,7 +56,14 @@ export const api = {
       // failure (schema drift, a crash) doesn't look identical to "no
       // network" or get silently swallowed upstream.
       const body = await res.json().catch(() => ({}));
-      throw new Error(body.error || `Failed to fetch venues (HTTP ${res.status})`);
+      // position/hint (when present) point at exactly which character of
+      // the query is malformed — critical for a bare "syntax error at or
+      // near ..." that isn't reproducible just by reading the query text.
+      const extra = [
+        body.position && `position ${body.position}`,
+        body.hint && `hint: ${body.hint}`,
+      ].filter(Boolean).join(', ');
+      throw new Error((body.error || `Failed to fetch venues (HTTP ${res.status})`) + (extra ? ` [${extra}]` : ''));
     }
     return res.json();
   },

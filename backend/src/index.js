@@ -61,7 +61,17 @@ app.use("*", async (c, next) => {
 app.onError((err, c) => {
   console.error(err);
   const status = err.status || 500;
-  return c.json({ error: err.message || "Internal error" }, status);
+  // Postgres errors from the driver carry more than just .message — the
+  // exact character position and a hint are exactly what's needed to
+  // pin down a "syntax error at or near ..." that isn't reproducible by
+  // reading the query text alone. Only ever attached for actual DB
+  // errors (err.position is undefined for ordinary httpError() throws).
+  const body = { error: err.message || "Internal error" };
+  if (err.position) body.position = err.position;
+  if (err.hint) body.hint = err.hint;
+  if (err.detail) body.detail = err.detail;
+  if (err.where) body.where = err.where;
+  return c.json(body, status);
 });
 
 // BUILD_MARKER lets you confirm, from a plain browser visit to this URL
