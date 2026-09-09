@@ -46,6 +46,18 @@ export async function createCourt(sql, organizationId, venueId, input) {
     )
     returning *
   `;
+
+  // venues.sport_ids drives the public booking page's "Select Sport" step,
+  // but it's a separate field only touched by the Business Setup form — a
+  // court added for a sport the owner never also ticked there left that
+  // step showing no chips at all (or the wrong ones) even though the court
+  // existed. Keep it in sync here instead of relying on the owner to set
+  // both places.
+  await sql`
+    update venues set sport_ids = array_append(coalesce(sport_ids, '{}'), ${input.sportId}::uuid)
+    where id = ${venueId} and not (${input.sportId}::uuid = any(coalesce(sport_ids, '{}')))
+  `;
+
   return court;
 }
 

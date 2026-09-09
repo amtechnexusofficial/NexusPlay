@@ -490,3 +490,22 @@ alter table game_participants add column if not exists upi_utr text;
 alter table game_participants drop constraint if exists game_participants_payment_status_check;
 alter table game_participants add constraint game_participants_payment_status_check
   check (payment_status in ('pending', 'pending_verification', 'paid', 'failed', 'refunded'));
+
+-- ===========================================================================
+-- Migration: backfill venues.sport_ids from their courts' actual sports.
+-- The public booking page's "Select Sport" step reads venues.sport_ids,
+-- but that field was only ever set by the Business Setup form, separate
+-- from Add Court — a venue with courts added but sport_ids never touched
+-- (or touched before the court was added) shows no sport chips at all.
+-- Merges each court's sport into the venue's existing list rather than
+-- overwriting it, so nothing manually set there is lost.
+-- ===========================================================================
+
+update venues v
+set sport_ids = (
+  select array_agg(distinct s)
+  from unnest(
+    coalesce(v.sport_ids, '{}') || coalesce((select array_agg(c.sport_id) from courts c where c.venue_id = v.id), '{}')
+  ) as s
+)
+where exists (select 1 from courts c where c.venue_id = v.id);
