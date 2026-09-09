@@ -2630,7 +2630,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {bookings.slice(0, 10).map(b => {
+                  {(Array.isArray(bookings) ? bookings : []).slice(0, 10).map(b => {
                     const isActive = b.status === 'confirmed' || b.status === 'pending_payment';
                     const needsCashCollection = isActive && (b.payment_status === 'pending' || b.payment_status === 'cash') && b.payment_status !== 'paid';
                     return (

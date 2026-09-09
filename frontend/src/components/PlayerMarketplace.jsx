@@ -485,7 +485,7 @@ export default function PlayerMarketplace({ onSelectVenue }) {
 
                 {/* Amenities pills */}
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 14 }}>
-                  {venue.amenities?.slice(0, 3).map((am, i) => (
+                  {(Array.isArray(venue.amenities) ? venue.amenities : []).slice(0, 3).map((am, i) => (
                     <span
                       key={i}
                       style={{
