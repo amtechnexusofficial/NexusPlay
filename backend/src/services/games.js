@@ -62,6 +62,18 @@ export async function createGame(env, input) {
     const venue = venueRows[0];
     if (!venue) throw httpError(404, "Selected venue does not exist");
 
+    // The owner "Host Open Game" form (and any other caller) sends a sport
+    // slug like "badminton", not a uuid — sport_id is a uuid column, so
+    // inserting the slug straight through fails with "invalid input syntax
+    // for type uuid". Resolve slug-or-uuid the same way createCourt does.
+    const { rows: sportRows } = await client.query(
+      "select id from sports where id::text = $1 or slug = $1",
+      [sportId]
+    );
+    const sport = sportRows[0];
+    if (!sport) throw httpError(400, "Invalid sportId");
+    const resolvedSportId = sport.id;
+
     let slot;
     if (courtSlotId) {
       const { rows } = await client.query("select * from court_slots where id = $1 for update", [courtSlotId]);
@@ -96,7 +108,7 @@ export async function createGame(env, input) {
       `insert into games (organization_id, venue_id, court_id, court_slot_id, organizer_customer_id, sport_id, title, starts_at, capacity, price_per_player, status, skill_level, rules)
        values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'open', $11, $12) returning *`,
       [
-        venue.organization_id, venueId, courtId, slot.id, organizer.id, sportId,
+        venue.organization_id, venueId, courtId, slot.id, organizer.id, resolvedSportId,
         title || `Open Game at ${venue.name}`, `${date}T${startTime}:00`,
         Number(requiredPlayers), Number(costPerPlayer), skillLevel, rules || null,
       ]
