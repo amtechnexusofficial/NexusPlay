@@ -2946,6 +2946,49 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
             </button>
           </div>
 
+          {(() => {
+            // Two courts with the same name + sport look identical in the
+            // Live Slots grid — every slot they generate shows up twice,
+            // often confusingly starting from whichever hour their
+            // schedules overlap rather than at every slot (e.g. one opens
+            // at 06:00 and the other at 07:00 — only 07:00 onward looks
+            // duplicated). Surfacing it here, side by side with the exact
+            // settings that differ, beats asking the owner to eyeball two
+            // identical-looking cards in the grid.
+            const groups = {};
+            for (const c of selectedVenue.courts || []) {
+              const key = `${(c.name || '').trim().toLowerCase()}__${c.sport_id}`;
+              (groups[key] ||= []).push(c);
+            }
+            const dupeGroups = Object.values(groups).filter((g) => g.length > 1);
+            if (dupeGroups.length === 0) return null;
+            return (
+              <div style={{ background: '#fef2f2', border: '2px solid #fca5a5', borderRadius: 12, padding: 16, marginBottom: 20 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 800, fontSize: 14, color: '#991b1b', marginBottom: 8 }}>
+                  <AlertCircle size={16} /> {dupeGroups.length} duplicate court name{dupeGroups.length > 1 ? 's' : ''} found
+                </div>
+                <p style={{ fontSize: 12.5, color: '#7f1d1d', marginBottom: 10 }}>
+                  Each pair below generates its own slot grid, so every one of their slots shows up twice in Live Slots. Compare the settings, then use Delete Court on whichever one has no real bookings.
+                </p>
+                {dupeGroups.map((group, gi) => (
+                  <div key={gi} style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: gi < dupeGroups.length - 1 ? 12 : 0 }}>
+                    {group.map((c) => (
+                      <div key={c.id} style={{ background: '#ffffff', border: '1px solid #fecaca', borderRadius: 8, padding: '8px 12px', fontSize: 12 }}>
+                        <strong style={{ color: '#0f172a' }}>{c.name}</strong>
+                        <span style={{ color: c.status === 'active' ? '#059669' : '#94a3b8', marginLeft: 6, fontWeight: 700 }}>
+                          {c.status === 'active' ? '(Published)' : '(Unpublished)'}
+                        </span>
+                        <div style={{ color: '#64748b', marginTop: 2 }}>
+                          Open {c.open_time || selectedVenue.open_time || '06:00'} - {c.close_time || selectedVenue.close_time || '23:00'} · {c.slot_duration_minutes}-min slots · ₹{c.base_price} · ID {c.id.slice(0, 8)} · Added {c.created_at ? new Date(c.created_at).toLocaleString() : ''}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 18 }}>
             {selectedVenue.courts?.map(c => {
               const isActive = c.status === 'active';

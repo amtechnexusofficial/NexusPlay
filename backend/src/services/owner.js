@@ -13,13 +13,21 @@ export async function getContext(sql, organizationId, user) {
   const [organization] = await sql`select id, name from organizations where id = ${organizationId}`;
   const venues = await sql`select * from venues where organization_id = ${organizationId} order by created_at desc`;
 
-  // The dashboard shell (court dropdowns in the block/walk-in modals) reads
-  // selectedVenue.courts directly, so embed each venue's courts here rather
-  // than making the UI fetch them separately per venue.
+  // The dashboard shell (court dropdowns in the block/walk-in modals, and
+  // the Courts tab itself) reads selectedVenue.courts directly, so embed
+  // each venue's courts here rather than making the UI fetch them
+  // separately per venue. No status filter — unlike
+  // listPublicCourtsForVenue (which is the actual "is this bookable by a
+  // player" gate), this feeds the OWNER's own view of their inventory.
+  // Filtering to 'active' here made an unpublished court invisible to its
+  // own owner: the Courts tab it needed to be edited, republished, or
+  // deleted from would just silently drop it, while its already-generated
+  // slots kept showing in Live Slots (which never filtered by court
+  // status) with no way back to it.
   const venuesWithCourts = await Promise.all(
     venues.map(async (v) => ({
       ...v,
-      courts: await sql`select * from courts where venue_id = ${v.id} and status = 'active' order by created_at`,
+      courts: await sql`select * from courts where venue_id = ${v.id} order by created_at`,
     }))
   );
 
