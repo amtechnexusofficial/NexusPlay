@@ -103,7 +103,11 @@ a { color: inherit; }
 /* Animations */
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: translateY(0); }
+  /* `transform: none` (not translateY(0)) — any non-none transform on an
+     ancestor creates a containing block for position:fixed children, so
+     owner modals were centering inside the tall page instead of the
+     viewport and owners had to scroll to find them. */
+  to { opacity: 1; transform: none; }
 }
 @keyframes pulseGlow {
   0%, 100% { opacity: 1; transform: scale(1); }
@@ -234,7 +238,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 }
 .scroll-pills::-webkit-scrollbar { display: none; }
 
-/* Modal overlay & responsive sheet */
+/* Modal overlay & responsive sheet — must sit in the viewport (not inside
+   a transformed ancestor). z-index above mobile bottom nav (90). */
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -243,9 +248,10 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 100;
+  z-index: 1000;
   padding: 16px;
   overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .modal-content {
   background: #ffffff;
@@ -256,6 +262,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   max-width: 580px;
   max-height: 90vh;
   overflow-y: auto;
+  margin: auto; /* keeps the panel centered when the overlay itself scrolls */
 }
 
 /* Shared page shell used across every screen */
@@ -325,12 +332,11 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   .mobile-grid-1 { grid-template-columns: 1fr !important; }
   .mobile-stack { flex-direction: column !important; align-items: stretch !important; }
 
-  /* Modal on mobile behaves as a bottom sheet */
-  .modal-overlay { align-items: flex-end; padding: 0; }
+  /* Keep modals centered on mobile too (same as desktop) so owners
+     don't have to hunt for walk-in / host-game / inquiry panels. */
+  .modal-overlay { align-items: center; padding: 16px; }
   .modal-content {
     max-height: 90vh;
-    border-bottom-left-radius: 0;
-    border-bottom-right-radius: 0;
   }
 
   .section-title { font-size: 19px; }
