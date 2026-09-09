@@ -50,7 +50,14 @@ export const api = {
   async getMarketplaceVenues(params = {}) {
     const q = new URLSearchParams(params).toString();
     const res = await fetch(`${API_BASE}/public/venues?${q}`);
-    if (!res.ok) throw new Error('Failed to fetch venues');
+    if (!res.ok) {
+      // Same fix as getPublicVenue: surface the actual server error
+      // instead of a hardcoded generic message, so a real backend
+      // failure (schema drift, a crash) doesn't look identical to "no
+      // network" or get silently swallowed upstream.
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.error || `Failed to fetch venues (HTTP ${res.status})`);
+    }
     return res.json();
   },
 
