@@ -292,7 +292,7 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
   }
 
   // Filter available courts by sport
-  const filteredCourts = venue.courts?.filter(c => !selectedSport || c.sport_id === selectedSport) || [];
+  const filteredCourts = (Array.isArray(venue.courts) ? venue.courts : []).filter(c => !selectedSport || c.sport_id === selectedSport);
 
   return (
     <div className="animate-fade-in" style={{ maxWidth: 1120, margin: '0 auto', padding: '16px 20px 80px' }}>
@@ -376,7 +376,7 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
 
           {/* Amenities Badges */}
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 18 }}>
-            {venue.amenities?.map((amenity, idx) => (
+            {(Array.isArray(venue.amenities) ? venue.amenities : []).map((amenity, idx) => (
               <span
                 key={idx}
                 style={{
@@ -489,12 +489,12 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
                 1. Select Sport
               </label>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-                {venue.sport_ids?.map(sport => (
+                {(Array.isArray(venue.sport_ids) ? venue.sport_ids : []).map(sport => (
                   <button
                     key={sport}
                     onClick={() => {
                       setSelectedSport(sport);
-                      const matchingCourt = venue.courts?.find(c => c.sport_id === sport);
+                      const matchingCourt = (Array.isArray(venue.courts) ? venue.courts : []).find(c => c.sport_id === sport);
                       if (matchingCourt) setSelectedCourt(matchingCourt);
                     }}
                     style={{
