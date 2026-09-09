@@ -17,6 +17,7 @@ export async function listGames(sql, { sportId, venueId, date } = {}) {
   const games = await sql`
     select g.*, cs.date, cs.start_time, cs.end_time,
            v.name as venue_name, v.address as venue_address, v.photos as venue_photos,
+           v.upi_id as venue_upi_id, v.upi_name as venue_upi_name,
            c.name as court_name, sp.name as sport_name, sp.icon as sport_icon,
            oc.name as organizer_name, oc.phone as organizer_phone,
            g.capacity as required_players, g.price_per_player as cost_per_player,
@@ -133,8 +134,9 @@ export async function createGame(env, input) {
   });
 }
 
-export async function joinGame(env, gameId, { playerName, playerPhone }) {
+export async function joinGame(env, gameId, { playerName, playerPhone, utr }) {
   if (!playerName || !playerPhone) throw httpError(400, "Player name and phone are required");
+  if (!utr || utr.trim().length < 8) throw httpError(400, "Enter the UPI transaction reference (UTR) after paying the venue's QR code");
 
   return withTransaction(env, async (client) => {
     const { rows } = await client.query("select * from games where id = $1 for update", [gameId]);
@@ -148,9 +150,13 @@ export async function joinGame(env, gameId, { playerName, playerPhone }) {
     const player = await findOrCreateCustomerInTx(client, game.organization_id, { name: playerName, phone: playerPhone });
 
     try {
+      // pending_verification, not paid — matches every other UPI payment
+      // in this app: no gateway holds the money, so it's not actually
+      // confirmed until the owner checks their bank statement and
+      // verifies it (see verifyUpiPayment / the owner's UPI queue).
       await client.query(
-        "insert into game_participants (game_id, customer_id, payment_status, share_amount) values ($1, $2, 'paid', $3)",
-        [gameId, player.id, game.price_per_player]
+        "insert into game_participants (game_id, customer_id, payment_status, share_amount, upi_utr) values ($1, $2, 'pending_verification', $3, $4)",
+        [gameId, player.id, game.price_per_player, utr.trim()]
       );
     } catch (err) {
       if (err.code === "23505") throw httpError(409, "You've already joined this game");

@@ -368,8 +368,9 @@ export async function listCustomers(sql, organizationId) {
 
 export async function listPendingUpi(sql, organizationId, venueId) {
   const venueIdParam = venueId || null;
-  return sql`
-    select b.*, cs.date, cs.start_time, cs.end_time,
+  const bookingRows = await sql`
+    select b.id, 'booking' as payment_type, b.total_amount as amount, b.upi_utr, b.created_at,
+           cs.date, cs.start_time, cs.end_time,
            c.name as customer_name, c.phone as customer_phone, c.email as customer_email,
            crt.name as court_name, v.name as venue_name, v.upi_id as venue_upi_id, v.upi_name as venue_upi_name
     from bookings b
@@ -381,6 +382,29 @@ export async function listPendingUpi(sql, organizationId, venueId) {
       and (${venueIdParam}::uuid is null or b.venue_id = ${venueIdParam}::uuid)
     order by b.created_at desc
   `;
+
+  // A player joining an open game's spot pays the same venue UPI QR as
+  // any other booking — this used to just get marked "paid" with nothing
+  // for the owner to check, unlike every other payment path in the app.
+  // Surfaced here in the same queue, tagged 'game_join' so the frontend
+  // and verifyUpiPayment know which table to act on.
+  const gameJoinRows = await sql`
+    select gp.id, 'game_join' as payment_type, gp.share_amount as amount, gp.upi_utr, gp.joined_at as created_at,
+           cs.date, cs.start_time, cs.end_time,
+           c.name as customer_name, c.phone as customer_phone, c.email as customer_email,
+           crt.name as court_name, v.name as venue_name, v.upi_id as venue_upi_id, v.upi_name as venue_upi_name
+    from game_participants gp
+    join games g on gp.game_id = g.id
+    join court_slots cs on g.court_slot_id = cs.id
+    left join customers c on gp.customer_id = c.id
+    left join courts crt on g.court_id = crt.id
+    left join venues v on g.venue_id = v.id
+    where g.organization_id = ${organizationId} and gp.payment_status = 'pending_verification'
+      and (${venueIdParam}::uuid is null or g.venue_id = ${venueIdParam}::uuid)
+    order by gp.joined_at desc
+  `;
+
+  return [...bookingRows, ...gameJoinRows].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 }
 
 export async function verifyUpiPayment(env, organizationId, bookingId, { action = "verify_credit", notes = "" }) {
@@ -431,6 +455,64 @@ export async function verifyUpiPayment(env, organizationId, bookingId, { action 
         message: `Your booking at ${venueName} was not verified. Reason: ${reason}. The slot has been released.`,
       });
       return { status: "rejected", booking: updated[0], message: "Booking rejected and slot released back to open" };
+    }
+
+    throw httpError(400, "Invalid verification action");
+  });
+}
+
+// Same idea as verifyUpiPayment but for a player who paid to join an open
+// game's spot (game_participants), not a direct booking — separate table,
+// separate shape, so it's its own function rather than overloading the one
+// above with a type switch on every internal query.
+export async function verifyGameParticipantPayment(env, organizationId, participantId, { action = "verify_credit", notes = "" }) {
+  return withTransaction(env, async (client) => {
+    const { rows } = await client.query(
+      `select gp.*, g.organization_id, g.venue_id, g.title
+       from game_participants gp join games g on gp.game_id = g.id
+       where gp.id = $1 and g.organization_id = $2 for update`,
+      [participantId, organizationId]
+    );
+    const participant = rows[0];
+    if (!participant) throw httpError(404, "Participant not found");
+
+    const { rows: customerRows } = await client.query("select * from customers where id = $1", [participant.customer_id]);
+    const { rows: venueRows } = await client.query("select name from venues where id = $1", [participant.venue_id]);
+    const customer = customerRows[0];
+    const venueName = venueRows[0]?.name || "the venue";
+
+    if (action === "verify_credit") {
+      const { rows: updated } = await client.query(
+        "update game_participants set payment_status = 'paid' where id = $1 returning *",
+        [participantId]
+      );
+      await notifyInTx(client, {
+        organizationId,
+        recipientPhone: customer?.phone,
+        type: "payment_confirmation",
+        message: `Your payment of ₹${participant.share_amount} (UTR: ${participant.upi_utr || "direct"}) for "${participant.title || "the open game"}" at ${venueName} has been verified. You're confirmed!`,
+      });
+      return { status: "paid", participant: updated[0], message: "UPI payment verified" };
+    }
+
+    if (action === "reject") {
+      const reason = notes || "Payment not received in owner UPI bank account";
+      // Delete rather than mark 'failed' — every count of "how many spots
+      // are filled" (joinGame, listGames) is a plain row count against this
+      // table, so a rejected row left behind would permanently occupy a
+      // spot nobody actually holds. Deleting frees it back up immediately.
+      await client.query("delete from game_participants where id = $1", [participantId]);
+      await client.query(
+        "update games set status = 'open' where id = $1 and status = 'confirmed'",
+        [participant.game_id]
+      );
+      await notifyInTx(client, {
+        organizationId,
+        recipientPhone: customer?.phone,
+        type: "cancellation",
+        message: `Your spot for "${participant.title || "the open game"}" at ${venueName} was not verified. Reason: ${reason}. Please contact the venue.`,
+      });
+      return { status: "rejected", participant, message: "Payment rejected and spot released" };
     }
 
     throw httpError(400, "Invalid verification action");

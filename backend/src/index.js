@@ -33,6 +33,7 @@ import {
   listCustomers,
   listPendingUpi,
   verifyUpiPayment,
+  verifyGameParticipantPayment,
   updateVenueProfile,
   getVenueProfile,
   convertSlotToFullInquiry,
@@ -82,7 +83,7 @@ app.onError((err, c) => {
 // If production /api/health does not return this exact build string, the
 // Worker was not actually promoted (common with `wrangler versions upload`
 // without a subsequent promote / `wrangler deploy`).
-const BUILD_MARKER = "fix-empty-fragment-queries-2026-09-09-v6";
+const BUILD_MARKER = "join-a-spot-upi-qr-payment-2026-09-09-v7";
 app.get("/api/health", (c) =>
   c.json({
     ok: true,
@@ -409,6 +410,15 @@ app.get("/api/owner/upi-pending", ...ownerAuth, async (c) => {
 
 app.post("/api/owner/bookings/:bookingId/verify-upi", ...ownerAuth, async (c) => {
   const result = await verifyUpiPayment(c.env, c.get("organizationId"), c.req.param("bookingId"), await c.req.json());
+  return c.json({ success: true, ...result });
+});
+
+// Same UPI-verify action, but for a player who paid to join an open
+// game's spot rather than a direct booking (see listPendingUpi's
+// payment_type field, which tells the owner dashboard which of these
+// two endpoints to call for a given queue row).
+app.post("/api/owner/game-participants/:participantId/verify-upi", ...ownerAuth, async (c) => {
+  const result = await verifyGameParticipantPayment(c.env, c.get("organizationId"), c.req.param("participantId"), await c.req.json());
   return c.json({ success: true, ...result });
 });
 

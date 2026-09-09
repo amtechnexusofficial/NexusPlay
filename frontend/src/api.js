@@ -403,6 +403,17 @@ export const api = {
     return body;
   },
 
+  async verifyGameParticipantPayment(participantId, { action = 'verify_credit', notes = '' }) {
+    const res = await ownerFetch(`${API_BASE}/owner/game-participants/${participantId}/verify-upi`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, notes })
+    });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error || 'Failed to verify UPI payment');
+    return body;
+  },
+
   async getVenueUpiSettings(venueId) {
     const res = await ownerFetch(`${API_BASE}/owner/venues/${venueId}/upi-settings`);
     if (!res.ok) throw new Error('Failed to fetch UPI settings');

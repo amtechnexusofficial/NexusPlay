@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../api.js';
 import {
   Users, Plus, Calendar, Clock, MapPin, CheckCircle,
-  AlertCircle, ShieldCheck, Trophy, Sparkles, Filter, Shield
+  AlertCircle, ShieldCheck, Trophy, Sparkles, Filter, Shield, Copy, CheckCircle2
 } from 'lucide-react';
 
 export default function OpenGamesHub({ onNavigateToVenue, onNavigateToDashboard, onNavigateToLogin, currentUser }) {
@@ -18,6 +18,12 @@ export default function OpenGamesHub({ onNavigateToVenue, onNavigateToDashboard,
   const [isJoining, setIsJoining] = useState(false);
   const [joinSuccess, setJoinSuccess] = useState('');
   const [joinError, setJoinError] = useState('');
+  // Joining used to just mark the spot "paid" with no payment actually
+  // collected — no QR, nothing for the owner to verify. Now it pays the
+  // venue's UPI QR the same way a direct booking does: 'form' -> 'payment'.
+  const [joinPaymentStep, setJoinPaymentStep] = useState('form');
+  const [joinUtr, setJoinUtr] = useState('');
+  const [joinCopiedUpi, setJoinCopiedUpi] = useState(false);
 
   // Modal: Book Full Slot (Exclusive Pitch Reservation)
   const [activeFullSlotGame, setActiveFullSlotGame] = useState(null);
@@ -49,10 +55,20 @@ export default function OpenGamesHub({ onNavigateToVenue, onNavigateToDashboard,
     loadData();
   }, []);
 
-  async function handleJoinSubmit(e) {
+  function handleProceedToJoinPayment(e) {
     e.preventDefault();
     if (!playerName || !playerPhone) {
       setJoinError('Please enter your name and phone number');
+      return;
+    }
+    setJoinError('');
+    setJoinPaymentStep('payment');
+  }
+
+  async function handleJoinSubmit(e) {
+    e.preventDefault();
+    if (!joinUtr.trim() || joinUtr.trim().length < 8) {
+      setJoinError('Enter the UPI transaction reference (UTR) from your payment confirmation.');
       return;
     }
     setJoinError('');
@@ -61,16 +77,18 @@ export default function OpenGamesHub({ onNavigateToVenue, onNavigateToDashboard,
       await api.joinGame(activeJoinGame.id, {
         playerName,
         playerPhone,
-        paymentMode: 'online'
+        utr: joinUtr.trim()
       });
-      setJoinSuccess(`You have successfully joined "${activeJoinGame.title}"! Paid: ₹${activeJoinGame.cost_per_player}.`);
+      setJoinSuccess(`Payment submitted! The venue will verify your ₹${activeJoinGame.cost_per_player} payment shortly to confirm your spot in "${activeJoinGame.title}".`);
       loadData();
       setTimeout(() => {
         setActiveJoinGame(null);
         setJoinSuccess('');
+        setJoinPaymentStep('form');
+        setJoinUtr('');
         setPlayerName(currentUser?.name || '');
         setPlayerPhone(currentUser?.phone || '');
-      }, 2000);
+      }, 2500);
     } catch (err) {
       setJoinError(err.message);
     } finally {
@@ -362,7 +380,7 @@ export default function OpenGamesHub({ onNavigateToVenue, onNavigateToDashboard,
                         id={`btn-join-game-${game.id}`}
                         className="btn-primary"
                         disabled={isFull || hasPendingFullInquiry}
-                        onClick={() => setActiveJoinGame(game)}
+                        onClick={() => { setActiveJoinGame(game); setJoinPaymentStep('form'); setJoinUtr(''); setJoinError(''); }}
                         style={{ flex: 1, padding: '9px 10px', fontSize: 12.5 }}
                       >
                         {isFull ? 'Match Full' : `Join Spot (₹${game.cost_per_player})`}
@@ -426,8 +444,79 @@ export default function OpenGamesHub({ onNavigateToVenue, onNavigateToDashboard,
                 <CheckCircle size={40} style={{ color: '#059669', margin: '0 auto 10px' }} />
                 <div style={{ color: '#0f172a', fontWeight: 700, fontSize: 15 }}>{joinSuccess}</div>
               </div>
+            ) : joinPaymentStep === 'payment' ? (
+              <div>
+                {joinError && (
+                  <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', padding: 10, borderRadius: 8, fontSize: 12, marginBottom: 12 }}>
+                    {joinError}
+                  </div>
+                )}
+
+                <div style={{ textAlign: 'center', marginBottom: 14 }}>
+                  <img
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`upi://pay?pa=${activeJoinGame.venue_upi_id || 'koramangala.sports@okaxis'}&pn=${encodeURIComponent(activeJoinGame.venue_name)}&am=${activeJoinGame.cost_per_player}&cu=INR`)}`}
+                    alt="Venue Owner UPI QR Code"
+                    style={{ width: 180, height: 180, borderRadius: 10, border: '1px solid #e2e8f0' }}
+                  />
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 8, fontSize: 12.5, color: '#334155' }}>
+                    {activeJoinGame.venue_upi_id || 'koramangala.sports@okaxis'}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(activeJoinGame.venue_upi_id || 'koramangala.sports@okaxis');
+                        setJoinCopiedUpi(true);
+                        setTimeout(() => setJoinCopiedUpi(false), 2000);
+                      }}
+                      style={{ background: 'none', border: 'none', color: '#4f46e5', cursor: 'pointer', display: 'flex' }}
+                    >
+                      {joinCopiedUpi ? <CheckCircle2 size={14} /> : <Copy size={14} />}
+                    </button>
+                  </div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: '#0f172a', marginTop: 6 }}>
+                    ₹{activeJoinGame.cost_per_player}
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ display: 'block', fontSize: 11.5, fontWeight: 600, color: '#64748b', marginBottom: 4 }}>
+                    UPI TRANSACTION REFERENCE (UTR) *
+                  </label>
+                  <input
+                    type="text"
+                    className="nexus-input"
+                    style={{ width: '100%' }}
+                    placeholder="e.g. 402812345678"
+                    value={joinUtr}
+                    onChange={e => setJoinUtr(e.target.value)}
+                  />
+                  <div style={{ fontSize: 10.5, color: '#94a3b8', marginTop: 4 }}>
+                    Found in your UPI app's payment confirmation, right after paying the QR above.
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    style={{ flex: 1 }}
+                    disabled={isJoining}
+                    onClick={() => { setJoinPaymentStep('form'); setJoinUtr(''); setJoinError(''); }}
+                  >
+                    Back
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    disabled={isJoining}
+                    onClick={handleJoinSubmit}
+                    style={{ flex: 1.4 }}
+                  >
+                    {isJoining ? 'Submitting...' : 'Submit UTR & Join Spot'}
+                  </button>
+                </div>
+              </div>
             ) : (
-              <form onSubmit={handleJoinSubmit}>
+              <form onSubmit={handleProceedToJoinPayment}>
                 {joinError && (
                   <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', padding: 10, borderRadius: 8, fontSize: 12, marginBottom: 12 }}>
                     {joinError}
@@ -470,7 +559,7 @@ export default function OpenGamesHub({ onNavigateToVenue, onNavigateToDashboard,
                     <strong style={{ color: '#0f172a' }}>₹{activeJoinGame.cost_per_player}</strong>
                   </div>
                   <div style={{ fontSize: 11, color: '#059669', fontWeight: 600 }}>
-                    ✓ Instant Confirmation · Direct Pitch Access
+                    ✓ Pay via UPI QR · Venue Verifies & Confirms
                   </div>
                 </div>
 
@@ -486,10 +575,9 @@ export default function OpenGamesHub({ onNavigateToVenue, onNavigateToDashboard,
                   <button
                     type="submit"
                     className="btn-primary"
-                    disabled={isJoining}
                     style={{ flex: 1.4 }}
                   >
-                    {isJoining ? 'Confirming...' : `Pay ₹${activeJoinGame.cost_per_player} & Join`}
+                    {`Continue to Payment · ₹${activeJoinGame.cost_per_player}`}
                   </button>
                 </div>
               </form>

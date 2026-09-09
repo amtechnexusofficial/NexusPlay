@@ -38,21 +38,43 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
   const [joiningGame, setJoiningGame] = useState(false);
   const [joinGameError, setJoinGameError] = useState('');
   const [joinGameSuccess, setJoinGameSuccess] = useState('');
+  // Joining a spot pays the venue's UPI QR the same way a direct booking
+  // does — previously this skipped straight to marking the spot "paid"
+  // with nothing actually collected. 'form' -> 'payment' -> submit.
+  const [joinPaymentStep, setJoinPaymentStep] = useState('form');
+  const [joinUtr, setJoinUtr] = useState('');
+  const [joinCopiedUpi, setJoinCopiedUpi] = useState(false);
   const [requestingFullSlot, setRequestingFullSlot] = useState(false);
   const [fullSlotError, setFullSlotError] = useState('');
   const [fullSlotSuccess, setFullSlotSuccess] = useState('');
 
-  async function handleJoinOpenGame() {
+  function handleProceedToJoinPayment() {
     if (!selectedSlot?.game) return;
     if (!customerName.trim() || !customerPhone.trim()) {
       setJoinGameError('Enter your name and phone number to join.');
       return;
     }
     setJoinGameError('');
+    setJoinPaymentStep('payment');
+  }
+
+  async function handleSubmitJoinPayment() {
+    if (!selectedSlot?.game) return;
+    if (!joinUtr.trim() || joinUtr.trim().length < 8) {
+      setJoinGameError('Enter the UPI transaction reference (UTR) from your payment confirmation.');
+      return;
+    }
+    setJoinGameError('');
     setJoiningGame(true);
     try {
-      const res = await api.joinGame(selectedSlot.game.id, { playerName: customerName.trim(), playerPhone: customerPhone.trim() });
-      setJoinGameSuccess(`You're in! Paid ₹${selectedSlot.game.cost_per_player}. ${res.newPlayerCount}/${selectedSlot.game.required_players} spots filled.`);
+      const res = await api.joinGame(selectedSlot.game.id, {
+        playerName: customerName.trim(),
+        playerPhone: customerPhone.trim(),
+        utr: joinUtr.trim()
+      });
+      setJoinGameSuccess(`Payment submitted! ${res.newPlayerCount}/${selectedSlot.game.required_players} spots filled. The venue will verify your ₹${selectedSlot.game.cost_per_player} payment shortly.`);
+      setJoinPaymentStep('form');
+      setJoinUtr('');
       const res2 = await api.getVenueSlots(venue.id, selectedDate, selectedCourt?.id);
       setSlots(res2);
       const refreshed = res2.find(s => s.id === selectedSlot.id);
@@ -637,6 +659,7 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
                           setErrorMsg('');
                           setJoinGameError(''); setJoinGameSuccess('');
                           setFullSlotError(''); setFullSlotSuccess('');
+                          setJoinPaymentStep('form'); setJoinUtr('');
                         }}
                         style={{
                           background: isSelected
@@ -733,6 +756,69 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
                     </div>
                   )}
 
+                  {joinPaymentStep === 'payment' ? (
+                    <div>
+                      <div style={{ textAlign: 'center', marginBottom: 14 }}>
+                        <img
+                          src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`upi://pay?pa=${venue.upi_id || 'koramangala.sports@okaxis'}&pn=${encodeURIComponent(venue.name)}&am=${selectedSlot.game.cost_per_player}&cu=INR`)}`}
+                          alt="Venue Owner UPI QR Code"
+                          style={{ width: 180, height: 180, borderRadius: 10, border: '1px solid #e2e8f0' }}
+                        />
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 8, fontSize: 12.5, color: '#334155' }}>
+                          {venue.upi_id || 'koramangala.sports@okaxis'}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(venue.upi_id || 'koramangala.sports@okaxis');
+                              setJoinCopiedUpi(true);
+                              setTimeout(() => setJoinCopiedUpi(false), 2000);
+                            }}
+                            style={{ background: 'none', border: 'none', color: '#4f46e5', cursor: 'pointer', display: 'flex' }}
+                          >
+                            {joinCopiedUpi ? <CheckCircle2 size={14} /> : <Copy size={14} />}
+                          </button>
+                        </div>
+                        <div style={{ fontSize: 18, fontWeight: 800, color: '#0f172a', marginTop: 6 }}>
+                          ₹{selectedSlot.game.cost_per_player}
+                        </div>
+                      </div>
+
+                      <div style={{ marginBottom: 12 }}>
+                        <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
+                          UPI TRANSACTION REFERENCE (UTR) *
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. 402812345678"
+                          className="nexus-input"
+                          style={{ width: '100%' }}
+                          value={joinUtr}
+                          onChange={e => setJoinUtr(e.target.value)}
+                        />
+                        <div style={{ fontSize: 10.5, color: '#94a3b8', marginTop: 4 }}>
+                          Found in your UPI app's payment confirmation, right after paying the QR above.
+                        </div>
+                      </div>
+
+                      <button
+                        disabled={joiningGame}
+                        onClick={handleSubmitJoinPayment}
+                        className="btn-primary"
+                        style={{ width: '100%', marginBottom: 8 }}
+                      >
+                        {joiningGame ? 'Submitting...' : 'Submit UTR & Join Spot'}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={joiningGame}
+                        onClick={() => { setJoinPaymentStep('form'); setJoinUtr(''); setJoinGameError(''); }}
+                        style={{ width: '100%', background: 'none', border: 'none', color: '#64748b', fontSize: 12, cursor: 'pointer', textDecoration: 'underline' }}
+                      >
+                        Back
+                      </button>
+                    </div>
+                  ) : (
+                    <>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
                     <div>
                       <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
@@ -764,11 +850,11 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
 
                   <button
                     disabled={joiningGame || !!joinGameSuccess}
-                    onClick={handleJoinOpenGame}
+                    onClick={handleProceedToJoinPayment}
                     className="btn-primary"
                     style={{ width: '100%', marginBottom: 10 }}
                   >
-                    {joiningGame ? 'Joining...' : `Join a Spot · ₹${selectedSlot.game.cost_per_player}`}
+                    {!!joinGameSuccess ? 'Joined' : `Join a Spot · ₹${selectedSlot.game.cost_per_player}`}
                   </button>
                   <button
                     disabled={requestingFullSlot || !!fullSlotSuccess}
@@ -778,6 +864,8 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
                   >
                     {requestingFullSlot ? 'Sending...' : `Book Full Slot Instead · ₹${selectedSlot.price}`}
                   </button>
+                    </>
+                  )}
                 </div>
               ) : selectedSlot ? (
                 <div>

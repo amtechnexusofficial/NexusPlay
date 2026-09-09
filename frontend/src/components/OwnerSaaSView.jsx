@@ -700,9 +700,13 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
     }
   }
 
-  async function handleVerifyUpi(bookingId) {
+  async function handleVerifyUpi(row) {
     try {
-      await api.verifyUpiPayment(bookingId, { action: 'verify_credit' });
+      if (row.payment_type === 'game_join') {
+        await api.verifyGameParticipantPayment(row.id, { action: 'verify_credit' });
+      } else {
+        await api.verifyUpiPayment(row.id, { action: 'verify_credit' });
+      }
       await loadData(selectedVenue?.id);
       alert('✅ UPI Payment verified as credited! Customer notified and booking confirmed.');
     } catch (err) {
@@ -710,13 +714,17 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
     }
   }
 
-  async function handleRejectUpi(bookingId) {
+  async function handleRejectUpi(row) {
     const reason = prompt('Reason for rejection:', 'Payment not received in owner UPI bank account');
     if (reason === null) return;
     try {
-      await api.verifyUpiPayment(bookingId, { action: 'reject', notes: reason });
+      if (row.payment_type === 'game_join') {
+        await api.verifyGameParticipantPayment(row.id, { action: 'reject', notes: reason });
+      } else {
+        await api.verifyUpiPayment(row.id, { action: 'reject', notes: reason });
+      }
       await loadData(selectedVenue?.id);
-      alert('❌ Booking rejected and slot released back to open.');
+      alert('❌ Payment rejected and spot released.');
     } catch (err) {
       alert('Rejection failed: ' + err.message);
     }
@@ -2719,18 +2727,27 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 16 }}>
               {pendingUpiBookings.map(b => (
-                <div key={b.id} className="nexus-card" style={{ padding: 18, borderLeft: '3px solid #f59e0b' }}>
+                <div key={`${b.payment_type}-${b.id}`} className="nexus-card" style={{ padding: 18, borderLeft: '3px solid #f59e0b' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div>
                       <div style={{ fontWeight: 700, color: '#0f172a' }}>{b.customer_name || 'Player'}</div>
                       <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{b.customer_phone}</div>
                     </div>
                     <div style={{ fontSize: 16, fontWeight: 800, color: '#059669' }}>
-                      ₹{b.total_amount}
+                      ₹{b.amount}
                     </div>
                   </div>
 
                   <div style={{ background: '#f8fafc', padding: '8px 10px', borderRadius: 6, margin: '12px 0', fontSize: 12 }}>
+                    <div style={{ marginBottom: 4 }}>
+                      <span style={{
+                        display: 'inline-block', fontSize: 10.5, fontWeight: 700, padding: '2px 7px', borderRadius: 999,
+                        background: b.payment_type === 'game_join' ? '#e0e7ff' : '#d1fae5',
+                        color: b.payment_type === 'game_join' ? '#4338ca' : '#065f46'
+                      }}>
+                        {b.payment_type === 'game_join' ? 'Join a Spot' : 'Full Slot Booking'}
+                      </span>
+                    </div>
                     <div>Slot: <strong>{b.date} · {b.start_time} - {b.end_time}</strong></div>
                     <div>Court: <strong>{b.court_name}</strong></div>
                     <div style={{ color: '#2563eb', fontFamily: 'monospace', marginTop: 2 }}>
@@ -2740,14 +2757,14 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
 
                   <div style={{ display: 'flex', gap: 8 }}>
                     <button
-                      onClick={() => handleVerifyUpi(b.id)}
+                      onClick={() => handleVerifyUpi(b)}
                       className="btn-primary"
                       style={{ flex: 2, fontSize: 12, padding: '7px 10px' }}
                     >
                       <Check size={13} /> Verify & Credit
                     </button>
                     <button
-                      onClick={() => handleRejectUpi(b.id)}
+                      onClick={() => handleRejectUpi(b)}
                       style={{ flex: 1, background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#f87171', borderRadius: 6, fontSize: 12, cursor: 'pointer' }}
                     >
                       Reject

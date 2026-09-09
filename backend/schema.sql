@@ -473,3 +473,20 @@ from courts c
 where cs.court_id = c.id and cs.venue_id is null;
 
 create index if not exists idx_court_slots_venue_date on court_slots(venue_id, date, status);
+
+-- ===========================================================================
+-- Migration: real UPI payment collection for joining an open game.
+-- joinGame previously marked every participant 'paid' unconditionally with
+-- no payment actually collected — no QR shown, no UTR captured, nothing
+-- for the owner to verify against their bank statement, unlike every
+-- other payment path in this app (direct bookings, full-slot inquiries).
+-- Brings it in line with that: a joiner submits a UTR after paying the
+-- venue's UPI QR, lands in 'pending_verification' same as a booking, and
+-- shows up in the owner's existing UPI verification queue.
+-- ===========================================================================
+
+alter table game_participants add column if not exists upi_utr text;
+
+alter table game_participants drop constraint if exists game_participants_payment_status_check;
+alter table game_participants add constraint game_participants_payment_status_check
+  check (payment_status in ('pending', 'pending_verification', 'paid', 'failed', 'refunded'));
