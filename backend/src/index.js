@@ -21,7 +21,7 @@ import {
   updateCourt,
   deleteCourt,
 } from "./services/courts.js";
-import { listSlots, blockSlot, unblockSlot, updateSlotPrice, listLiveSlots, generateSlotsForDate } from "./services/slots.js";
+import { listSlots, blockSlot, unblockSlot, updateSlotPrice, deleteSlot, listLiveSlots, generateSlotsForDate } from "./services/slots.js";
 import { holdSlot, confirmBooking, releaseHold, sweepExpiredHolds } from "./services/bookings.js";
 import { getSplitShare, paySplitShare } from "./services/splitPayments.js";
 import {
@@ -40,7 +40,7 @@ import {
   declineSlotInquiry,
   getBillingReport,
 } from "./services/owner.js";
-import { listGames, createGame, joinGame, requestFullSlot } from "./services/games.js";
+import { listGames, createGame, joinGame, requestFullSlot, sweepUnfilledGames } from "./services/games.js";
 import { getPlayerDashboard, listPlayerNotifications } from "./services/players.js";
 import { createReview, listReviewsForVenue } from "./services/reviews.js";
 import { getPlatformStats, listAllVenuesForAdmin, setVenueStatusForAdmin } from "./services/admin.js";
@@ -83,7 +83,7 @@ app.onError((err, c) => {
 // If production /api/health does not return this exact build string, the
 // Worker was not actually promoted (common with `wrangler versions upload`
 // without a subsequent promote / `wrangler deploy`).
-const BUILD_MARKER = "advance-payment-remove-pay-at-turf-2026-09-09-v10";
+const BUILD_MARKER = "court-edit-publish-slot-remove-game-refund-2026-09-10-v11";
 app.get("/api/health", (c) =>
   c.json({
     ok: true,
@@ -362,6 +362,12 @@ app.patch("/api/owner/slots/:slotId/price", ...ownerAuth, async (c) => {
   return c.json({ success: true, slot });
 });
 
+app.delete("/api/owner/slots/:slotId", ...ownerAuth, async (c) => {
+  const sql = getDb(c.env);
+  const result = await deleteSlot(sql, c.get("organizationId"), c.req.param("slotId"));
+  return c.json({ success: true, ...result });
+});
+
 app.post("/api/owner/slots/:slotId/convert-full-inquiry", ...ownerAuth, async (c) => {
   const result = await convertSlotToFullInquiry(c.env, c.get("organizationId"), c.req.param("slotId"), await c.req.json());
   return c.json({ success: true, ...result });
@@ -492,8 +498,11 @@ export default {
 
   // Cloudflare Cron Trigger — see wrangler.toml [triggers]. Runs every
   // minute; releases any slot whose 10-minute payment hold expired
-  // without the customer completing checkout.
+  // without the customer completing checkout, and auto-cancels (with
+  // refund notifications) any open pickup game that hasn't filled up
+  // within an hour of its kickoff.
   async scheduled(event, env, ctx) {
     ctx.waitUntil(sweepExpiredHolds(env));
+    ctx.waitUntil(sweepUnfilledGames(env));
   },
 };

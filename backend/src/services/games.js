@@ -232,3 +232,61 @@ export async function requestFullSlot(sql, gameId, { clientName, clientPhone, am
     offerAmount,
   };
 }
+
+// Wired into the same Cron Trigger as sweepExpiredHolds (see index.js
+// `scheduled` / wrangler.toml, runs every minute). The deal shown to
+// players joining a spot is: the game is confirmed once every spot
+// fills, or it's auto-cancelled and refunded if it hasn't filled by one
+// hour before kickoff — an open game was otherwise able to sit "open"
+// forever, silently taking players' money for a match that never
+// actually locks in.
+export async function sweepUnfilledGames(env) {
+  return withTransaction(env, async (client) => {
+    const { rows: games } = await client.query(
+      `select g.*, cs.date, cs.start_time, cs.end_time, v.name as venue_name, v.phone as venue_phone
+       from games g
+       join court_slots cs on g.court_slot_id = cs.id
+       join venues v on g.venue_id = v.id
+       where g.status = 'open'
+         and (cs.date::timestamp + cs.start_time::time) <= now() + interval '1 hour'`
+    );
+    if (games.length === 0) return { cancelled: 0 };
+
+    for (const game of games) {
+      const { rows: participants } = await client.query(
+        `select gp.*, c.name, c.phone from game_participants gp join customers c on gp.customer_id = c.id where gp.game_id = $1`,
+        [game.id]
+      );
+
+      await client.query("update games set status = 'cancelled' where id = $1", [game.id]);
+      await client.query(
+        "update game_participants set payment_status = 'refunded' where game_id = $1 and payment_status in ('paid', 'pending_verification')",
+        [game.id]
+      );
+      await client.query("update court_slots set status = 'open', hold_expires_at = null where id = $1", [game.court_slot_id]);
+
+      for (const p of participants) {
+        await notifyInTx(client, {
+          organizationId: game.organization_id,
+          recipientPhone: p.phone,
+          type: "cancellation",
+          message: `"${game.title}" at ${game.venue_name} on ${game.date} didn't fill up in time and has been cancelled. The venue owes you a ₹${p.share_amount} refund via UPI.`,
+        });
+      }
+
+      if (participants.length > 0) {
+        const refundList = participants
+          .map((p) => `${p.name || "Player"} (${p.phone}) ₹${p.share_amount}`)
+          .join("; ");
+        await notifyInTx(client, {
+          organizationId: game.organization_id,
+          recipientPhone: game.venue_phone,
+          type: "cancellation",
+          message: `Open game "${game.title}" (${game.date} ${game.start_time}-${game.end_time}) didn't fill up in time and was auto-cancelled. Please refund these ${participants.length} player(s) via UPI: ${refundList}.`,
+        });
+      }
+    }
+
+    return { cancelled: games.length };
+  });
+}

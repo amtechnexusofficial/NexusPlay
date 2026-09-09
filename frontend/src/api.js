@@ -286,6 +286,13 @@ export const api = {
     return res.json();
   },
 
+  async deleteSlot(slotId) {
+    const res = await ownerFetch(`${API_BASE}/owner/slots/${slotId}`, { method: 'DELETE' });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error || 'Failed to remove slot');
+    return body;
+  },
+
   async getCustomers() {
     const res = await ownerFetch(`${API_BASE}/owner/crm`);
     if (!res.ok) throw new Error('Failed to load CRM data');
@@ -298,7 +305,20 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
-    return res.json();
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error || 'Failed to create court');
+    return body;
+  },
+
+  async updateCourt(courtId, data) {
+    const res = await ownerFetch(`${API_BASE}/courts/${courtId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error || 'Failed to update court');
+    return body;
   },
 
   // A brand-new owner account has an organization but zero venues — this

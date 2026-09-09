@@ -219,6 +219,25 @@ export async function unblockSlot(sql, organizationId, { slotId, courtId, date, 
   return updated;
 }
 
+// Distinct from blockSlot — blocking keeps the slot visible (as
+// "blocked") so the owner remembers why it's off the grid; this actually
+// removes the row, for a slot that shouldn't have existed at all (e.g.
+// generated outside real operating hours). Guarded to 'open'/'blocked'/
+// 'maintenance' only — court_slots cascades to bookings and games on
+// delete, so a 'booked' or 'held' slot is refused rather than silently
+// wiping a real booking or an active pickup game.
+export async function deleteSlot(sql, organizationId, slotId) {
+  const [slot] = await sql`select * from court_slots where id = ${slotId} and organization_id = ${organizationId}`;
+  if (!slot) throw httpError(404, "Slot not found");
+  if (!["open", "blocked", "maintenance"].includes(slot.status)) {
+    throw httpError(409, `Cannot remove a slot that is ${slot.status} — cancel the booking first`);
+  }
+  const [activeGame] = await sql`select id from games where court_slot_id = ${slotId} and status in ('open', 'confirmed')`;
+  if (activeGame) throw httpError(409, "Cannot remove a slot with an active open game — cancel the game first");
+  await sql`delete from court_slots where id = ${slotId}`;
+  return { ok: true };
+}
+
 export async function updateSlotPrice(sql, organizationId, slotId, price) {
   if (!Number.isFinite(price) || price < 0) throw httpError(400, "A valid price is required");
   const [updated] = await sql`

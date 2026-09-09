@@ -872,6 +872,10 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
                     </div>
                   </div>
 
+                  <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, padding: '8px 10px', marginBottom: 12, fontSize: 11, color: '#92400e', lineHeight: 1.4 }}>
+                    <strong>Confirmation terms:</strong> this game is confirmed once every spot is filled. If it isn't full by 1 hour before kickoff, it's cancelled and the venue refunds your payment via UPI.
+                  </div>
+
                   <button
                     disabled={joiningGame || !!joinGameSuccess}
                     onClick={handleProceedToJoinPayment}

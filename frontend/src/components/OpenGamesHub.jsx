@@ -553,7 +553,7 @@ export default function OpenGamesHub({ onNavigateToVenue, onNavigateToDashboard,
                   />
                 </div>
 
-                <div style={{ background: '#f8fafc', padding: 12, borderRadius: 8, border: '1px solid #e2e8f0', marginBottom: 18 }}>
+                <div style={{ background: '#f8fafc', padding: 12, borderRadius: 8, border: '1px solid #e2e8f0', marginBottom: 12 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
                     <span style={{ color: '#475569' }}>Individual Spot Share</span>
                     <strong style={{ color: '#0f172a' }}>₹{activeJoinGame.cost_per_player}</strong>
@@ -561,6 +561,10 @@ export default function OpenGamesHub({ onNavigateToVenue, onNavigateToDashboard,
                   <div style={{ fontSize: 11, color: '#059669', fontWeight: 600 }}>
                     ✓ Pay via UPI QR · Venue Verifies & Confirms
                   </div>
+                </div>
+
+                <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, padding: '8px 10px', marginBottom: 18, fontSize: 11, color: '#92400e', lineHeight: 1.4 }}>
+                  <strong>Confirmation terms:</strong> this game is confirmed once every spot is filled. If it isn't full by 1 hour before kickoff, it's cancelled and the venue refunds your payment via UPI.
                 </div>
 
                 <div style={{ display: 'flex', gap: 10 }}>

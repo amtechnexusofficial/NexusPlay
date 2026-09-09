@@ -141,14 +141,18 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
   const [blockStartTime, setBlockStartTime] = useState('14:00');
   const [blockReason, setBlockReason] = useState('Turf Maintenance & Brushing');
 
-  // Add Court modal
+  // Add/Edit Court modal — editingCourt null means "Add Court"; set to
+  // the court object means the form is pre-filled and submits an update
+  // instead of a create.
   const [showCourtModal, setShowCourtModal] = useState(false);
+  const [editingCourt, setEditingCourt] = useState(null);
   const [newCourtName, setNewCourtName] = useState('');
   const [newCourtSportId, setNewCourtSportId] = useState('football');
   const [newCourtCapacity, setNewCourtCapacity] = useState(14);
   const [newCourtBasePrice, setNewCourtBasePrice] = useState(1000);
   const [newCourtPeakPrice, setNewCourtPeakPrice] = useState(1500);
   const [newCourtWeekendPrice, setNewCourtWeekendPrice] = useState(1800);
+  const [courtStatusBusyId, setCourtStatusBusyId] = useState(null);
 
   // Link copy toast
   const [copiedLink, setCopiedLink] = useState(false);
@@ -425,6 +429,44 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
     }
   }
 
+  function handleOpenAddCourt() {
+    setEditingCourt(null);
+    setNewCourtName('');
+    setNewCourtSportId('football');
+    setNewCourtCapacity(14);
+    setNewCourtBasePrice(1000);
+    setNewCourtPeakPrice(1500);
+    setNewCourtWeekendPrice(1800);
+    setShowCourtModal(true);
+  }
+
+  function handleOpenEditCourt(court) {
+    setEditingCourt(court);
+    setNewCourtName(court.name || '');
+    setNewCourtSportId(court.sport_id || 'football');
+    setNewCourtCapacity(court.capacity ?? 14);
+    setNewCourtBasePrice(court.base_price ?? 1000);
+    setNewCourtPeakPrice(court.peak_price ?? court.base_price ?? 1500);
+    setNewCourtWeekendPrice(court.weekend_price ?? court.base_price ?? 1800);
+    setShowCourtModal(true);
+  }
+
+  // Toggling this is how an owner takes a court off (or back onto) the
+  // marketplace and the public booking page without losing it or its
+  // booking history — deleting a court cascades to every booking and
+  // slot that ever referenced it, so that's never offered here.
+  async function handleToggleCourtStatus(court) {
+    setCourtStatusBusyId(court.id);
+    try {
+      await api.updateCourt(court.id, { status: court.status === 'active' ? 'inactive' : 'active' });
+      await loadData(selectedVenue.id);
+    } catch (err) {
+      alert('Failed to update court status: ' + err.message);
+    } finally {
+      setCourtStatusBusyId(null);
+    }
+  }
+
   async function handleCreateVenue(e) {
     e.preventDefault();
     if (!onboardName.trim() || !onboardAddress.trim()) {
@@ -644,6 +686,21 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
       alert('Slot blocked for maintenance successfully.');
     } catch (err) {
       alert('Failed to block slot: ' + err.message);
+    }
+  }
+
+  // Distinct from blocking — this actually removes the slot from the grid
+  // (for one that shouldn't have been generated at all), rather than
+  // leaving it visible as "blocked". The backend refuses this for a slot
+  // that's booked or has an active game, so the confirm here is just to
+  // stop a misclick, not the real safety check.
+  async function handleRemoveSlot(slot) {
+    if (!window.confirm(`Remove the ${slot.start_time}-${slot.end_time} slot on ${slot.date}? This can't be undone.`)) return;
+    try {
+      await api.deleteSlot(slot.id);
+      if (selectedVenue) loadLiveSlots(selectedVenue.id, calendarDate);
+    } catch (err) {
+      alert('Failed to remove slot: ' + err.message);
     }
   }
 
@@ -1834,20 +1891,37 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                           >
                             Block
                           </button>
+
+                          <button
+                            onClick={() => handleRemoveSlot(slot)}
+                            title="Remove this slot entirely"
+                            style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', color: '#dc2626', borderRadius: 6, padding: '7px 10px', fontSize: 11.5, cursor: 'pointer' }}
+                          >
+                            Remove
+                          </button>
                         </div>
                       )}
 
                       {isBlocked && (
-                        <button
-                          onClick={async () => {
-                            await api.unblockSlot({ courtId: slot.court_id, date: slot.date, startTime: slot.start_time });
-                            if (selectedVenue) loadLiveSlots(selectedVenue.id, calendarDate);
-                          }}
-                          className="btn-secondary"
-                          style={{ fontSize: 12, padding: '7px 12px', justifyContent: 'center', width: '100%' }}
-                        >
-                          Unblock Slot
-                        </button>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button
+                            onClick={async () => {
+                              await api.unblockSlot({ courtId: slot.court_id, date: slot.date, startTime: slot.start_time });
+                              if (selectedVenue) loadLiveSlots(selectedVenue.id, calendarDate);
+                            }}
+                            className="btn-secondary"
+                            style={{ flex: 1.4, fontSize: 12, padding: '7px 12px', justifyContent: 'center' }}
+                          >
+                            Unblock Slot
+                          </button>
+                          <button
+                            onClick={() => handleRemoveSlot(slot)}
+                            title="Remove this slot entirely"
+                            style={{ flex: 1, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', color: '#dc2626', borderRadius: 6, padding: '7px 10px', fontSize: 11.5, cursor: 'pointer' }}
+                          >
+                            Remove
+                          </button>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -2042,20 +2116,36 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                                   >
                                     Block
                                   </button>
+                                  <button
+                                    onClick={() => handleRemoveSlot(slot)}
+                                    title="Remove this slot entirely"
+                                    style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', color: '#dc2626', borderRadius: 6, padding: '4px 8px', fontSize: 11, cursor: 'pointer' }}
+                                  >
+                                    Remove
+                                  </button>
                                 </>
                               )}
 
                               {isBlocked && (
-                                <button
-                                  onClick={async () => {
-                                    await api.unblockSlot({ courtId: slot.court_id, date: slot.date, startTime: slot.start_time });
-                                    if (selectedVenue) loadLiveSlots(selectedVenue.id, calendarDate);
-                                  }}
-                                  className="btn-secondary"
-                                  style={{ fontSize: 11, padding: '4px 8px' }}
-                                >
-                                  Unblock
-                                </button>
+                                <>
+                                  <button
+                                    onClick={async () => {
+                                      await api.unblockSlot({ courtId: slot.court_id, date: slot.date, startTime: slot.start_time });
+                                      if (selectedVenue) loadLiveSlots(selectedVenue.id, calendarDate);
+                                    }}
+                                    className="btn-secondary"
+                                    style={{ fontSize: 11, padding: '4px 8px' }}
+                                  >
+                                    Unblock
+                                  </button>
+                                  <button
+                                    onClick={() => handleRemoveSlot(slot)}
+                                    title="Remove this slot entirely"
+                                    style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', color: '#dc2626', borderRadius: 6, padding: '4px 8px', fontSize: 11, cursor: 'pointer' }}
+                                  >
+                                    Remove
+                                  </button>
+                                </>
                               )}
 
                               {isBooked && slot.booking && (
@@ -2824,15 +2914,22 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                 Configure base pricing, peak hours surge, and weekend rates set by owner.
               </p>
             </div>
-            <button className="btn-primary" onClick={() => setShowCourtModal(true)}>
+            <button className="btn-primary" onClick={handleOpenAddCourt}>
               <Plus size={15} /> Add Court / Pitch
             </button>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 18 }}>
-            {selectedVenue.courts?.map(c => (
-              <div key={c.id} className="nexus-card" style={{ padding: 20 }}>
-                <h3 style={{ fontSize: 17, fontWeight: 800, color: '#0f172a', margin: 0 }}>{c.name}</h3>
+            {selectedVenue.courts?.map(c => {
+              const isActive = c.status === 'active';
+              return (
+              <div key={c.id} className="nexus-card" style={{ padding: 20, opacity: isActive ? 1 : 0.7 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                  <h3 style={{ fontSize: 17, fontWeight: 800, color: '#0f172a', margin: 0 }}>{c.name}</h3>
+                  <span className={isActive ? 'badge-emerald' : 'badge-slate'} style={{ fontSize: 10, whiteSpace: 'nowrap' }}>
+                    {isActive ? 'Published' : 'Unpublished'}
+                  </span>
+                </div>
                 <div style={{ fontSize: 12, color: '#059669', textTransform: 'capitalize', fontWeight: 600, marginTop: 2, marginBottom: 14 }}>
                   Sport: {c.sport_id} · Capacity: {c.capacity} Players
                 </div>
@@ -2852,11 +2949,30 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                   </div>
                 </div>
 
-                <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>
+                <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginBottom: 14 }}>
                   Slot Duration: {c.slot_duration_minutes} minutes per interval
                 </div>
+
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    onClick={() => handleOpenEditCourt(c)}
+                    className="btn-secondary"
+                    style={{ flex: 1, fontSize: 12, padding: '7px 10px' }}
+                  >
+                    <Edit3 size={13} /> Edit
+                  </button>
+                  <button
+                    onClick={() => handleToggleCourtStatus(c)}
+                    disabled={courtStatusBusyId === c.id}
+                    className={isActive ? 'btn-secondary' : 'btn-primary'}
+                    style={{ flex: 1.3, fontSize: 12, padding: '7px 10px' }}
+                  >
+                    {courtStatusBusyId === c.id ? 'Updating...' : isActive ? 'Unpublish' : 'Publish to Marketplace'}
+                  </button>
+                </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -3604,27 +3720,39 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 20 }}>
           <div className="nexus-card animate-fade-in" style={{ maxHeight: '90vh', overflowY: 'auto', maxWidth: 460, width: '100%', padding: 24, background: '#ffffff' }}>
             <h3 style={{ fontSize: 18, fontWeight: 800, color: '#0f172a', marginBottom: 6 }}>
-              Add Court / Pitch
+              {editingCourt ? `Edit ${editingCourt.name}` : 'Add Court / Pitch'}
             </h3>
 
             <form
               onSubmit={async e => {
                 e.preventDefault();
                 try {
-                  await api.createCourt({
-                    venueId: selectedVenue.id,
-                    name: newCourtName,
-                    sportId: newCourtSportId,
-                    capacity: Number(newCourtCapacity),
-                    basePrice: Number(newCourtBasePrice),
-                    peakPrice: Number(newCourtPeakPrice),
-                    weekendPrice: Number(newCourtWeekendPrice)
-                  });
+                  if (editingCourt) {
+                    await api.updateCourt(editingCourt.id, {
+                      name: newCourtName,
+                      capacity: Number(newCourtCapacity),
+                      basePrice: Number(newCourtBasePrice),
+                      peakPrice: Number(newCourtPeakPrice),
+                      weekendPrice: Number(newCourtWeekendPrice)
+                    });
+                    alert('Court updated successfully.');
+                  } else {
+                    await api.createCourt({
+                      venueId: selectedVenue.id,
+                      name: newCourtName,
+                      sportId: newCourtSportId,
+                      capacity: Number(newCourtCapacity),
+                      basePrice: Number(newCourtBasePrice),
+                      peakPrice: Number(newCourtPeakPrice),
+                      weekendPrice: Number(newCourtWeekendPrice)
+                    });
+                    alert('Court created successfully.');
+                  }
                   setShowCourtModal(false);
+                  setEditingCourt(null);
                   loadData(selectedVenue.id);
-                  alert('Court created successfully.');
                 } catch (err) {
-                  alert('Failed to create court: ' + err.message);
+                  alert(`Failed to ${editingCourt ? 'update' : 'create'} court: ` + err.message);
                 }
               }}
               style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
@@ -3650,6 +3778,8 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                     onChange={e => setNewCourtSportId(e.target.value)}
                     className="nexus-input"
                     style={{ width: '100%' }}
+                    disabled={!!editingCourt}
+                    title={editingCourt ? "Sport can't be changed after a court is created" : undefined}
                   >
                     <option value="football">Football</option>
                     <option value="futsal">Futsal</option>
@@ -3708,11 +3838,11 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
               </div>
 
               <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
-                <button type="button" className="btn-secondary" style={{ flex: 1 }} onClick={() => setShowCourtModal(false)}>
+                <button type="button" className="btn-secondary" style={{ flex: 1 }} onClick={() => { setShowCourtModal(false); setEditingCourt(null); }}>
                   Cancel
                 </button>
                 <button type="submit" className="btn-primary" style={{ flex: 1.5 }}>
-                  Save Court
+                  {editingCourt ? 'Save Changes' : 'Save Court'}
                 </button>
               </div>
             </form>
