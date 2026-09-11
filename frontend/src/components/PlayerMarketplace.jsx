@@ -36,7 +36,6 @@ export default function PlayerMarketplace({ onSelectVenue }) {
   const [loadError, setLoadError] = useState('');
 
   const [selectedCity, setSelectedCity] = useState(() => readSavedCity());
-  const [cityDraft, setCityDraft] = useState(() => readSavedCity());
   const [choosingCity, setChoosingCity] = useState(() => !readSavedCity());
 
   useEffect(() => {
@@ -60,6 +59,17 @@ export default function PlayerMarketplace({ onSelectVenue }) {
     load();
   }, []);
 
+  // If a saved city no longer has any published turfs, force re-pick.
+  useEffect(() => {
+    if (loading || choosingCity || !selectedCity || venues.length === 0) return;
+    const stillAvailable = venues.some(
+      (v) => normalizeCity(v.city) === normalizeCity(selectedCity)
+    );
+    if (!stillAvailable) {
+      setChoosingCity(true);
+    }
+  }, [loading, choosingCity, selectedCity, venues]);
+
   const availableCities = Array.from(
     new Set(
       venues
@@ -71,23 +81,13 @@ export default function PlayerMarketplace({ onSelectVenue }) {
   function confirmCity(cityName) {
     const trimmed = (cityName || '').trim();
     if (!trimmed) return;
-    // Prefer the canonical spelling from published venues when it matches.
-    const match = availableCities.find((c) => normalizeCity(c) === normalizeCity(trimmed));
-    const canonical = match || trimmed;
-    setSelectedCity(canonical);
-    setCityDraft(canonical);
-    saveCity(canonical);
+    setSelectedCity(trimmed);
+    saveCity(trimmed);
     setChoosingCity(false);
     setSearchQuery('');
   }
 
-  function handleCitySubmit(e) {
-    e.preventDefault();
-    confirmCity(cityDraft);
-  }
-
   function handleChangeCity() {
-    setCityDraft(selectedCity);
     setChoosingCity(true);
   }
 
@@ -140,64 +140,57 @@ export default function PlayerMarketplace({ onSelectVenue }) {
             Where do you want to play?
           </h1>
           <p style={{ color: '#64748b', fontSize: 13.5, marginTop: 8, marginBottom: 20, lineHeight: 1.5 }}>
-            Enter your city and we’ll show turfs available there. You can change this anytime.
+            Tap a city to see turfs available there. You can change this anytime.
           </p>
 
-          <form onSubmit={handleCitySubmit}>
-            <label style={{ display: 'block', fontSize: 11.5, fontWeight: 600, color: '#64748b', marginBottom: 6 }}>
-              CITY NAME
-            </label>
-            <input
-              id="marketplace-city-input"
-              type="text"
-              className="nexus-input"
-              autoFocus
-              placeholder="e.g. Madurai, Rajapalayam"
-              value={cityDraft}
-              onChange={(e) => setCityDraft(e.target.value)}
-              style={{ width: '100%', marginBottom: 12, fontSize: 15 }}
-            />
-            <button
-              type="submit"
-              className="btn-primary"
-              disabled={!cityDraft.trim()}
-              style={{ width: '100%', padding: '12px 16px', fontSize: 14 }}
-            >
-              Show turfs in this city
-            </button>
-          </form>
-
-          {!loading && availableCities.length > 0 && (
-            <div style={{ marginTop: 22 }}>
-              <div style={{ fontSize: 11.5, fontWeight: 600, color: '#64748b', marginBottom: 8 }}>
-                Cities with live turfs
-              </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                {availableCities.map((city) => (
+          {loading ? (
+            <div style={{ fontSize: 13, color: '#64748b', padding: '12px 0' }}>Loading cities with turfs…</div>
+          ) : loadError ? (
+            <div style={{ fontSize: 13, color: '#b91c1c' }}>{loadError}</div>
+          ) : availableCities.length === 0 ? (
+            <div style={{ fontSize: 13.5, color: '#64748b', lineHeight: 1.5 }}>
+              No cities have published turfs yet. Check back once an owner goes live.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {availableCities.map((city) => {
+                const count = venues.filter((v) => normalizeCity(v.city) === normalizeCity(city)).length;
+                const isActive = normalizeCity(city) === normalizeCity(selectedCity);
+                return (
                   <button
                     key={city}
                     type="button"
+                    id={`city-option-${normalizeCity(city).replace(/\s+/g, '-')}`}
                     onClick={() => confirmCity(city)}
                     style={{
-                      background: normalizeCity(city) === normalizeCity(cityDraft) ? '#4f46e5' : '#f1f5f9',
-                      color: normalizeCity(city) === normalizeCity(cityDraft) ? '#ffffff' : '#334155',
-                      border: '1px solid #cbd5e1',
-                      padding: '8px 14px',
-                      borderRadius: 8,
-                      fontSize: 13,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 12,
+                      width: '100%',
+                      textAlign: 'left',
+                      background: isActive ? '#4f46e5' : '#ffffff',
+                      color: isActive ? '#ffffff' : '#0f172a',
+                      border: `1px solid ${isActive ? '#4f46e5' : '#cbd5e1'}`,
+                      padding: '14px 16px',
+                      borderRadius: 10,
+                      fontSize: 15,
                       fontWeight: 700,
-                      cursor: 'pointer'
+                      cursor: 'pointer',
+                      boxShadow: '0 1px 2px rgba(0,0,0,0.04)'
                     }}
                   >
-                    {city}
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                      <MapPin size={16} style={{ color: isActive ? '#c7d2fe' : '#4f46e5', flexShrink: 0 }} />
+                      {city}
+                    </span>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: isActive ? '#e0e7ff' : '#64748b' }}>
+                      {count} turf{count === 1 ? '' : 's'}
+                    </span>
                   </button>
-                ))}
-              </div>
+                );
+              })}
             </div>
-          )}
-
-          {loading && (
-            <div style={{ marginTop: 16, fontSize: 12.5, color: '#64748b' }}>Loading available cities…</div>
           )}
         </div>
       </div>
