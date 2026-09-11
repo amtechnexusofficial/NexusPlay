@@ -297,11 +297,6 @@ export default function PlayerMarketplace({ onSelectVenue }) {
                         <MapPin size={12} /> {venue.city}
                       </span>
                     )}
-                    {venue.review_count > 0 && (
-                      <span className="marketplace-badge marketplace-badge-rating">
-                        ★ {venue.avg_rating} <span>({venue.review_count})</span>
-                      </span>
-                    )}
                   </div>
 
                   <div className="marketplace-venue-badges marketplace-venue-badges-bottom">
@@ -330,17 +325,6 @@ export default function PlayerMarketplace({ onSelectVenue }) {
                   <div className="marketplace-venue-hours">
                     {venue.open_time && venue.close_time ? `Open ${venue.open_time} – ${venue.close_time}` : '\u00a0'}
                   </div>
-
-                  {(Array.isArray(venue.amenities) ? venue.amenities : []).length > 0 && (
-                    <div className="marketplace-amenities">
-                      {(Array.isArray(venue.amenities) ? venue.amenities : []).slice(0, 3).map((am, i) => (
-                        <span key={i}>{am}</span>
-                      ))}
-                      {venue.amenities?.length > 3 && (
-                        <span className="marketplace-amenities-more">+{venue.amenities.length - 3}</span>
-                      )}
-                    </div>
-                  )}
 
                   <div className="marketplace-venue-footer">
                     <div>

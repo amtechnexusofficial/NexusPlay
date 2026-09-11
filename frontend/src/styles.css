@@ -531,15 +531,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   flex-shrink: 0;
 }
 
-.turf-rating-pill {
-  font-size: 12px;
-  font-weight: 700;
-  padding: 6px 10px;
-  border-radius: 999px;
-  background: #ecfdf5;
-  color: #059669;
-}
-
 .turf-share-btn {
   padding: 8px 12px !important;
   font-size: 13px !important;
@@ -1344,15 +1335,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   color: #e2e8f0;
   font-size: 11.5px;
   font-weight: 650;
-}
-
-.marketplace-badge-rating {
-  color: #fbbf24;
-}
-
-.marketplace-badge-rating span {
-  color: #cbd5e1;
-  font-weight: 500;
 }
 
 .marketplace-badge-games {
