@@ -2,14 +2,11 @@ import React, { useState, useEffect } from 'react';
 import {
   User,
   Building2,
-  Phone,
   Mail,
   Lock,
   ArrowRight,
   CheckCircle2,
-  ShieldCheck,
-  X,
-  KeyRound
+  X
 } from 'lucide-react';
 import { api } from '../api';
 
@@ -44,16 +41,6 @@ const primaryBtnStyle = {
   gap: '8px'
 };
 
-const linkBtnStyle = {
-  background: 'none',
-  border: 'none',
-  color: '#4f46e5',
-  fontWeight: '700',
-  fontSize: '12.5px',
-  cursor: 'pointer',
-  padding: 0
-};
-
 function Field({ icon: Icon, ...props }) {
   return (
     <div style={fieldWrapStyle}>
@@ -63,41 +50,26 @@ function Field({ icon: Icon, ...props }) {
   );
 }
 
-export function AuthModal({ isOpen, onClose, initialRole = 'player', onAuthSuccess }) {
-  const [activeRole, setActiveRole] = useState(initialRole); // 'player' | 'owner'
+/** Owner portal sign-in / register. Players book as guests (no login). */
+export function AuthModal({ isOpen, onClose, onAuthSuccess }) {
   const [ownerMode, setOwnerMode] = useState('login'); // 'login' | 'register'
-
-  // Player OTP flow state
-  const [playerStep, setPlayerStep] = useState('phone'); // 'phone' | 'code'
-  const [playerPhone, setPlayerPhone] = useState('');
-  const [playerName, setPlayerName] = useState('');
-  const [otpCode, setOtpCode] = useState('');
-  const [devCode, setDevCode] = useState(null);
-
-  // Owner form state
   const [ownerName, setOwnerName] = useState('');
   const [orgName, setOrgName] = useState('');
   const [ownerEmail, setOwnerEmail] = useState('');
   const [ownerPassword, setOwnerPassword] = useState('');
-
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
-  // Holds the signed-in result until the user explicitly continues —
-  // see finishAuth() for why this replaced an automatic timer.
   const [pendingAuth, setPendingAuth] = useState(null);
 
   useEffect(() => {
     if (isOpen) {
-      setActiveRole(initialRole || 'player');
-      setPlayerStep('phone');
-      setOtpCode('');
-      setDevCode(null);
+      setOwnerMode('login');
       setErrorMsg('');
       setSuccessMsg('');
       setPendingAuth(null);
     }
-  }, [isOpen, initialRole]);
+  }, [isOpen]);
 
   function handleContinue() {
     if (!pendingAuth) return;
@@ -119,54 +91,6 @@ export function AuthModal({ isOpen, onClose, initialRole = 'player', onAuthSucce
     setSuccessMsg(`Welcome, ${res.user.name}!`);
     setPendingAuth({ user: res.user, role, venue });
   }
-
-  // --- Player: phone + OTP -------------------------------------------------
-
-  async function handleSendCode(e) {
-    e.preventDefault();
-    const phone = playerPhone.trim();
-    if (phone.length < 10) {
-      setErrorMsg('Please enter a valid 10-digit mobile number');
-      return;
-    }
-    setIsLoading(true);
-    setErrorMsg('');
-    try {
-      const res = await api.requestOtp({ phone, role: 'player' });
-      setDevCode(res.devCode || null);
-      setPlayerStep('code');
-      setSuccessMsg(`Code sent to ${phone}`);
-    } catch (err) {
-      setErrorMsg(err.message || 'Failed to send code');
-    } finally {
-      setIsLoading(false);
-    }
-  }
-
-  async function handleVerifyCode(e) {
-    e.preventDefault();
-    if (otpCode.trim().length !== 4) {
-      setErrorMsg('Enter the 4-digit code');
-      return;
-    }
-    setIsLoading(true);
-    setErrorMsg('');
-    try {
-      const res = await api.verifyOtp({
-        phone: playerPhone.trim(),
-        code: otpCode.trim(),
-        role: 'player',
-        name: playerName.trim() || undefined
-      });
-      finishAuth(res, 'player');
-    } catch (err) {
-      setErrorMsg(err.message || 'Invalid or expired code');
-    } finally {
-      setIsLoading(false);
-    }
-  }
-
-  // --- Owner: email + password ----------------------------------------------
 
   async function handleOwnerLogin(e) {
     e.preventDefault();
@@ -217,17 +141,16 @@ export function AuthModal({ isOpen, onClose, initialRole = 'player', onAuthSucce
         style={{ maxWidth: '460px', borderRadius: '16px', overflow: 'hidden' }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header with role switcher */}
         <div style={{ background: '#f8fafc', padding: '20px 24px 16px', borderBottom: '1px solid #e2e8f0' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <img src="/logo-mark.png" alt="NexusPlay" style={{ width: '32px', height: '32px', borderRadius: '8px', objectFit: 'contain' }} />
               <div>
                 <h3 style={{ fontSize: '18px', fontWeight: '800', color: '#0f172a', margin: 0, letterSpacing: '-0.02em' }}>
-                  {activeRole === 'player' ? 'Player Sign In' : 'Arena Owner Portal'}
+                  Arena Owner Portal
                 </h3>
                 <p style={{ fontSize: '12.5px', color: '#64748b', margin: 0 }}>
-                  {activeRole === 'player' ? 'Verify your phone to book & join games' : 'Venue SaaS management & slots'}
+                  Venue SaaS management & slots
                 </p>
               </div>
             </div>
@@ -237,35 +160,6 @@ export function AuthModal({ isOpen, onClose, initialRole = 'player', onAuthSucce
               style={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '8px', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b' }}
             >
               <X size={18} />
-            </button>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', background: '#f1f5f9', padding: '4px', borderRadius: '12px', border: '1px solid #e2e8f0', gap: '4px' }}>
-            <button
-              id="auth-role-player-tab"
-              type="button"
-              onClick={() => { setActiveRole('player'); setErrorMsg(''); setSuccessMsg(''); }}
-              style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', height: '42px', padding: '0 12px',
-                borderRadius: '9px', border: activeRole === 'player' ? '1px solid #cbd5e1' : '1px solid transparent',
-                background: activeRole === 'player' ? '#ffffff' : 'transparent', color: activeRole === 'player' ? '#4f46e5' : '#64748b',
-                fontWeight: activeRole === 'player' ? '800' : '600', fontSize: '13px', cursor: 'pointer'
-              }}
-            >
-              <User size={16} /><span>Player</span>
-            </button>
-            <button
-              id="auth-role-owner-tab"
-              type="button"
-              onClick={() => { setActiveRole('owner'); setErrorMsg(''); setSuccessMsg(''); }}
-              style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', height: '42px', padding: '0 12px',
-                borderRadius: '9px', border: activeRole === 'owner' ? '1px solid #cbd5e1' : '1px solid transparent',
-                background: activeRole === 'owner' ? '#ffffff' : 'transparent', color: activeRole === 'owner' ? '#4f46e5' : '#64748b',
-                fontWeight: activeRole === 'owner' ? '800' : '600', fontSize: '13px', cursor: 'pointer'
-              }}
-            >
-              <Building2 size={16} /><span>Arena Owner</span>
             </button>
           </div>
         </div>
@@ -284,55 +178,11 @@ export function AuthModal({ isOpen, onClose, initialRole = 'player', onAuthSucce
 
           {pendingAuth && (
             <button type="button" onClick={handleContinue} style={primaryBtnStyle}>
-              Continue to Dashboard <ArrowRight size={16} />
+              Continue to Owner Hub <ArrowRight size={16} />
             </button>
           )}
 
-          {/* ============================ PLAYER ============================ */}
-          {!pendingAuth && activeRole === 'player' && playerStep === 'phone' && (
-            <form onSubmit={handleSendCode}>
-              <Field icon={User} type="text" placeholder="Your name" value={playerName} onChange={(e) => setPlayerName(e.target.value)} />
-              <Field icon={Phone} type="tel" placeholder="10-digit mobile number" value={playerPhone} onChange={(e) => setPlayerPhone(e.target.value)} maxLength={10} />
-              <button type="submit" style={primaryBtnStyle} disabled={isLoading}>
-                {isLoading ? 'Sending…' : 'Send verification code'} <ArrowRight size={16} />
-              </button>
-              <p style={{ fontSize: '11.5px', color: '#94a3b8', marginTop: '10px', textAlign: 'center' }}>
-                We'll text you a 4-digit code. New here? Your name creates your player profile automatically.
-              </p>
-            </form>
-          )}
-
-          {!pendingAuth && activeRole === 'player' && playerStep === 'code' && (
-            <form onSubmit={handleVerifyCode}>
-              <p style={{ fontSize: '13px', color: '#475569', marginBottom: '12px' }}>
-                Enter the 4-digit code sent to <strong>{playerPhone}</strong>.
-              </p>
-              <Field
-                icon={KeyRound}
-                type="text"
-                inputMode="numeric"
-                placeholder="4-digit code"
-                value={otpCode}
-                onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                maxLength={4}
-                autoFocus
-              />
-              {devCode && (
-                <p style={{ fontSize: '11.5px', color: '#b45309', marginBottom: '10px' }}>
-                  Dev mode code: <strong>{devCode}</strong>
-                </p>
-              )}
-              <button type="submit" style={primaryBtnStyle} disabled={isLoading}>
-                {isLoading ? 'Verifying…' : 'Verify & continue'} <ShieldCheck size={16} />
-              </button>
-              <button type="button" onClick={() => setPlayerStep('phone')} style={{ ...linkBtnStyle, marginTop: '12px', display: 'block', width: '100%', textAlign: 'center' }}>
-                Change number / resend code
-              </button>
-            </form>
-          )}
-
-          {/* ============================ OWNER ============================ */}
-          {!pendingAuth && activeRole === 'owner' && (
+          {!pendingAuth && (
             <div>
               <div style={{ display: 'flex', gap: '16px', marginBottom: '16px', borderBottom: '1px solid #e2e8f0' }}>
                 <button

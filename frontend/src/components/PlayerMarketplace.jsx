@@ -25,8 +25,8 @@ export default function PlayerMarketplace({ onSelectVenue }) {
 
   // Geolocation state
   const [userCoords, setUserCoords] = useState(null);
-  const [locatingUser, setLocatingUser] = useState(false);
-  const [locationStatusText, setLocationStatusText] = useState('Allow location to sort turfs by distance to you');
+  const [locatingUser, setLocatingUser] = useState(true);
+  const [locationStatusText, setLocationStatusText] = useState('Detecting your location…');
   const [locationPermissionGranted, setLocationPermissionGranted] = useState(false);
   const [sortBy, setSortBy] = useState('distance'); // 'distance', 'price_asc', 'slots_desc', 'rating'
   const [copiedSlug, setCopiedSlug] = useState(null);
@@ -62,7 +62,7 @@ export default function PlayerMarketplace({ onSelectVenue }) {
       return;
     }
     setLocatingUser(true);
-    setLocationStatusText('Acquiring your GPS position...');
+    setLocationStatusText('Detecting your location to show nearby turfs...');
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         setUserCoords({
@@ -71,17 +71,23 @@ export default function PlayerMarketplace({ onSelectVenue }) {
         });
         setLocationPermissionGranted(true);
         setLocatingUser(false);
-        setLocationStatusText(`Location active! Showing nearest turfs to you.`);
+        setLocationStatusText('Location active — showing nearest turfs first.');
         setSortBy('distance');
       },
       (err) => {
         setLocatingUser(false);
         console.warn('Geolocation denied or error:', err.message);
-        setLocationStatusText('Location access was denied or timed out. Click any quick area preset below.');
+        setLocationStatusText('Location access was denied or timed out. Use a Bangalore preset below, or retry.');
       },
       { timeout: 10000, enableHighAccuracy: true }
     );
   }
+
+  // Ask for location as soon as the marketplace opens so guests see closest turfs.
+  useEffect(() => {
+    handleRequestLocation();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function handlePresetLocation(area) {
     if (area === 'koramangala') {
@@ -171,7 +177,7 @@ export default function PlayerMarketplace({ onSelectVenue }) {
               Find Sports Arenas Near You
             </h1>
             <p style={{ color: '#64748b', fontSize: 13, marginTop: 4, marginBottom: 0 }}>
-              Allow location to calculate real-time distance, view live slot availability, registered player counts, and prices set by owners.
+              We detect your location to sort turfs by distance. Browse live slots and book as a guest — no account needed.
             </p>
           </div>
 
@@ -193,7 +199,7 @@ export default function PlayerMarketplace({ onSelectVenue }) {
               }}
             >
               <Navigation size={14} style={{ transform: locatingUser ? 'rotate(45deg)' : 'none', transition: 'transform 0.3s' }} />
-              {locatingUser ? 'Locating...' : locationPermissionGranted ? '📍 Location Active' : 'Use My Current Location'}
+              {locatingUser ? 'Locating...' : locationPermissionGranted ? 'Location Active' : 'Retry My Location'}
             </button>
             <div style={{ fontSize: 11, color: locationPermissionGranted ? '#059669' : '#64748b' }}>
               {locationStatusText}

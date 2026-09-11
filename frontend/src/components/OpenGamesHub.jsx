@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api.js';
 import {
-  Users, Plus, Calendar, Clock, MapPin, CheckCircle,
-  AlertCircle, ShieldCheck, Trophy, Sparkles, Filter, Shield, Copy, CheckCircle2
+  Plus, Calendar, Clock, MapPin, CheckCircle,
+  AlertCircle, ShieldCheck, Trophy, Sparkles, Filter, Shield, Copy, CheckCircle2, Building2
 } from 'lucide-react';
 
 export default function OpenGamesHub({ onNavigateToVenue, onNavigateToDashboard, onNavigateToLogin, currentUser }) {
@@ -151,11 +151,11 @@ export default function OpenGamesHub({ onNavigateToVenue, onNavigateToDashboard,
               Open Games Hub
             </h1>
             <p style={{ color: '#64748b', marginTop: 6, fontSize: 14, lineHeight: 1.5, margin: 0 }}>
-              Short of players for tonight's match? Join individual spots or reserve the entire slot for your private squad. Hosting open games is integrated inside your verified Player and Owner dashboards.
+              Short of players for tonight's match? Join a spot or reserve the full turf as a guest. Venue owners host open games from the Owner Hub.
             </p>
           </div>
 
-          {/* Hosting inside profile CTA button */}
+          {/* Hosting CTA — owners manage from hub; guests browse turfs */}
           <div>
             {currentUser?.role === 'owner' ? (
               <button
@@ -166,23 +166,14 @@ export default function OpenGamesHub({ onNavigateToVenue, onNavigateToDashboard,
               >
                 <Plus size={15} /> Host Open Game in Owner Hub
               </button>
-            ) : currentUser?.role === 'player' ? (
-              <button
-                id="btn-hub-host-player"
-                className="btn-primary"
-                onClick={() => onNavigateToDashboard?.('player', 'host_game')}
-                style={{ padding: '10px 18px', fontSize: 13, display: 'inline-flex', alignItems: 'center', gap: 7 }}
-              >
-                <Plus size={15} /> Host Open Game in My Profile
-              </button>
             ) : (
               <button
                 id="btn-hub-host-guest"
                 className="btn-secondary"
-                onClick={() => onNavigateToLogin?.('player')}
+                onClick={() => onNavigateToLogin?.('owner')}
                 style={{ padding: '10px 18px', fontSize: 13, display: 'inline-flex', alignItems: 'center', gap: 7 }}
               >
-                <Users size={15} /> Sign In to Host Open Game
+                <Building2 size={15} /> Owner Portal to Host
               </button>
             )}
           </div>
@@ -242,18 +233,17 @@ export default function OpenGamesHub({ onNavigateToVenue, onNavigateToDashboard,
           <Trophy size={40} style={{ color: '#94a3b8', margin: '0 auto 12px' }} />
           <h3 style={{ fontSize: 17, fontWeight: 700, color: '#0f172a' }}>No active pickup games for this sport yet</h3>
           <p style={{ color: '#64748b', fontSize: 13.5, marginTop: 4 }}>
-            You can start an open match from registered turfs inside your Player or Owner dashboard!
+            Venue owners can start an open match from the Owner Hub after booking a slot.
           </p>
           <button
             className="btn-primary"
             onClick={() => {
               if (currentUser?.role === 'owner') onNavigateToDashboard?.('owner');
-              else if (currentUser?.role === 'player') onNavigateToDashboard?.('player', 'host_game');
-              else onNavigateToLogin?.('player');
+              else onNavigateToLogin?.('owner');
             }}
             style={{ marginTop: 14 }}
           >
-            Host Match via Profile
+            {currentUser?.role === 'owner' ? 'Open Owner Hub' : 'Owner Portal to Host'}
           </button>
         </div>
       ) : (
