@@ -170,6 +170,18 @@ export default function OwnerSaaSView() {
   const [showQrModal, setShowQrModal] = useState(false);
   const [slotViewMode, setSlotViewMode] = useState('cards'); // 'cards' or 'table'
 
+  // Phones can't usefully show the wide live-slots table — keep cards only.
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const mq = window.matchMedia('(max-width: 768px)');
+    const apply = () => {
+      if (mq.matches) setSlotViewMode('cards');
+    };
+    apply();
+    mq.addEventListener?.('change', apply);
+    return () => mq.removeEventListener?.('change', apply);
+  }, []);
+
   // Reschedule booking modal
   const [showRescheduleModal, setShowRescheduleModal] = useState(false);
   const [rescheduleBooking, setRescheduleBooking] = useState(null);
@@ -2893,14 +2905,14 @@ export default function OwnerSaaSView() {
             </div>
           </div>
 
-          {/* Recent Bookings Table */}
+          {/* Recent Bookings — table on desktop, cards on phone */}
           <div className="nexus-card" style={{ overflow: 'hidden' }}>
             <div style={{ padding: '14px 18px', background: '#f8fafc', borderBottom: '1px solid var(--border-card)' }}>
               <h3 style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', margin: 0 }}>
                 Recent Bookings & Slot Reservations
               </h3>
             </div>
-            <div style={{ overflowX: 'auto' }}>
+            <div className="owner-table-desktop" style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 13 }}>
                 <thead>
                   <tr style={{ background: '#f8fafc', borderBottom: '1px solid var(--border-card)', color: 'var(--text-muted)', fontSize: 11.5 }}>
@@ -2977,6 +2989,50 @@ export default function OwnerSaaSView() {
                   })}
                 </tbody>
               </table>
+            </div>
+            <div className="owner-table-mobile">
+              {(Array.isArray(bookings) ? bookings : []).slice(0, 10).map(b => {
+                const isActive = b.status === 'confirmed' || b.status === 'pending_payment';
+                const needsCashCollection = isActive && ['pending', 'cash', 'partially_paid'].includes(b.payment_status);
+                return (
+                  <div key={b.id} className="owner-mobile-row">
+                    <div className="owner-mobile-row-top">
+                      <div>
+                        <div className="owner-mobile-row-title">{b.customer_name || 'Guest'}</div>
+                        <div className="owner-mobile-row-sub">{b.date} · {b.start_time}–{b.end_time}</div>
+                        <div className="owner-mobile-row-sub">{b.court_name || 'Court'}{b.customer_phone ? ` · ${b.customer_phone}` : ''}</div>
+                      </div>
+                      <div className="owner-mobile-row-amount">₹{b.total_amount}</div>
+                    </div>
+                    <div className="owner-mobile-row-meta">
+                      <span className={b.status === 'confirmed' ? 'badge-emerald' : 'badge-slate'} style={{ fontSize: 11 }}>
+                        {b.payment_status === 'partially_paid' ? 'Advance Paid' : b.status}{b.payment_mode === 'upi' ? ' · UPI' : ''}
+                      </span>
+                      {b.amount_paid < b.total_amount && (
+                        <span className="owner-mobile-row-due">₹{b.total_amount - b.amount_paid} due</span>
+                      )}
+                    </div>
+                    {isActive && (
+                      <div className="owner-mobile-row-actions">
+                        {needsCashCollection && (
+                          <button type="button" className="owner-mobile-action is-paid" onClick={() => handleMarkCashPaid(b)}>
+                            {b.payment_status === 'partially_paid' ? 'Mark Balance' : 'Mark Paid'}
+                          </button>
+                        )}
+                        <button type="button" className="owner-mobile-action is-reschedule" onClick={() => handleOpenReschedule(b)}>
+                          Reschedule
+                        </button>
+                        <button type="button" className="owner-mobile-action is-cancel" onClick={() => handleCancelBooking(b)}>
+                          Cancel
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+              {(Array.isArray(bookings) ? bookings : []).length === 0 && (
+                <div className="owner-mobile-empty">No recent bookings.</div>
+              )}
             </div>
           </div>
         </div>
@@ -3203,7 +3259,7 @@ export default function OwnerSaaSView() {
           </div>
 
           <div className="nexus-card" style={{ overflow: 'hidden' }}>
-            <div style={{ overflowX: 'auto' }}>
+            <div className="owner-table-desktop" style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 13 }}>
                 <thead>
                   <tr style={{ background: '#f8fafc', borderBottom: '1px solid var(--border-card)', color: 'var(--text-muted)', fontSize: 11.5 }}>
@@ -3236,6 +3292,28 @@ export default function OwnerSaaSView() {
                   ))}
                 </tbody>
               </table>
+            </div>
+            <div className="owner-table-mobile">
+              {customers.map(c => (
+                <div key={c.id} className="owner-mobile-row">
+                  <div className="owner-mobile-row-top">
+                    <div>
+                      <div className="owner-mobile-row-title">{c.name || 'Player'}</div>
+                      <div className="owner-mobile-row-sub">{c.phone || 'No phone'}</div>
+                    </div>
+                    <div className="owner-mobile-row-amount">₹{c.total_spend?.toLocaleString() || 0}</div>
+                  </div>
+                  <div className="owner-mobile-row-meta">
+                    <span>{c.booking_count || 0} bookings</span>
+                    <span>
+                      Last: {c.last_booking_date ? new Date(c.last_booking_date).toLocaleDateString() : 'Recent'}
+                    </span>
+                  </div>
+                </div>
+              ))}
+              {customers.length === 0 && (
+                <div className="owner-mobile-empty">No customers yet.</div>
+              )}
             </div>
           </div>
         </div>
@@ -3305,9 +3383,9 @@ export default function OwnerSaaSView() {
             </div>
           </div>
 
-          {/* Transaction list */}
+          {/* Transaction list — table on desktop, cards on phone */}
           <div className="nexus-card" style={{ overflow: 'hidden' }}>
-            <div style={{ overflowX: 'auto' }}>
+            <div className="owner-table-desktop" style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 13 }}>
                 <thead>
                   <tr style={{ background: '#f8fafc', borderBottom: '1px solid var(--border-card)', color: 'var(--text-muted)', fontSize: 11.5 }}>
@@ -3368,6 +3446,42 @@ export default function OwnerSaaSView() {
                   )}
                 </tbody>
               </table>
+            </div>
+            <div className="owner-table-mobile">
+              {(billingData?.transactions || []).map(t => {
+                const invoiceNo = `INV-${(t.date || '').replace(/-/g, '')}-${(t.id || '').replace(/-/g, '').slice(0, 6).toUpperCase()}`;
+                return (
+                  <div key={t.id} className="owner-mobile-row">
+                    <div className="owner-mobile-row-top">
+                      <div>
+                        <div className="owner-mobile-row-title">{t.customer_name || 'Player'}</div>
+                        <div className="owner-mobile-row-sub">{t.date}{t.start_time ? ` · ${t.start_time}` : ''} · {t.court_name || 'Court'}</div>
+                        <div className="owner-mobile-row-sub">{invoiceNo} · {(t.payment_provider || t.payment_status || '').toString().toUpperCase()}</div>
+                      </div>
+                      <div className="owner-mobile-row-amount">₹{t.amount_paid}</div>
+                    </div>
+                    <div className="owner-mobile-row-meta">
+                      <span style={{
+                        fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', padding: '3px 8px', borderRadius: 999,
+                        background: t.status === 'confirmed' || t.status === 'completed' ? 'rgba(16,185,129,0.12)' : t.status === 'cancelled' ? 'rgba(239,68,68,0.12)' : 'rgba(148,163,184,0.15)',
+                        color: t.status === 'confirmed' || t.status === 'completed' ? '#059669' : t.status === 'cancelled' ? '#dc2626' : '#64748b'
+                      }}>
+                        {t.status}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setReceiptBooking(t)}
+                        className="btn-secondary owner-mobile-invoice-btn"
+                      >
+                        <Receipt size={12} /> Invoice
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+              {!loadingBilling && (billingData?.transactions || []).length === 0 && (
+                <div className="owner-mobile-empty">No transactions in this date range.</div>
+              )}
             </div>
           </div>
         </div>
