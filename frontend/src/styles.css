@@ -760,6 +760,71 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   cursor: pointer;
 }
 
+.turf-summary-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.turf-summary-close {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  min-height: 40px;
+  border-radius: 10px;
+  border: 1px solid var(--border-light);
+  background: #ffffff;
+  color: var(--text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.turf-booking-summary-col.is-open .turf-summary-close {
+  display: inline-flex;
+}
+
+@media (max-width: 768px) {
+  .turf-booking-summary-col {
+    display: none;
+  }
+
+  .turf-booking-summary-col.is-open {
+    display: flex;
+    position: fixed;
+    inset: 0;
+    z-index: 1100;
+    align-items: flex-end;
+    justify-content: center;
+    background: rgba(18, 32, 27, 0.45);
+    backdrop-filter: blur(3px);
+    padding: 12px;
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .turf-booking-summary-col.is-open .turf-booking-summary {
+    width: 100%;
+    max-width: 520px;
+    max-height: min(92vh, 920px);
+    overflow-y: auto;
+    margin-top: auto;
+    border-radius: 16px !important;
+    position: relative !important;
+    top: auto !important;
+    box-shadow: 0 -8px 32px rgba(15, 23, 42, 0.18);
+  }
+
+  .turf-summary-close {
+    display: inline-flex !important;
+  }
+}
+
 @media (max-width: 768px) {
   .turf-booking-page {
     padding: 8px 0 88px;

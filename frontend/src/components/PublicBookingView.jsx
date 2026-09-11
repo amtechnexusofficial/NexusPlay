@@ -4,7 +4,7 @@ import {
   Calendar, Clock, MapPin, Phone, ShieldCheck, ChevronRight,
   Share2, Users, ArrowLeft, CheckCircle, AlertCircle,
   Split, Sparkles, Trophy, Lock, QrCode, Copy, CheckCircle2,
-  ExternalLink, RefreshCw, Star
+  ExternalLink, RefreshCw, Star, X
 } from 'lucide-react';
 
 export default function PublicBookingView({ slug = 'nexus-central-koramangala', onBack, currentUser }) {
@@ -62,6 +62,7 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
   const [hostError, setHostError] = useState('');
   const [hostSuccess, setHostSuccess] = useState('');
   const [showVenueDetails, setShowVenueDetails] = useState(false);
+  const [showBookingSheet, setShowBookingSheet] = useState(false);
 
   function handleProceedToJoinPayment() {
     if (!selectedSlot?.game) return;
@@ -368,6 +369,7 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
     }
     setActiveHold(null);
     setSelectedSlot(null);
+    setShowBookingSheet(false);
     setCheckoutStep('slots');
     setUpiUtr('');
     setErrorMsg('');
@@ -459,6 +461,18 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
     setHostError('');
     setHostSuccess('');
     prepareHostDefaults(slot);
+    setShowBookingSheet(true);
+  }
+
+  async function closeBookingSheet() {
+    if (activeHold?.bookingId) {
+      await handleCancelHold();
+    } else {
+      setSelectedSlot(null);
+      setSlotIntent('book');
+      setErrorMsg('');
+    }
+    setShowBookingSheet(false);
   }
 
   function formatSlotTime(t) {
@@ -742,12 +756,31 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
             )}
           </div>
 
-          {/* Right Column: Checkout Summary & Temporary Lock Widget */}
-          <div>
-            <div className="nexus-card" style={{ padding: 22, position: 'sticky', top: 20, background: '#ffffff', border: '1px solid #e2e8f0' }}>
-              <h3 className="font-display" style={{ fontSize: 20, fontWeight: 700, color: '#0f172a', marginBottom: 16 }}>
-                Booking Summary
-              </h3>
+          {/* Right Column: Checkout Summary — sticky on desktop, sheet/modal on phone */}
+          <div
+            className={`turf-booking-summary-col${selectedSlot && showBookingSheet ? ' is-open' : ''}`}
+            onClick={(e) => {
+              if (e.target === e.currentTarget) closeBookingSheet();
+            }}
+          >
+            <div
+              className="nexus-card turf-booking-summary"
+              style={{ padding: 22, position: 'sticky', top: 20, background: '#ffffff', border: '1px solid #e2e8f0' }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="turf-summary-header">
+                <h3 className="font-display" style={{ fontSize: 20, fontWeight: 700, color: '#0f172a', margin: 0 }}>
+                  Booking Summary
+                </h3>
+                <button
+                  type="button"
+                  className="turf-summary-close"
+                  onClick={closeBookingSheet}
+                  aria-label="Close booking summary"
+                >
+                  <X size={18} />
+                </button>
+              </div>
 
               {selectedSlot?.game ? (
                 <div>
