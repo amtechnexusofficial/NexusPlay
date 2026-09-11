@@ -11,7 +11,17 @@ import { notifyInTx, notify } from "./notifications.js";
 
 export async function getContext(sql, organizationId, user) {
   const [organization] = await sql`select id, name from organizations where id = ${organizationId}`;
-  const venues = await sql`select * from venues where organization_id = ${organizationId} order by created_at desc`;
+  // One courts query for the whole org (was N+1 per venue) — Neon HTTP
+  // makes each await a round-trip, so this cuts bootstrap latency hard.
+  const [venues, courts] = await Promise.all([
+    sql`select * from venues where organization_id = ${organizationId} order by created_at desc`,
+    sql`select * from courts where organization_id = ${organizationId} order by created_at`,
+  ]);
+
+  const courtsByVenue = {};
+  for (const c of courts) {
+    (courtsByVenue[c.venue_id] ||= []).push(c);
+  }
 
   // The dashboard shell (court dropdowns in the block/walk-in modals, and
   // the Courts tab itself) reads selectedVenue.courts directly, so embed
@@ -19,17 +29,10 @@ export async function getContext(sql, organizationId, user) {
   // separately per venue. No status filter — unlike
   // listPublicCourtsForVenue (which is the actual "is this bookable by a
   // player" gate), this feeds the OWNER's own view of their inventory.
-  // Filtering to 'active' here made an unpublished court invisible to its
-  // own owner: the Courts tab it needed to be edited, republished, or
-  // deleted from would just silently drop it, while its already-generated
-  // slots kept showing in Live Slots (which never filtered by court
-  // status) with no way back to it.
-  const venuesWithCourts = await Promise.all(
-    venues.map(async (v) => ({
-      ...v,
-      courts: await sql`select * from courts where venue_id = ${v.id} order by created_at`,
-    }))
-  );
+  const venuesWithCourts = venues.map((v) => ({
+    ...v,
+    courts: courtsByVenue[v.id] || [],
+  }));
 
   return { user, organization, venues: venuesWithCourts };
 }

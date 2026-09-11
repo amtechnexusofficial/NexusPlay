@@ -190,7 +190,7 @@ export default function OwnerSaaSView() {
   const [rescheduleEndTime, setRescheduleEndTime] = useState('');
   const [submittingReschedule, setSubmittingReschedule] = useState(false);
 
-  // Load Initial Data
+  // Load Initial Data — slots first; analytics/CRM/bookings/UPI in background
   async function loadData(targetVenueId = null) {
     try {
       setLoading(true);
@@ -207,20 +207,25 @@ export default function OwnerSaaSView() {
         populateBizForm(v);
 
         const vId = v.id;
-        const [anData, bData, cData, pendingUpi] = await Promise.all([
+        // Critical path: live slots for the default tab — do not wait on
+        // analytics / CRM / bookings / UPI (those were serializing first paint).
+        setLoadingSlots(true);
+        const slotsPromise = loadLiveSlots(vId, calendarDate);
+
+        // Secondary dashboard data — fire and forget
+        Promise.all([
           api.getOwnerAnalytics(vId).catch(() => null),
           api.getOwnerBookings({ venueId: vId }).catch(() => []),
           api.getCustomers().catch(() => []),
           api.getPendingUpiBookings(vId).catch(() => [])
-        ]);
+        ]).then(([anData, bData, cData, pendingUpi]) => {
+          setAnalytics(anData);
+          setBookings(bData || []);
+          setCustomers(cData || []);
+          setPendingUpiBookings(pendingUpi || []);
+        });
 
-        setAnalytics(anData);
-        setBookings(bData || []);
-        setCustomers(cData || []);
-        setPendingUpiBookings(pendingUpi || []);
-
-        // Load live slots for default date
-        loadLiveSlots(vId, calendarDate);
+        await slotsPromise;
       }
     } catch (err) {
       console.error('Error fetching owner data:', err);
@@ -326,7 +331,20 @@ export default function OwnerSaaSView() {
     if (v) {
       setSelectedVenue(v);
       populateBizForm(v);
+      setLoadingSlots(true);
       loadLiveSlots(v.id, calendarDate);
+      // Refresh secondary tabs in the background for the new venue
+      Promise.all([
+        api.getOwnerAnalytics(v.id).catch(() => null),
+        api.getOwnerBookings({ venueId: v.id }).catch(() => []),
+        api.getCustomers().catch(() => []),
+        api.getPendingUpiBookings(v.id).catch(() => [])
+      ]).then(([anData, bData, cData, pendingUpi]) => {
+        setAnalytics(anData);
+        setBookings(bData || []);
+        setCustomers(cData || []);
+        setPendingUpiBookings(pendingUpi || []);
+      });
     }
   }
 

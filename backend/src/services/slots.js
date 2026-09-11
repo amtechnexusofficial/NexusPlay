@@ -412,42 +412,54 @@ export async function updateSlotPrice(sql, organizationId, slotId, price) {
 // slot enriched with its booking (if any). Ensures the grid exists first.
 export async function listLiveSlots(sql, organizationId, venueId, date) {
   const targetDate = date || dateStr(new Date());
-  await generateSlotsForNextDays(sql, venueId, 7);
 
-  const slots = await sql`
-    select cs.*, c.name as court_name, sp.slug as sport_id, c.capacity as court_capacity,
-           c.base_price, c.peak_price, c.weekend_price
-    from court_slots cs
-    join courts c on cs.court_id = c.id
-    join sports sp on c.sport_id = sp.id
-    where cs.organization_id = ${organizationId} and cs.venue_id = ${venueId} and cs.date = ${targetDate}
-    order by c.name asc, cs.start_time asc
+  // Previously always ran generateSlotsForNextDays(7) on every refresh —
+  // multi-second even when the grid already existed. Only fill the
+  // requested date when it has zero rows (same approach as public listSlots).
+  const existing = await sql`
+    select 1 as ok from court_slots
+    where venue_id = ${venueId} and date = ${targetDate}
+    limit 1
   `;
+  if (existing.length === 0) {
+    await generateSlotsForDates(sql, venueId, [targetDate]);
+  }
 
-  const bookings = await sql`
-    select b.id, b.court_slot_id, b.customer_id, b.total_amount, b.amount_paid, b.status, b.payment_status,
-           b.source, b.notes, c.name as customer_name, c.phone as customer_phone
-    from bookings b
-    join court_slots cs on b.court_slot_id = cs.id
-    left join customers c on b.customer_id = c.id
-    where b.organization_id = ${organizationId} and b.venue_id = ${venueId} and cs.date = ${targetDate}
-  `;
+  // Slots + bookings + games in parallel (was serial Neon RTTs).
+  const [slots, bookings, games] = await Promise.all([
+    sql`
+      select cs.id, cs.court_id, cs.venue_id, cs.date, cs.start_time, cs.end_time,
+             cs.price, cs.status, cs.block_reason, cs.organization_id,
+             c.name as court_name, sp.slug as sport_id, c.capacity as court_capacity,
+             c.base_price, c.peak_price, c.weekend_price
+      from court_slots cs
+      join courts c on cs.court_id = c.id
+      join sports sp on c.sport_id = sp.id
+      where cs.organization_id = ${organizationId} and cs.venue_id = ${venueId} and cs.date = ${targetDate}
+      order by c.name asc, cs.start_time asc
+    `,
+    sql`
+      select b.id, b.court_slot_id, b.customer_id, b.total_amount, b.amount_paid, b.status, b.payment_status,
+             b.source, b.notes, c.name as customer_name, c.phone as customer_phone
+      from bookings b
+      join court_slots cs on b.court_slot_id = cs.id
+      left join customers c on b.customer_id = c.id
+      where b.organization_id = ${organizationId} and b.venue_id = ${venueId} and cs.date = ${targetDate}
+    `,
+    sql`
+      select g.*, g.capacity as required_players, g.price_per_player as cost_per_player
+      from games g
+      join court_slots cs on g.court_slot_id = cs.id
+      where g.organization_id = ${organizationId} and g.venue_id = ${venueId} and cs.date = ${targetDate}
+        and g.status in ('open', 'confirmed')
+    `,
+  ]);
+
   const bookingBySlot = {};
   for (const b of bookings) {
     if (b.court_slot_id) bookingBySlot[b.court_slot_id] = b;
   }
 
-  // Open/confirmed pickup games on this venue's slots — the owner dashboard
-  // shows "4/8 joined" and, when reviewing a full-slot inquiry, needs each
-  // registered player's name + phone so the owner knows who to actually
-  // refund (there's no payment gateway holding this money to auto-refund).
-  const games = await sql`
-    select g.*, g.capacity as required_players, g.price_per_player as cost_per_player
-    from games g
-    join court_slots cs on g.court_slot_id = cs.id
-    where g.organization_id = ${organizationId} and g.venue_id = ${venueId} and cs.date = ${targetDate}
-      and g.status in ('open', 'confirmed')
-  `;
   const gameBySlot = {};
   for (const g of games) gameBySlot[g.court_slot_id] = g;
 
