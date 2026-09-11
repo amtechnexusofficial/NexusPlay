@@ -12,7 +12,10 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
   const [sports, setSports] = useState([]);
   const [selectedSport, setSelectedSport] = useState(null);
   const [selectedCourt, setSelectedCourt] = useState(null);
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  });
   const [slots, setSlots] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedSlot, setSelectedSlot] = useState(null);
@@ -393,8 +396,40 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
     );
   }
 
-  // Filter available courts by sport
-  const filteredCourts = (Array.isArray(venue.courts) ? venue.courts : []).filter(c => !selectedSport || c.sport_id === selectedSport);
+  // Filter courts by selected sport (UUID or slug). Also merge in any court
+  // that still has slots for that sport so inactive/unpublished courts aren't
+  // silently dropped while the owner live calendar still shows them.
+  function sportMatches(entity) {
+    if (!selectedSport) return true;
+    const sel = String(selectedSport);
+    const id = String(entity?.sport_id || '');
+    const slug = String(entity?.sport_slug || '');
+    if (id === sel || slug === sel) return true;
+    const sport = sports.find((s) => String(s.id) === sel || s.slug === sel);
+    if (!sport) return false;
+    return id === String(sport.id) || slug === sport.slug || id === sport.slug;
+  }
+
+  const filteredCourts = (() => {
+    const map = new Map();
+    for (const c of Array.isArray(venue.courts) ? venue.courts : []) {
+      if (sportMatches(c)) map.set(c.id, c);
+    }
+    for (const s of slots) {
+      if (!sportMatches(s)) continue;
+      if (!map.has(s.court_id)) {
+        map.set(s.court_id, {
+          id: s.court_id,
+          name: s.court_name || 'Court',
+          sport_id: s.sport_id,
+          capacity: null,
+          slot_duration_minutes: null,
+          base_price: s.price
+        });
+      }
+    }
+    return [...map.values()];
+  })();
 
   // Owner-configurable deposit — see Business Setup's "Advance Payment %".
   // 100 (the default) means "pay in full to lock the slot", same as
@@ -407,9 +442,14 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
   const balanceAtVenue = selectedSlot ? selectedSlot.price - advanceAmount : 0;
 
   function selectSlot(slot) {
-    const court = (venue.courts || []).find((c) => c.id === slot.court_id);
+    const court = (venue.courts || []).find((c) => c.id === slot.court_id)
+      || filteredCourts.find((c) => c.id === slot.court_id);
     if (court) setSelectedCourt(court);
-    if (slot.sport_id) setSelectedSport(slot.sport_id);
+    // Prefer UUID from venue.sport_ids / courts so the sport chip stays selected
+    const sportUuid = sports.find(
+      (s) => s.id === slot.sport_id || s.slug === slot.sport_id || s.slug === slot.sport_slug
+    )?.id || slot.sport_id;
+    if (sportUuid) setSelectedSport(sportUuid);
     setSelectedSlot(slot);
     setErrorMsg('');
     setJoinGameError(''); setJoinGameSuccess('');
@@ -423,6 +463,11 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
 
   function formatSlotTime(t) {
     return String(t || '').slice(0, 5);
+  }
+
+  function localDateStr(base = new Date(), offsetDays = 0) {
+    const d = new Date(base.getFullYear(), base.getMonth(), base.getDate() + offsetDays);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   }
 
   return (
@@ -571,8 +616,9 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
           <div className="turf-date-strip scroll-pills" role="tablist" aria-label="Choose date">
             {Array.from({ length: 7 }).map((_, i) => {
               const d = new Date();
+              d.setHours(12, 0, 0, 0);
               d.setDate(d.getDate() + i);
-              const dStr = d.toISOString().slice(0, 10);
+              const dStr = localDateStr(new Date(), i);
               const isSelected = selectedDate === dStr;
               const dayName = d.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
               const dayNum = d.getDate();
@@ -594,10 +640,10 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
             })}
           </div>
 
-          {(Array.isArray(venue.sport_ids) ? venue.sport_ids : []).length > 1 && (
+          {(Array.isArray(venue.sport_ids) ? venue.sport_ids : []).length > 0 && (
             <div className="turf-filter-row scroll-pills" role="tablist" aria-label="Select sport">
               {(Array.isArray(venue.sport_ids) ? venue.sport_ids : []).map((sport) => {
-                const sportInfo = sports.find((s) => s.id === sport);
+                const sportInfo = sports.find((s) => s.id === sport || s.slug === sport);
                 return (
                   <button
                     key={sport}
@@ -608,7 +654,10 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
                     onClick={() => {
                       setSelectedSport(sport);
                       setSelectedSlot(null);
-                      const matchingCourt = (Array.isArray(venue.courts) ? venue.courts : []).find((c) => c.sport_id === sport);
+                      const matchingCourt = (Array.isArray(venue.courts) ? venue.courts : []).find((c) => {
+                        const sid = String(c.sport_id || '');
+                        return sid === String(sport) || sid === sportInfo?.slug || sid === String(sportInfo?.id || '');
+                      });
                       if (matchingCourt) setSelectedCourt(matchingCourt);
                     }}
                   >
@@ -627,42 +676,51 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
               <div className="turf-empty-slots">No courts available for this sport.</div>
             ) : (
               filteredCourts.map((crt) => {
-                const courtSlots = slots.filter(
-                  (s) =>
-                    s.court_id === crt.id &&
-                    (s.status === 'open' || s.status === 'held')
-                );
+                const courtSlots = slots
+                  .filter(
+                    (s) =>
+                      s.court_id === crt.id &&
+                      (s.status === 'open' || s.status === 'held' || s.status === 'booked')
+                  )
+                  .sort((a, b) => String(a.start_time).localeCompare(String(b.start_time)));
                 return (
                   <div key={crt.id} className="turf-court-card">
                     <div className="turf-court-card-head">
                       <div>
                         <div className="turf-court-name">{crt.name}</div>
                         <div className="turf-court-meta">
-                          {crt.capacity} players · {crt.slot_duration_minutes}m · from ₹{crt.base_price}/hr
+                          {[
+                            crt.capacity ? `${crt.capacity} players` : null,
+                            crt.slot_duration_minutes ? `${crt.slot_duration_minutes}m` : null,
+                            crt.base_price != null ? `from ₹${crt.base_price}/hr` : null
+                          ].filter(Boolean).join(' · ') || 'Slots for this court'}
                         </div>
                       </div>
                     </div>
                     {courtSlots.length === 0 ? (
-                      <div className="turf-court-no-slots">No open slots on this date</div>
+                      <div className="turf-court-no-slots">No slots on this date</div>
                     ) : (
                       <div className="turf-slot-row">
                         {courtSlots.map((slot) => {
                           const isOpen = slot.status === 'open';
                           const isHeld = slot.status === 'held';
+                          const isBooked = slot.status === 'booked';
                           const isSelected = selectedSlot?.id === slot.id;
-                          const hasOpenGame = isOpen && !!slot.game;
+                          const hasOpenGame = !!slot.game && (isOpen || isHeld);
                           const canTap = isOpen || (isHeld && !!slot.game);
                           return (
                             <button
                               key={slot.id}
                               type="button"
                               disabled={!canTap}
-                              className={`turf-slot-btn${isSelected ? ' is-selected' : ''}${isHeld ? ' is-held' : ''}${!isOpen && !hasOpenGame ? ' is-locked' : ''}`}
+                              className={`turf-slot-btn${isSelected ? ' is-selected' : ''}${isHeld ? ' is-held' : ''}${isBooked || (!isOpen && !hasOpenGame) ? ' is-locked' : ''}`}
                               onClick={() => selectSlot(slot)}
                             >
                               <span className="turf-slot-time">{formatSlotTime(slot.start_time)}</span>
                               <span className="turf-slot-sub">
-                                {isOpen
+                                {isBooked
+                                  ? 'Booked'
+                                  : isOpen
                                   ? `₹${slot.price}`
                                   : hasOpenGame
                                   ? `${slot.game.current_players}/${slot.game.required_players} joined`

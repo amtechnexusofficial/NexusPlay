@@ -245,8 +245,10 @@ export async function listSlots(sql, venueId, { date, courtId } = {}) {
   const fetch = () =>
     courtId
       ? sql`
-          select s.*, c.name as court_name, c.sport_id
-          from court_slots s join courts c on s.court_id = c.id
+          select s.*, c.name as court_name, c.sport_id, sp.slug as sport_slug
+          from court_slots s
+          join courts c on s.court_id = c.id
+          join sports sp on c.sport_id = sp.id
           where s.venue_id = ${venueId} and s.date = ${queryDate} and s.court_id = ${courtId}
             and (
               ${queryDate}::date > (timezone('Asia/Kolkata', now()))::date
@@ -257,8 +259,10 @@ export async function listSlots(sql, venueId, { date, courtId } = {}) {
             )
           order by s.start_time asc`
       : sql`
-          select s.*, c.name as court_name, c.sport_id
-          from court_slots s join courts c on s.court_id = c.id
+          select s.*, c.name as court_name, c.sport_id, sp.slug as sport_slug
+          from court_slots s
+          join courts c on s.court_id = c.id
+          join sports sp on c.sport_id = sp.id
           where s.venue_id = ${venueId} and s.date = ${queryDate}
             and (
               ${queryDate}::date > (timezone('Asia/Kolkata', now()))::date
@@ -267,7 +271,7 @@ export async function listSlots(sql, venueId, { date, courtId } = {}) {
                 and s.start_time::time > (timezone('Asia/Kolkata', now()))::time
               )
             )
-          order by s.start_time asc`;
+          order by c.name asc, s.start_time asc`;
 
   let slots = await fetch();
   if (slots.length === 0) {

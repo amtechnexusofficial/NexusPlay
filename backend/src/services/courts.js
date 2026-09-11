@@ -7,12 +7,15 @@ export async function listCourtsForVenue(sql, organizationId, venueId) {
 }
 
 // Public: courts for the shareable venue page — no org check needed since
-// getPublicVenue already filtered to active venues.
+// getPublicVenue already filtered to active venues. Include inactive courts
+// too: owners still see their slots on the live calendar, and players should
+// be able to book those same courts (inactive is used as a soft pause, not a
+// hard unpublish).
 export async function listPublicCourtsForVenue(sql, venueId) {
   return sql`
     select id, venue_id, name, sport_id, capacity, slot_duration_minutes,
-           base_price, peak_price, weekend_price, peak_hours, open_time, close_time
-    from courts where venue_id = ${venueId} and status = 'active'
+           base_price, peak_price, weekend_price, peak_hours, open_time, close_time, status
+    from courts where venue_id = ${venueId}
     order by created_at
   `;
 }
