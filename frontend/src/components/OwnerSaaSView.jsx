@@ -1219,34 +1219,19 @@ export default function OwnerSaaSView() {
       
       {/* VENUE UNIQUE LINK & SWITCHER BANNER */}
       {selectedVenue && (
-        <div
-          className="nexus-card mobile-stack"
-          style={{
-            padding: '16px 20px',
-            marginBottom: 20,
-            background: '#ffffff',
-            border: '1px solid #e2e8f0',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            gap: 16
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            <div style={{ width: 44, height: 44, borderRadius: 10, background: '#ecfdf5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#059669', flexShrink: 0 }}>
-              <Building size={22} />
+        <div className="owner-venue-banner nexus-card">
+          <div className="owner-venue-banner-main">
+            <div className="owner-venue-banner-icon" aria-hidden="true">
+              <Building size={20} />
             </div>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <span className="badge-emerald" style={{ fontSize: 10, padding: '2px 8px' }}>
-                  ACTIVE ARENA
-                </span>
+            <div className="owner-venue-banner-text">
+              <div className="owner-venue-banner-meta">
+                <span className="badge-emerald owner-venue-banner-badge">ACTIVE ARENA</span>
                 {venues.length > 1 && (
                   <select
                     value={selectedVenue.id}
                     onChange={e => handleVenueChange(e.target.value)}
-                    style={{ background: '#ffffff', border: '1px solid #cbd5e1', color: '#0f172a', padding: '3px 8px', borderRadius: 6, fontSize: 12, outline: 'none' }}
+                    className="owner-venue-banner-switcher"
                   >
                     {venues.map(v => (
                       <option key={v.id} value={v.id}>{v.name}</option>
@@ -1254,31 +1239,29 @@ export default function OwnerSaaSView() {
                   </select>
                 )}
               </div>
-              <h2 className="font-display" style={{ fontSize: 20, fontWeight: 800, color: '#0f172a', margin: '3px 0 0 0' }}>
-                {selectedVenue.name}
-              </h2>
-              <div style={{ fontSize: 12, color: '#64748b' }}>
-                {selectedVenue.address}
-              </div>
+              <h2 className="font-display owner-venue-banner-name">{selectedVenue.name}</h2>
+              {selectedVenue.address && (
+                <div className="owner-venue-banner-address">{selectedVenue.address}</div>
+              )}
             </div>
           </div>
 
-          {/* Unique Turf Booking Link Controls */}
-          <div className="mobile-btn-group" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <div className="owner-venue-banner-actions">
             <button
+              type="button"
               onClick={handleCopyUniqueTurfLink}
-              className="btn-primary"
-              style={{ fontSize: 12, padding: '7px 12px', flex: '1 1 auto' }}
+              className="btn-primary owner-venue-copy-btn"
             >
               {copiedLink ? <Check size={14} /> : <Copy size={14} />}
-              {copiedLink ? 'Copied' : 'Copy Link'}
+              <span>{copiedLink ? 'Copied' : 'Copy Link'}</span>
             </button>
 
             <button
+              type="button"
               onClick={() => setShowQrModal(true)}
-              className="btn-secondary"
+              className="btn-secondary owner-venue-qr-btn"
               title="Show QR Code"
-              style={{ fontSize: 12, padding: '7px 10px' }}
+              aria-label="Show QR Code"
             >
               <QrCode size={15} />
             </button>

@@ -1514,3 +1514,159 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   background: var(--owner-bg);
   min-height: 100vh;
 }
+
+.owner-venue-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  margin-bottom: 20px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.owner-venue-banner-main {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  flex: 1;
+}
+
+.owner-venue-banner-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: #ecfdf5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #059669;
+  flex-shrink: 0;
+}
+
+.owner-venue-banner-text {
+  min-width: 0;
+}
+
+.owner-venue-banner-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.owner-venue-banner-badge {
+  font-size: 10px;
+  padding: 2px 8px;
+}
+
+.owner-venue-banner-switcher {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: #0f172a;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  outline: none;
+  max-width: 100%;
+}
+
+.owner-venue-banner-name {
+  font-size: 20px;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 3px 0 0;
+  line-height: 1.2;
+}
+
+.owner-venue-banner-address {
+  font-size: 12px;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+.owner-venue-banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.owner-venue-copy-btn {
+  font-size: 12px;
+  padding: 7px 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.owner-venue-qr-btn {
+  font-size: 12px;
+  padding: 7px 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  min-height: 36px;
+}
+
+@media (max-width: 768px) {
+  .owner-venue-banner {
+    padding: 10px 12px;
+    margin-bottom: 12px;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .owner-venue-banner-main {
+    gap: 0;
+  }
+
+  .owner-venue-banner-icon,
+  .owner-venue-banner-badge,
+  .owner-venue-banner-address {
+    display: none;
+  }
+
+  .owner-venue-banner-name {
+    font-size: 15px;
+    font-weight: 750;
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .owner-venue-banner-meta:empty,
+  .owner-venue-banner-meta:not(:has(select)) {
+    display: none;
+  }
+
+  .owner-venue-banner-meta:has(select) {
+    margin-bottom: 2px;
+  }
+
+  .owner-venue-banner-switcher {
+    font-size: 11px;
+    padding: 2px 6px;
+  }
+
+  .owner-venue-banner-actions {
+    gap: 6px;
+  }
+
+  .owner-venue-copy-btn {
+    padding: 6px 10px;
+    font-size: 11.5px;
+    min-height: 34px;
+  }
+
+  .owner-venue-qr-btn {
+    padding: 6px 8px;
+    min-width: 34px;
+    min-height: 34px;
+  }
+}
