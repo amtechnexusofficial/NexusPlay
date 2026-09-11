@@ -1215,11 +1215,11 @@ export default function OwnerSaaSView() {
 
   return (
     <>
-    <div style={{ maxWidth: 1280, margin: '0 auto', padding: '16px 16px 80px' }}>
+    <div className="owner-hub-page" style={{ maxWidth: 1280, margin: '0 auto', padding: '16px 16px 80px' }}>
       
       {/* VENUE UNIQUE LINK & SWITCHER BANNER */}
       {selectedVenue && (
-        <div className="owner-venue-banner nexus-card">
+        <div className="owner-venue-banner">
           <div className="owner-venue-banner-main">
             <div className="owner-venue-banner-icon" aria-hidden="true">
               <Building size={20} />
@@ -1251,9 +1251,11 @@ export default function OwnerSaaSView() {
               type="button"
               onClick={handleCopyUniqueTurfLink}
               className="btn-primary owner-venue-copy-btn"
+              title={copiedLink ? 'Copied' : 'Copy booking link'}
+              aria-label={copiedLink ? 'Copied' : 'Copy booking link'}
             >
               {copiedLink ? <Check size={14} /> : <Copy size={14} />}
-              <span>{copiedLink ? 'Copied' : 'Copy Link'}</span>
+              <span className="owner-venue-copy-label">{copiedLink ? 'Copied' : 'Copy Link'}</span>
             </button>
 
             <button
@@ -1269,180 +1271,79 @@ export default function OwnerSaaSView() {
         </div>
       )}
 
-      {/* NAVIGATION TABS (TOUCH-FRIENDLY HORIZONTAL SCROLL) */}
-      <div className="scroll-pills" style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: 12, marginBottom: 22, display: 'flex', gap: 8, overflowX: 'auto' }}>
+      {/* NAVIGATION TABS */}
+      <div className="owner-tabs scroll-pills">
         <button
+          type="button"
+          className={`owner-tab${activeTab === 'live_slots' ? ' is-active' : ''}`}
           onClick={() => setActiveTab('live_slots')}
-          style={{
-            height: 40,
-            background: activeTab === 'live_slots' ? '#059669' : '#ffffff',
-            color: activeTab === 'live_slots' ? '#ffffff' : '#334155',
-            border: activeTab === 'live_slots' ? '1px solid #059669' : '1px solid #cbd5e1',
-            borderRadius: 10,
-            padding: '0 16px',
-            fontWeight: 700,
-            fontSize: 13,
-            cursor: 'pointer',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 7,
-            whiteSpace: 'nowrap',
-            boxShadow: activeTab === 'live_slots' ? '0 2px 5px rgba(5,150,105,0.2)' : '0 1px 2px rgba(0,0,0,0.03)',
-            transition: 'all 0.15s ease'
-          }}
         >
-          <Calendar size={15} /> Live Slots & Calendar
+          <Calendar size={14} />
+          <span className="owner-tab-full">Live Slots & Calendar</span>
+          <span className="owner-tab-short">Slots</span>
         </button>
 
         <button
+          type="button"
+          className={`owner-tab${activeTab === 'dashboard' ? ' is-active' : ''}`}
           onClick={() => setActiveTab('dashboard')}
-          style={{
-            height: 40,
-            background: activeTab === 'dashboard' ? '#059669' : '#ffffff',
-            color: activeTab === 'dashboard' ? '#ffffff' : '#334155',
-            border: activeTab === 'dashboard' ? '1px solid #059669' : '1px solid #cbd5e1',
-            borderRadius: 10,
-            padding: '0 16px',
-            fontWeight: 700,
-            fontSize: 13,
-            cursor: 'pointer',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 7,
-            whiteSpace: 'nowrap',
-            boxShadow: activeTab === 'dashboard' ? '0 2px 5px rgba(5,150,105,0.2)' : '0 1px 2px rgba(0,0,0,0.03)',
-            transition: 'all 0.15s ease'
-          }}
         >
-          <LayoutDashboard size={15} /> Overview & Analytics
+          <LayoutDashboard size={14} />
+          <span className="owner-tab-full">Overview & Analytics</span>
+          <span className="owner-tab-short">Overview</span>
         </button>
 
         <button
+          type="button"
+          className={`owner-tab${activeTab === 'upi_verification' ? ' is-active' : ''}`}
           onClick={() => setActiveTab('upi_verification')}
-          style={{
-            height: 40,
-            background: activeTab === 'upi_verification' ? '#059669' : '#ffffff',
-            color: activeTab === 'upi_verification' ? '#ffffff' : '#334155',
-            border: activeTab === 'upi_verification' ? '1px solid #059669' : '1px solid #cbd5e1',
-            borderRadius: 10,
-            padding: '0 16px',
-            fontWeight: 700,
-            fontSize: 13,
-            cursor: 'pointer',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 7,
-            position: 'relative',
-            whiteSpace: 'nowrap',
-            boxShadow: activeTab === 'upi_verification' ? '0 2px 5px rgba(5,150,105,0.2)' : '0 1px 2px rgba(0,0,0,0.03)',
-            transition: 'all 0.15s ease'
-          }}
         >
-          <ShieldCheck size={15} /> UPI Direct Audit
+          <ShieldCheck size={14} />
+          <span className="owner-tab-full">UPI Direct Audit</span>
+          <span className="owner-tab-short">UPI</span>
           {pendingUpiBookings.length > 0 && (
-            <span style={{ 
-              background: activeTab === 'upi_verification' ? '#ffffff' : '#f59e0b', 
-              color: activeTab === 'upi_verification' ? '#059669' : '#000', 
-              fontSize: 10, 
-              fontWeight: 800, 
-              padding: '1px 6px', 
-              borderRadius: 999 
-            }}>
-              {pendingUpiBookings.length}
-            </span>
+            <span className="owner-tab-badge">{pendingUpiBookings.length}</span>
           )}
         </button>
 
         <button
+          type="button"
+          className={`owner-tab${activeTab === 'courts' ? ' is-active' : ''}`}
           onClick={() => setActiveTab('courts')}
-          style={{
-            height: 40,
-            background: activeTab === 'courts' ? '#059669' : '#ffffff',
-            color: activeTab === 'courts' ? '#ffffff' : '#334155',
-            border: activeTab === 'courts' ? '1px solid #059669' : '1px solid #cbd5e1',
-            borderRadius: 10,
-            padding: '0 16px',
-            fontWeight: 700,
-            fontSize: 13,
-            cursor: 'pointer',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 7,
-            whiteSpace: 'nowrap',
-            boxShadow: activeTab === 'courts' ? '0 2px 5px rgba(5,150,105,0.2)' : '0 1px 2px rgba(0,0,0,0.03)',
-            transition: 'all 0.15s ease'
-          }}
         >
-          <Settings size={15} /> Courts & Rates
+          <Settings size={14} />
+          <span className="owner-tab-full">Courts & Rates</span>
+          <span className="owner-tab-short">Courts</span>
         </button>
 
         <button
+          type="button"
+          className={`owner-tab${activeTab === 'crm' ? ' is-active' : ''}`}
           onClick={() => setActiveTab('crm')}
-          style={{
-            height: 40,
-            background: activeTab === 'crm' ? '#059669' : '#ffffff',
-            color: activeTab === 'crm' ? '#ffffff' : '#334155',
-            border: activeTab === 'crm' ? '1px solid #059669' : '1px solid #cbd5e1',
-            borderRadius: 10,
-            padding: '0 16px',
-            fontWeight: 700,
-            fontSize: 13,
-            cursor: 'pointer',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 7,
-            whiteSpace: 'nowrap',
-            boxShadow: activeTab === 'crm' ? '0 2px 5px rgba(5,150,105,0.2)' : '0 1px 2px rgba(0,0,0,0.03)',
-            transition: 'all 0.15s ease'
-          }}
         >
-          <Users size={15} /> Customer CRM
+          <Users size={14} />
+          <span className="owner-tab-full">Customer CRM</span>
+          <span className="owner-tab-short">CRM</span>
         </button>
 
         <button
+          type="button"
+          className={`owner-tab${activeTab === 'billing' ? ' is-active' : ''}`}
           onClick={() => setActiveTab('billing')}
-          style={{
-            height: 40,
-            background: activeTab === 'billing' ? '#059669' : '#ffffff',
-            color: activeTab === 'billing' ? '#ffffff' : '#334155',
-            border: activeTab === 'billing' ? '1px solid #059669' : '1px solid #cbd5e1',
-            borderRadius: 10,
-            padding: '0 16px',
-            fontWeight: 700,
-            fontSize: 13,
-            cursor: 'pointer',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 7,
-            whiteSpace: 'nowrap',
-            boxShadow: activeTab === 'billing' ? '0 2px 5px rgba(5,150,105,0.2)' : '0 1px 2px rgba(0,0,0,0.03)',
-            transition: 'all 0.15s ease'
-          }}
         >
-          <Receipt size={15} /> Reports & Billing
+          <Receipt size={14} />
+          <span className="owner-tab-full">Reports & Billing</span>
+          <span className="owner-tab-short">Billing</span>
         </button>
 
         <button
+          type="button"
+          className={`owner-tab${activeTab === 'business_setup' ? ' is-active' : ''}`}
           onClick={() => setActiveTab('business_setup')}
-          style={{
-            height: 40,
-            background: activeTab === 'business_setup' ? '#059669' : '#ffffff',
-            color: activeTab === 'business_setup' ? '#ffffff' : '#334155',
-            border: activeTab === 'business_setup' ? '1px solid #059669' : '1px solid #cbd5e1',
-            borderRadius: 10,
-            padding: '0 16px',
-            fontWeight: 700,
-            fontSize: 13,
-            cursor: 'pointer',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 7,
-            whiteSpace: 'nowrap',
-            boxShadow: activeTab === 'business_setup' ? '0 2px 5px rgba(5,150,105,0.2)' : '0 1px 2px rgba(0,0,0,0.03)',
-            transition: 'all 0.15s ease'
-          }}
         >
-          <Building size={15} /> Business Setup
+          <Building size={14} />
+          <span className="owner-tab-full">Business Setup</span>
+          <span className="owner-tab-short">Setup</span>
         </button>
       </div>
 
@@ -1450,55 +1351,34 @@ export default function OwnerSaaSView() {
       {/* TAB: LIVE SLOTS & INTERACTIVE CALENDAR (WITH FULL TIME INQUIRY CONVERSION) */}
       {/* ========================================================================= */}
       {activeTab === 'live_slots' && (
-        <div className="animate-fade-in">
-          {/* Calendar Controls Header */}
-          <div className="mobile-stack" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 14, marginBottom: 16 }}>
-            <div>
-              <h2 className="font-display" style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', margin: 0 }}>
+        <div className="animate-fade-in owner-live-slots">
+          {/* Calendar Controls Header — title hidden on mobile */}
+          <div className="owner-live-slots-header">
+            <div className="owner-live-slots-intro">
+              <h2 className="font-display owner-live-slots-title">
                 Live Slot Control & Calendar Grid
               </h2>
-              <p style={{ fontSize: 13, color: '#64748b', margin: '4px 0 0 0' }}>
+              <p className="owner-live-slots-desc">
                 Manage live slot statuses, edit rates set by owner, and accept full-time inquiries on partially registered slots.
               </p>
             </div>
 
-            {/* View Mode Switcher (Cards vs Table) */}
-            <div style={{ display: 'flex', background: '#f8fafc', padding: 3, borderRadius: 8, border: '1px solid #e2e8f0', gap: 3 }}>
+            <div className="owner-view-toggle">
               <button
+                type="button"
                 onClick={() => setSlotViewMode('cards')}
-                style={{
-                  background: slotViewMode === 'cards' ? '#ffffff' : 'transparent',
-                  color: slotViewMode === 'cards' ? '#059669' : '#64748b',
-                  border: slotViewMode === 'cards' ? '1px solid #cbd5e1' : '1px solid transparent',
-                  borderRadius: 6,
-                  padding: '6px 12px',
-                  fontSize: 12,
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 5
-                }}
+                className={`owner-view-toggle-btn${slotViewMode === 'cards' ? ' is-active' : ''}`}
               >
-                <LayoutDashboard size={13} /> Cards View
+                <LayoutDashboard size={13} />
+                <span>Cards</span>
               </button>
               <button
+                type="button"
                 onClick={() => setSlotViewMode('table')}
-                style={{
-                  background: slotViewMode === 'table' ? '#ffffff' : 'transparent',
-                  color: slotViewMode === 'table' ? '#059669' : '#64748b',
-                  border: slotViewMode === 'table' ? '1px solid #cbd5e1' : '1px solid transparent',
-                  borderRadius: 6,
-                  padding: '6px 12px',
-                  fontSize: 12,
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 5
-                }}
+                className={`owner-view-toggle-btn${slotViewMode === 'table' ? ' is-active' : ''}`}
               >
-                <Calendar size={13} /> Table View
+                <Calendar size={13} />
+                <span>Table</span>
               </button>
             </div>
           </div>
@@ -1518,30 +1398,20 @@ export default function OwnerSaaSView() {
             </div>
           ) : (
           <>
-          {/* Quick Date Chips (Touch-Friendly Horizontal Scroll) */}
-          <div className="scroll-pills" style={{ marginBottom: 16 }}>
+          {/* Quick Date Chips */}
+          <div className="owner-date-chips scroll-pills">
             {[0, 1, 2, 3, 4, 5, 6].map(offset => {
               const d = new Date();
               d.setDate(d.getDate() + offset);
               const dateStr = d.toISOString().slice(0, 10);
               const isSelected = calendarDate === dateStr;
-              const label = offset === 0 ? 'Today' : offset === 1 ? 'Tomorrow' : d.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+              const label = offset === 0 ? 'Today' : offset === 1 ? 'Tomorrow' : d.toLocaleDateString([], { weekday: 'short', day: 'numeric' });
               return (
                 <button
                   key={dateStr}
+                  type="button"
                   onClick={() => handleDateChange(dateStr)}
-                  style={{
-                    background: isSelected ? '#059669' : '#ffffff',
-                    color: isSelected ? '#ffffff' : '#334155',
-                    border: isSelected ? '1px solid #059669' : '1px solid #cbd5e1',
-                    borderRadius: 999,
-                    padding: '7px 16px',
-                    fontWeight: 700,
-                    fontSize: 12,
-                    cursor: 'pointer',
-                    whiteSpace: 'nowrap',
-                    boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
-                  }}
+                  className={`owner-date-chip${isSelected ? ' is-active' : ''}`}
                 >
                   {label}
                 </button>
@@ -1550,21 +1420,19 @@ export default function OwnerSaaSView() {
           </div>
 
           {/* Filter & Action Bar */}
-          <div className="mobile-stack" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', flex: 1 }}>
+          <div className="owner-live-filters">
+            <div className="owner-live-filters-main">
               <input
                 type="date"
                 value={calendarDate}
                 onChange={e => handleDateChange(e.target.value)}
-                className="nexus-input"
-                style={{ padding: '7px 12px', fontSize: 13 }}
+                className="nexus-input owner-date-input"
               />
 
               <select
                 value={courtFilter}
                 onChange={e => setCourtFilter(e.target.value)}
-                className="nexus-input"
-                style={{ padding: '7px 12px', fontSize: 13 }}
+                className="nexus-input owner-court-filter"
               >
                 <option value="all">All Courts ({selectedVenue?.courts?.length || 0})</option>
                 {selectedVenue?.courts?.map(c => (
@@ -1573,18 +1441,20 @@ export default function OwnerSaaSView() {
               </select>
 
               <button
+                type="button"
                 onClick={() => selectedVenue && loadLiveSlots(selectedVenue.id, calendarDate)}
-                className="btn-secondary"
-                style={{ fontSize: 12, padding: '7px 12px' }}
+                className="btn-secondary owner-refresh-btn"
                 title="Refresh Slots"
+                aria-label="Refresh slots"
               >
                 <RefreshCw size={13} />
               </button>
             </div>
 
-            <div className="mobile-btn-group" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <div className="owner-live-actions">
               <button
                 id="btn-owner-host-open-game"
+                type="button"
                 onClick={() => {
                   const firstOpen = displaySlots.find(s => s.status === 'open' && !s.game) || displaySlots[0];
                   if (firstOpen) {
@@ -1593,26 +1463,32 @@ export default function OwnerSaaSView() {
                     alert('No open slots found on this date. Please pick another date or clear booked slots.');
                   }
                 }}
-                className="btn-primary"
-                style={{ background: '#059669', fontSize: 12.5, padding: '7px 14px', flex: '1 1 auto', display: 'flex', alignItems: 'center', gap: 6 }}
+                className="btn-primary owner-live-action-btn"
+                style={{ background: '#059669' }}
               >
-                <Trophy size={14} /> Host Open Game
+                <Trophy size={14} />
+                <span className="owner-action-full">Host Open Game</span>
+                <span className="owner-action-short">Host</span>
               </button>
 
               <button
+                type="button"
                 onClick={openWalkInFromToolbar}
-                className="btn-primary"
-                style={{ fontSize: 12.5, padding: '7px 14px', flex: '1 1 auto' }}
+                className="btn-primary owner-live-action-btn"
               >
-                <Plus size={14} /> Walk-in Booking
+                <Plus size={14} />
+                <span className="owner-action-full">Walk-in Booking</span>
+                <span className="owner-action-short">Walk-in</span>
               </button>
 
               <button
+                type="button"
                 onClick={() => setShowBlockModal(true)}
-                className="btn-secondary"
-                style={{ fontSize: 12.5, padding: '7px 14px', flex: '1 1 auto' }}
+                className="btn-secondary owner-live-action-btn"
               >
-                <Lock size={14} /> Block Slot
+                <Lock size={14} />
+                <span className="owner-action-full">Block Slot</span>
+                <span className="owner-action-short">Block</span>
               </button>
             </div>
           </div>

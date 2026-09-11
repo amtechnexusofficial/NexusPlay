@@ -1524,6 +1524,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   margin-bottom: 20px;
   background: #ffffff;
   border: 1px solid #e2e8f0;
+  border-radius: 12px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
@@ -1613,12 +1614,198 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   min-height: 36px;
 }
 
+.owner-tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 12px;
+  margin-bottom: 22px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.owner-tab {
+  height: 40px;
+  background: #ffffff;
+  color: #334155;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 0 14px;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.owner-tab.is-active {
+  background: #059669;
+  color: #ffffff;
+  border-color: #059669;
+  box-shadow: 0 2px 5px rgba(5, 150, 105, 0.2);
+}
+
+.owner-tab-short { display: none; }
+.owner-tab-full { display: inline; }
+
+.owner-tab-badge {
+  background: #f59e0b;
+  color: #000;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 1px 6px;
+  border-radius: 999px;
+}
+
+.owner-tab.is-active .owner-tab-badge {
+  background: #ffffff;
+  color: #059669;
+}
+
+.owner-live-slots-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.owner-live-slots-title {
+  font-size: 22px;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0;
+}
+
+.owner-live-slots-desc {
+  font-size: 13px;
+  color: #64748b;
+  margin: 4px 0 0;
+}
+
+.owner-view-toggle {
+  display: flex;
+  background: #f8fafc;
+  padding: 3px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+.owner-view-toggle-btn {
+  background: transparent;
+  color: #64748b;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.owner-view-toggle-btn.is-active {
+  background: #ffffff;
+  color: #059669;
+  border-color: #cbd5e1;
+}
+
+.owner-date-chips {
+  margin-bottom: 12px;
+}
+
+.owner-date-chip {
+  background: #ffffff;
+  color: #334155;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  padding: 7px 16px;
+  font-weight: 700;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+.owner-date-chip.is-active {
+  background: #059669;
+  color: #ffffff;
+  border-color: #059669;
+}
+
+.owner-live-filters {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.owner-live-filters-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  flex: 1;
+}
+
+.owner-date-input,
+.owner-court-filter {
+  padding: 7px 12px;
+  font-size: 13px;
+}
+
+.owner-refresh-btn {
+  font-size: 12px;
+  padding: 7px 12px;
+  min-width: 40px;
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.owner-live-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.owner-live-action-btn {
+  font-size: 12.5px;
+  padding: 7px 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.owner-action-short { display: none; }
+.owner-action-full { display: inline; }
+
 @media (max-width: 768px) {
+  .owner-hub-page {
+    padding: 8px 12px 88px !important;
+  }
+
   .owner-venue-banner {
-    padding: 10px 12px;
-    margin-bottom: 12px;
-    gap: 10px;
-    align-items: center;
+    padding: 0;
+    margin-bottom: 8px;
+    gap: 8px;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
   }
 
   .owner-venue-banner-main {
@@ -1632,7 +1819,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   }
 
   .owner-venue-banner-name {
-    font-size: 15px;
+    font-size: 16px;
     font-weight: 750;
     margin: 0;
     white-space: nowrap;
@@ -1658,15 +1845,112 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
     gap: 6px;
   }
 
-  .owner-venue-copy-btn {
+  .owner-venue-copy-btn,
+  .owner-venue-qr-btn {
+    padding: 0;
+    width: 34px;
+    height: 34px;
+    min-width: 34px;
+    min-height: 34px;
+    border-radius: 8px;
+    justify-content: center;
+  }
+
+  .owner-venue-copy-label {
+    display: none;
+  }
+
+  .owner-tabs {
+    gap: 6px;
+    padding-bottom: 8px;
+    margin-bottom: 10px;
+  }
+
+  .owner-tab {
+    height: 32px;
+    padding: 0 10px;
+    font-size: 12px;
+    border-radius: 8px;
+    gap: 5px;
+  }
+
+  .owner-tab svg {
+    width: 13px;
+    height: 13px;
+  }
+
+  .owner-tab-full { display: none; }
+  .owner-tab-short { display: inline; }
+
+  .owner-live-slots-intro {
+    display: none;
+  }
+
+  .owner-live-slots-header {
+    margin-bottom: 8px;
+    justify-content: flex-end;
+  }
+
+  .owner-view-toggle-btn {
+    padding: 5px 8px;
+    font-size: 11.5px;
+  }
+
+  .owner-view-toggle-btn span {
+    display: none;
+  }
+
+  .owner-date-chips {
+    margin-bottom: 8px;
+  }
+
+  .owner-date-chip {
+    padding: 5px 11px;
+    font-size: 11.5px;
+  }
+
+  .owner-date-input {
+    display: none;
+  }
+
+  .owner-live-filters {
+    margin-bottom: 10px;
+    gap: 8px;
+  }
+
+  .owner-live-filters-main {
+    gap: 8px;
+    width: 100%;
+  }
+
+  .owner-court-filter {
+    flex: 1;
+    min-width: 0;
     padding: 6px 10px;
+    font-size: 12.5px;
+  }
+
+  .owner-refresh-btn {
+    padding: 6px 10px;
+    min-width: 34px;
+    min-height: 34px;
+  }
+
+  .owner-live-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 6px;
+  }
+
+  .owner-live-action-btn {
+    width: 100%;
+    justify-content: center;
+    padding: 7px 6px;
     font-size: 11.5px;
     min-height: 34px;
   }
 
-  .owner-venue-qr-btn {
-    padding: 6px 8px;
-    min-width: 34px;
-    min-height: 34px;
-  }
+  .owner-action-full { display: none; }
+  .owner-action-short { display: inline; }
 }
