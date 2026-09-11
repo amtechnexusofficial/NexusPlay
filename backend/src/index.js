@@ -9,6 +9,7 @@ import {
   listVenuesForOrg,
   getVenueForOrg,
   getPublicVenue,
+  resolvePublicVenueId,
   listPublicVenues,
   createVenue,
   updateVenue,
@@ -158,8 +159,13 @@ app.get("/api/public/venues", async (c) => {
 
 app.get("/api/public/venues/:slug", async (c) => {
   const sql = getDb(c.env);
-  const venue = await getPublicVenue(sql, c.req.param("slug"));
-  const courts = await listPublicCourtsForVenue(sql, venue.id);
+  const slug = c.req.param("slug");
+  // Resolve id once, then fetch venue details + courts in parallel (was sequential).
+  const venueId = await resolvePublicVenueId(sql, slug);
+  const [venue, courts] = await Promise.all([
+    getPublicVenue(sql, venueId),
+    listPublicCourtsForVenue(sql, venueId),
+  ]);
   return c.json({ ...venue, courts });
 });
 
@@ -177,10 +183,11 @@ app.post("/api/reviews", async (c) => {
 
 app.get("/api/public/venues/:slug/slots", async (c) => {
   const sql = getDb(c.env);
-  const venue = await getPublicVenue(sql, c.req.param("slug"));
+  // Slots only need venue.id — avoid reloading photos/UPI/policies on every date change.
+  const venueId = await resolvePublicVenueId(sql, c.req.param("slug"));
   const date = c.req.query("date") || undefined;
   const courtId = c.req.query("courtId") || undefined;
-  return c.json(await listSlots(sql, venue.id, { date, courtId }));
+  return c.json(await listSlots(sql, venueId, { date, courtId }));
 });
 
 // ===========================================================================

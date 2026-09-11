@@ -37,18 +37,27 @@ export async function getVenueForOrg(sql, organizationId, venueId) {
 }
 
 // Public: used by the shareable venue page and marketplace search — no
+// Lightweight id resolve for hot paths (public slots) that only need venue.id.
+export async function resolvePublicVenueId(sql, slugOrId) {
+  const [row] = await sql`
+    select id from venues
+    where (slug = ${slugOrId} or id::text = ${slugOrId}) and status = 'active'
+  `;
+  if (!row) throw httpError(404, "Venue not found");
+  return row.id;
+}
+
 // organization check, but only ever returns active venues.
 export async function getPublicVenue(sql, slugOrId) {
   // upi_id/upi_name were missing here despite every booking screen reading
   // venue.upi_id for its QR code — every player was silently shown the
   // frontend's hardcoded placeholder UPI ID instead of this venue's real
   // one, no matter what the owner set in Business Setup.
+  // Reviews aggregates dropped from the hot path — player UI no longer shows them.
   const [venue] = await sql`
     select id, name, slug, description, address, lat, lng, phone, email,
            photos, amenities, sport_ids, open_time, close_time, advance_payment_percent,
-           upi_id, upi_name, upi_qr_image, rules, cancellation_policy, allow_guest_open_games,
-           (select round(avg(rating), 1) from reviews where venue_id = venues.id)::float as avg_rating,
-           (select count(*)::int from reviews where venue_id = venues.id) as review_count
+           upi_id, upi_name, upi_qr_image, rules, cancellation_policy, allow_guest_open_games
     from venues
     where (slug = ${slugOrId} or id::text = ${slugOrId}) and status = 'active'
   `;

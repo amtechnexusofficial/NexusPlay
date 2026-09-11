@@ -242,10 +242,13 @@ export async function listSlots(sql, venueId, { date, courtId } = {}) {
   // driver quirks can't silently leave expired morning slots visible.
   // For a future queryDate the first OR branch is true and every slot that
   // day is returned; for today only start_time > now remains.
+  // Select only fields the public turf grid needs (not full s.* / hold columns).
   const fetch = () =>
     courtId
       ? sql`
-          select s.*, c.name as court_name, c.sport_id, sp.slug as sport_slug
+          select s.id, s.court_id, s.venue_id, s.date, s.start_time, s.end_time,
+                 s.price, s.status, s.block_reason,
+                 c.name as court_name, c.sport_id, sp.slug as sport_slug
           from court_slots s
           join courts c on s.court_id = c.id
           join sports sp on c.sport_id = sp.id
@@ -259,7 +262,9 @@ export async function listSlots(sql, venueId, { date, courtId } = {}) {
             )
           order by s.start_time asc`
       : sql`
-          select s.*, c.name as court_name, c.sport_id, sp.slug as sport_slug
+          select s.id, s.court_id, s.venue_id, s.date, s.start_time, s.end_time,
+                 s.price, s.status, s.block_reason,
+                 c.name as court_name, c.sport_id, sp.slug as sport_slug
           from court_slots s
           join courts c on s.court_id = c.id
           join sports sp on c.sport_id = sp.id
@@ -274,9 +279,24 @@ export async function listSlots(sql, venueId, { date, courtId } = {}) {
           order by c.name asc, s.start_time asc`;
 
   let slots = await fetch();
+  // Previously: empty after past-filter triggered generateSlotsForNextDays(14),
+  // which was multi-second and often useless (today's slots already existed but
+  // were all in the past). Only generate the requested date, and only when that
+  // date has zero rows at all.
   if (slots.length === 0) {
-    await generateSlotsForNextDays(sql, venueId, 14);
-    slots = await fetch();
+    const existing = courtId
+      ? await sql`
+          select 1 as ok from court_slots
+          where venue_id = ${venueId} and date = ${queryDate} and court_id = ${courtId}
+          limit 1`
+      : await sql`
+          select 1 as ok from court_slots
+          where venue_id = ${venueId} and date = ${queryDate}
+          limit 1`;
+    if (existing.length === 0) {
+      await generateSlotsForDates(sql, venueId, [queryDate]);
+      slots = await fetch();
+    }
   }
   if (slots.length === 0) return slots;
 

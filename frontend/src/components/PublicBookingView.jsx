@@ -19,6 +19,7 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
   });
   const [slots, setSlots] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [slotsLoading, setSlotsLoading] = useState(true);
   const [selectedSlot, setSelectedSlot] = useState(null);
 
   // Booking Flow & Concurrency Lock State
@@ -159,12 +160,18 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
     };
   }, [isMobileBooking, showBookingSheet, selectedSlot]);
 
-  // Load venue details
+  // Venue + sports (independent of slots so both can start immediately)
   useEffect(() => {
+    let cancelled = false;
     async function load() {
       try {
         setLoading(true);
-        const data = await api.getPublicVenue(slug);
+        setErrorMsg('');
+        const [data, sportsList] = await Promise.all([
+          api.getPublicVenue(slug),
+          api.getSports().catch(() => []),
+        ]);
+        if (cancelled) return;
         setVenue(data);
         if (data.sport_ids?.length > 0) {
           setSelectedSport(data.sport_ids[0]);
@@ -172,22 +179,25 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
         if (data.courts?.length > 0) {
           setSelectedCourt(data.courts[0]);
         }
-        api.getSports().then(setSports).catch(() => setSports([]));
+        setSports(sportsList);
       } catch (err) {
-        setErrorMsg('Failed to load venue: ' + err.message);
+        if (!cancelled) setErrorMsg('Failed to load venue: ' + err.message);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
     load();
+    return () => { cancelled = true; };
   }, [slug]);
 
-  // Load all courts' slots for the selected date (group by court in the UI)
+  // Slots by slug — starts on mount in parallel with venue (no wait for venue.id)
   useEffect(() => {
-    if (!venue) return;
+    let cancelled = false;
     async function loadSlots() {
       try {
-        const res = await api.getVenueSlots(venue.id, selectedDate);
+        setSlotsLoading(true);
+        const res = await api.getVenueSlots(slug, selectedDate);
+        if (cancelled) return;
         const now = Date.now();
         setSlots((Array.isArray(res) ? res : []).filter((s) => {
           const day = String(s.date || '').slice(0, 10);
@@ -198,10 +208,14 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
         }));
       } catch (err) {
         console.error('Error fetching slots:', err);
+        if (!cancelled) setSlots([]);
+      } finally {
+        if (!cancelled) setSlotsLoading(false);
       }
     }
     loadSlots();
-  }, [venue, selectedDate]);
+    return () => { cancelled = true; };
+  }, [slug, selectedDate]);
 
   // Handle Lock Countdown timer
   useEffect(() => {
@@ -692,7 +706,13 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
                         </div>
                       </div>
                     </div>
-                    {courtSlots.length === 0 ? (
+                    {slotsLoading ? (
+                      <div className="turf-slot-row turf-slot-row-skeleton" aria-busy="true" aria-label="Loading slots">
+                        {[0, 1, 2, 3, 4].map((i) => (
+                          <span key={i} className="turf-slot-skeleton" />
+                        ))}
+                      </div>
+                    ) : courtSlots.length === 0 ? (
                       <div className="turf-court-no-slots">No slots on this date</div>
                     ) : (
                       <div className="turf-slot-row">

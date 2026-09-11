@@ -515,9 +515,6 @@ export default function App() {
           currentUser?.role === 'owner' ? (
             <OwnerSaaSView
               key={currentUser?.id || 'signed-out'}
-              onNavigateToPublicPage={(slug) => {
-                navigateTo('venue-page', slug);
-              }}
             />
           ) : (
             <div style={{ maxWidth: 420, margin: '80px auto', padding: '0 16px', textAlign: 'center' }}>

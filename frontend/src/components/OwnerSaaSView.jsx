@@ -5,7 +5,7 @@ import {
   Plus, CheckCircle, XCircle, AlertTriangle, ChevronRight,
   TrendingUp, Activity, Lock, Unlock, Phone, RefreshCw,
   Building, Settings, QrCode, Copy, ShieldCheck, CheckCircle2,
-  FileText, Check, ExternalLink, MapPin, Share2, Flame,
+  FileText, Check, MapPin, Share2, Flame,
   Tag, AlertCircle, Edit3, Save, Navigation, Sparkles, Trophy,
   Download, Receipt, Link2, X
 } from 'lucide-react';
@@ -20,7 +20,7 @@ import {
 const FRONTEND_BUILD_MARKER = 'owner-auth-health-2026-09-08-v3';
 const EXPECTED_BACKEND_BUILD = 'webcrypto-jwt-2026-09-08-v3';
 
-export default function OwnerSaaSView({ onNavigateToPublicPage }) {
+export default function OwnerSaaSView() {
   // Temporary diagnostic: a random id generated exactly once per mount.
   // If this shows the SAME value before and after signing in, the
   // component never actually remounted (the key= fix isn't taking
@@ -1258,20 +1258,13 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                 {selectedVenue.name}
               </h2>
               <div style={{ fontSize: 12, color: '#64748b' }}>
-                {selectedVenue.address} · UPI: <strong style={{ color: '#0f172a' }}>{selectedVenue.upi_id}</strong>
+                {selectedVenue.address}
               </div>
             </div>
           </div>
 
           {/* Unique Turf Booking Link Controls */}
           <div className="mobile-btn-group" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <div style={{ background: '#f8fafc', padding: '6px 10px', borderRadius: 8, border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: 6, flex: '1 1 auto', minWidth: 160 }}>
-              <span style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>Link:</span>
-              <span style={{ fontSize: 12, fontFamily: 'monospace', color: '#2563eb', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                /?venue={selectedVenue.slug}
-              </span>
-            </div>
-
             <button
               onClick={handleCopyUniqueTurfLink}
               className="btn-primary"
@@ -1279,14 +1272,6 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
             >
               {copiedLink ? <Check size={14} /> : <Copy size={14} />}
               {copiedLink ? 'Copied' : 'Copy Link'}
-            </button>
-
-            <button
-              onClick={() => onNavigateToPublicPage(selectedVenue.slug)}
-              className="btn-secondary"
-              style={{ fontSize: 12, padding: '7px 12px', flex: '1 1 auto' }}
-            >
-              <ExternalLink size={14} /> View Page
             </button>
 
             <button
