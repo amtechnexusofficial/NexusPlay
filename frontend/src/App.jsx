@@ -9,7 +9,6 @@ import AdminView from './components/AdminView.jsx';
 import {
   Trophy,
   Compass,
-  Share2,
   Building2,
   LogOut
 } from 'lucide-react';
@@ -275,28 +274,6 @@ export default function App() {
               }}
             >
               <Trophy size={14} /> Pickup Games
-            </button>
-
-            <button
-              id="nav-direct-link-btn"
-              onClick={() => navigateTo('venue-page')}
-              style={{
-                background: activeView === 'venue-page' ? '#ffffff' : 'transparent',
-                color: activeView === 'venue-page' ? '#4f46e5' : '#475569',
-                border: activeView === 'venue-page' ? '1px solid #cbd5e1' : '1px solid transparent',
-                borderRadius: 7,
-                padding: '7px 15px',
-                fontSize: 12.5,
-                fontWeight: 700,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                boxShadow: activeView === 'venue-page' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none',
-                transition: 'all 0.15s ease'
-              }}
-            >
-              <Share2 size={14} /> Turf Direct Link
             </button>
 
             {/* If owner is logged in, show Owner Hub in nav */}
@@ -572,15 +549,6 @@ export default function App() {
             >
               <Building2 size={20} />
               <span>Owner Hub</span>
-            </button>
-
-            <button
-              id="mobile-nav-venue"
-              className={`mobile-bottom-btn ${activeView === 'venue-page' ? 'active' : ''}`}
-              onClick={() => navigateTo('venue-page')}
-            >
-              <Share2 size={20} />
-              <span>Direct Link</span>
             </button>
 
             <button
