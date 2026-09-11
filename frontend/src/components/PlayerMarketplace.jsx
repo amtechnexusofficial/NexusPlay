@@ -58,7 +58,8 @@ export default function PlayerMarketplace({ onSelectVenue }) {
 
   function handleRequestLocation() {
     if (!navigator.geolocation) {
-      setLocationStatusText('Geolocation is not supported by your browser. You can use Bangalore presets below.');
+      setLocationStatusText('Geolocation is not supported by your browser.');
+      setLocatingUser(false);
       return;
     }
     setLocatingUser(true);
@@ -77,10 +78,16 @@ export default function PlayerMarketplace({ onSelectVenue }) {
       (err) => {
         setLocatingUser(false);
         console.warn('Geolocation denied or error:', err.message);
-        setLocationStatusText('Location access was denied or timed out. Use a Bangalore preset below, or retry.');
+        setLocationStatusText('Location access was denied or timed out. Tap retry to try again.');
       },
       { timeout: 10000, enableHighAccuracy: true }
     );
+  }
+
+  function handleClearLocation() {
+    setUserCoords(null);
+    setLocationPermissionGranted(false);
+    setLocationStatusText('Location cleared. Showing turfs without distance sorting.');
   }
 
   // Ask for location as soon as the marketplace opens so guests see closest turfs.
@@ -88,26 +95,6 @@ export default function PlayerMarketplace({ onSelectVenue }) {
     handleRequestLocation();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  function handlePresetLocation(area) {
-    if (area === 'koramangala') {
-      setUserCoords({ lat: 12.9352, lng: 77.6245 });
-      setLocationPermissionGranted(true);
-      setLocationStatusText('Using Koramangala GPS reference point (12.9352° N, 77.6245° E)');
-    } else if (area === 'indiranagar') {
-      setUserCoords({ lat: 12.9784, lng: 77.6408 });
-      setLocationPermissionGranted(true);
-      setLocationStatusText('Using Indiranagar GPS reference point (12.9784° N, 77.6408° E)');
-    } else if (area === 'hsr') {
-      setUserCoords({ lat: 12.9116, lng: 77.6534 });
-      setLocationPermissionGranted(true);
-      setLocationStatusText('Using HSR Layout GPS reference point (12.9116° N, 77.6534° E)');
-    } else {
-      setUserCoords(null);
-      setLocationPermissionGranted(false);
-      setLocationStatusText('Showing all turfs across Bengaluru');
-    }
-  }
 
   function handleCopyUniqueLink(e, venue) {
     e.stopPropagation();
@@ -181,62 +168,39 @@ export default function PlayerMarketplace({ onSelectVenue }) {
             </p>
           </div>
 
-          {/* Location Request Button & Quick Presets */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-start', flex: '0 0 auto' }}>
-            <button
-              id="btn-request-location"
-              onClick={handleRequestLocation}
-              disabled={locatingUser}
-              className={locationPermissionGranted ? "btn-secondary" : "btn-primary"}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 8,
-                padding: '9px 16px',
-                fontSize: 12.5,
-                fontWeight: 700,
-                width: 'auto'
-              }}
-            >
-              <Navigation size={14} style={{ transform: locatingUser ? 'rotate(45deg)' : 'none', transition: 'transform 0.3s' }} />
-              {locatingUser ? 'Locating...' : locationPermissionGranted ? 'Location Active' : 'Retry My Location'}
-            </button>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+              <button
+                id="btn-request-location"
+                onClick={handleRequestLocation}
+                disabled={locatingUser}
+                className={locationPermissionGranted ? "btn-secondary" : "btn-primary"}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  padding: '9px 16px',
+                  fontSize: 12.5,
+                  fontWeight: 700,
+                  width: 'auto'
+                }}
+              >
+                <Navigation size={14} style={{ transform: locatingUser ? 'rotate(45deg)' : 'none', transition: 'transform 0.3s' }} />
+                {locatingUser ? 'Locating...' : locationPermissionGranted ? 'Location Active' : 'Retry My Location'}
+              </button>
+              {locationPermissionGranted && (
+                <button
+                  type="button"
+                  onClick={handleClearLocation}
+                  style={{ background: 'transparent', border: 'none', color: '#64748b', textDecoration: 'underline', fontSize: 11.5, cursor: 'pointer', padding: 0 }}
+                >
+                  Clear
+                </button>
+              )}
+            </div>
             <div style={{ fontSize: 11, color: locationPermissionGranted ? '#059669' : '#64748b' }}>
               {locationStatusText}
             </div>
-          </div>
-        </div>
-
-        {/* Location Presets if browser geolocation unavailable */}
-        <div className="location-preset-row" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', paddingTop: 12, borderTop: '1px solid #e2e8f0', fontSize: 12 }}>
-          <span style={{ color: '#64748b', fontWeight: 600, fontSize: 11.5 }}>Bangalore Presets:</span>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            <button
-              onClick={() => handlePresetLocation('koramangala')}
-              style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#334155', padding: '4px 10px', borderRadius: 6, fontSize: 11.5, cursor: 'pointer', fontWeight: 600 }}
-            >
-              Koramangala
-            </button>
-            <button
-              onClick={() => handlePresetLocation('indiranagar')}
-              style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#334155', padding: '4px 10px', borderRadius: 6, fontSize: 11.5, cursor: 'pointer', fontWeight: 600 }}
-            >
-              Indiranagar
-            </button>
-            <button
-              onClick={() => handlePresetLocation('hsr')}
-              style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', color: '#334155', padding: '4px 10px', borderRadius: 6, fontSize: 11.5, cursor: 'pointer', fontWeight: 600 }}
-            >
-              HSR Layout
-            </button>
-            {locationPermissionGranted && (
-              <button
-                onClick={() => handlePresetLocation('reset')}
-                style={{ background: 'transparent', border: 'none', color: '#64748b', textDecoration: 'underline', fontSize: 11, cursor: 'pointer' }}
-              >
-                Reset GPS
-              </button>
-            )}
           </div>
         </div>
 
@@ -247,7 +211,7 @@ export default function PlayerMarketplace({ onSelectVenue }) {
             <input
               id="marketplace-search-input"
               type="text"
-              placeholder="Search by arena name or area (Koramangala, Indiranagar)..."
+              placeholder="Search by arena name or area..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               style={{ background: 'transparent', border: 'none', color: '#0f172a', outline: 'none', width: '100%', fontSize: 13 }}
@@ -380,7 +344,7 @@ export default function PlayerMarketplace({ onSelectVenue }) {
                     >
                       <MapPin size={12} /> {venue.distanceKm} km away
                     </span>
-                  ) : (
+                  ) : venue.city ? (
                     <span
                       style={{
                         background: 'rgba(15, 23, 42, 0.75)',
@@ -392,9 +356,9 @@ export default function PlayerMarketplace({ onSelectVenue }) {
                         borderRadius: 6
                       }}
                     >
-                      {venue.city || 'Bangalore'}
+                      {venue.city}
                     </span>
-                  )}
+                  ) : null}
 
                   {venue.review_count > 0 && (
                     <span

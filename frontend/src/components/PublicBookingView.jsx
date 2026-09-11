@@ -817,16 +817,17 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
                     <div>
                       <div style={{ textAlign: 'center', marginBottom: 14 }}>
                         <img
-                          src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`upi://pay?pa=${venue.upi_id || 'koramangala.sports@okaxis'}&pn=${encodeURIComponent(venue.name)}&am=${selectedSlot.game.cost_per_player}&cu=INR`)}`}
+                          src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`upi://pay?pa=${venue.upi_id || ''}&pn=${encodeURIComponent(venue.name)}&am=${selectedSlot.game.cost_per_player}&cu=INR`)}`}
                           alt="Venue Owner UPI QR Code"
                           style={{ width: 180, height: 180, borderRadius: 10, border: '1px solid #e2e8f0' }}
                         />
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 8, fontSize: 12.5, color: '#334155' }}>
-                          {venue.upi_id || 'koramangala.sports@okaxis'}
+                          {venue.upi_id || 'UPI ID not set by venue'}
                           <button
                             type="button"
                             onClick={() => {
-                              navigator.clipboard.writeText(venue.upi_id || 'koramangala.sports@okaxis');
+                              if (!venue.upi_id) return;
+                              navigator.clipboard.writeText(venue.upi_id);
                               setJoinCopiedUpi(true);
                               setTimeout(() => setJoinCopiedUpi(false), 2000);
                             }}
@@ -1081,7 +1082,7 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 14 }}>
                             <div style={{ background: '#ffffff', padding: 10, borderRadius: 12, border: '1px solid #e2e8f0', boxShadow: '0 4px 14px rgba(0,0,0,0.06)', marginBottom: 8 }}>
                               <img
-                                src={activeHold.paymentOrder?.qrCodeUrl || `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(activeHold.paymentOrder?.upiUri || `upi://pay?pa=${venue.upi_id || 'koramangala.sports@okaxis'}&pn=${encodeURIComponent(venue.name)}&am=${amountDue}&cu=INR`)}`}
+                                src={activeHold.paymentOrder?.qrCodeUrl || `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(activeHold.paymentOrder?.upiUri || `upi://pay?pa=${venue.upi_id || ''}&pn=${encodeURIComponent(venue.name)}&am=${amountDue}&cu=INR`)}`}
                                 alt="Venue Owner UPI QR Code"
                                 style={{ width: 170, height: 170, display: 'block' }}
                               />
@@ -1101,12 +1102,13 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
                               <div>
                                 <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>UPI ID: </span>
                                 <span style={{ color: 'var(--accent-neon)', fontWeight: 700 }}>
-                                  {activeHold.paymentOrder?.upiId || venue.upi_id || 'koramangala.sports@okaxis'}
+                                  {activeHold.paymentOrder?.upiId || venue.upi_id || 'Not set'}
                                 </span>
                               </div>
                               <button
                                 onClick={() => {
-                                  const id = activeHold.paymentOrder?.upiId || venue.upi_id || 'koramangala.sports@okaxis';
+                                  const id = activeHold.paymentOrder?.upiId || venue.upi_id;
+                                  if (!id) return;
                                   navigator.clipboard.writeText(id);
                                   setCopiedUpi(true);
                                   setTimeout(() => setCopiedUpi(false), 2000);

@@ -444,16 +444,17 @@ export default function OpenGamesHub({ onNavigateToVenue, onNavigateToDashboard,
 
                 <div style={{ textAlign: 'center', marginBottom: 14 }}>
                   <img
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`upi://pay?pa=${activeJoinGame.venue_upi_id || 'koramangala.sports@okaxis'}&pn=${encodeURIComponent(activeJoinGame.venue_name)}&am=${activeJoinGame.cost_per_player}&cu=INR`)}`}
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`upi://pay?pa=${activeJoinGame.venue_upi_id || ''}&pn=${encodeURIComponent(activeJoinGame.venue_name)}&am=${activeJoinGame.cost_per_player}&cu=INR`)}`}
                     alt="Venue Owner UPI QR Code"
                     style={{ width: 180, height: 180, borderRadius: 10, border: '1px solid #e2e8f0' }}
                   />
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 8, fontSize: 12.5, color: '#334155' }}>
-                    {activeJoinGame.venue_upi_id || 'koramangala.sports@okaxis'}
+                    {activeJoinGame.venue_upi_id || 'UPI ID not set by venue'}
                     <button
                       type="button"
                       onClick={() => {
-                        navigator.clipboard.writeText(activeJoinGame.venue_upi_id || 'koramangala.sports@okaxis');
+                        if (!activeJoinGame.venue_upi_id) return;
+                        navigator.clipboard.writeText(activeJoinGame.venue_upi_id);
                         setJoinCopiedUpi(true);
                         setTimeout(() => setJoinCopiedUpi(false), 2000);
                       }}
@@ -660,7 +661,7 @@ export default function OpenGamesHub({ onNavigateToVenue, onNavigateToDashboard,
                     type="text"
                     className="nexus-input"
                     style={{ width: '100%' }}
-                    placeholder="e.g. Bangalore IT Cup 5v5 Friendly Match"
+                    placeholder="e.g. Weekend 5v5 Friendly Match"
                     value={fullSlotNotes}
                     onChange={e => setFullSlotNotes(e.target.value)}
                   />

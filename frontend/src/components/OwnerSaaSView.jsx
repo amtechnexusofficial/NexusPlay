@@ -104,8 +104,8 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
   const [bizType, setBizType] = useState('Private Limited Company');
   const [bizOpenTime, setBizOpenTime] = useState('06:00');
   const [bizCloseTime, setBizCloseTime] = useState('23:30');
-  const [bizLat, setBizLat] = useState('12.9352');
-  const [bizLng, setBizLng] = useState('77.6245');
+  const [bizLat, setBizLat] = useState('');
+  const [bizLng, setBizLng] = useState('');
   const [bizRules, setBizRules] = useState('');
   const [bizCancellationPolicy, setBizCancellationPolicy] = useState('');
   const [bizAmenities, setBizAmenities] = useState([]);
@@ -229,16 +229,16 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
     setBizName(v.name || '');
     setBizOrgName(v.organization_name || context?.organization?.name || 'Nexus Arena Sports Pvt Ltd');
     setBizAddress(v.address || '');
-    setBizCity(v.city || 'Bangalore');
-    setBizPincode(v.pincode || '560034');
-    setBizPhone(v.phone || '+91 98765 43210');
-    setBizEmail(v.email || 'contact@nexusplay.com');
-    setBizGstin(v.gstin || '29AABCN1234F1Z5');
+    setBizCity(v.city || '');
+    setBizPincode(v.pincode || '');
+    setBizPhone(v.phone || '');
+    setBizEmail(v.email || '');
+    setBizGstin(v.gstin || '');
     setBizType(v.business_type || 'Private Limited Company');
     setBizOpenTime(v.open_time || '06:00');
     setBizCloseTime(v.close_time || '23:30');
-    setBizLat(String(v.lat || '12.9352'));
-    setBizLng(String(v.lng || '77.6245'));
+    setBizLat(v.lat != null && v.lat !== '' ? String(v.lat) : '');
+    setBizLng(v.lng != null && v.lng !== '' ? String(v.lng) : '');
     setBizRules(v.rules || '1. Turf shoes or rubber studs only (No metal spikes).\n2. Arrive 10 minutes prior to slot start.\n3. Zero food or chewing gum on the artificial turf.');
     setBizCancellationPolicy(v.cancellation_policy || 'Free cancellation up to 4 hours before slot start. Cancellations within 4 hours are non-refundable. Reschedules allowed once if requested at least 4 hours ahead.');
     setBizAmenities(Array.isArray(v.amenities) ? v.amenities : [
@@ -246,8 +246,8 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
       'Free Parking (Car & 2-Wheeler)', 'Cafeteria & Energy Drinks', 'Bibs & Match Balls', 'First Aid Kit'
     ]);
     setBizPhotos(Array.isArray(v.photos) ? v.photos : []);
-    setBizUpiId(v.upi_id || 'koramangala.sports@okaxis');
-    setBizUpiName(v.upi_name || v.name);
+    setBizUpiId(v.upi_id || '');
+    setBizUpiName(v.upi_name || v.name || '');
     setBizAdvancePercent(v.advance_payment_percent ?? 100);
   }
 
@@ -427,8 +427,8 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
         business_type: bizType.trim(),
         open_time: bizOpenTime,
         close_time: bizCloseTime,
-        lat: parseFloat(bizLat) || 12.9352,
-        lng: parseFloat(bizLng) || 77.6245,
+        lat: bizLat.trim() === '' ? null : (parseFloat(bizLat) || null),
+        lng: bizLng.trim() === '' ? null : (parseFloat(bizLng) || null),
         rules: bizRules.trim(),
         cancellation_policy: bizCancellationPolicy.trim(),
         amenities: bizAmenities,
@@ -601,7 +601,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
   // Accept Full-Time Inquiry on a Slot (e.g. 6/8 players)
   function handleOpenInquiryModal(slot) {
     setInquirySlot(slot);
-    setInquiryClientName(slot.full_inquiry_client || 'Bangalore Tech League / Corporate FC');
+    setInquiryClientName(slot.full_inquiry_client || '');
     setInquiryClientPhone(slot.full_inquiry_phone || '+91 98800 12345');
     setInquiryAmount(slot.full_inquiry_amount || slot.price || 1600);
     setInquiryPaymentMode('cash');
@@ -1035,7 +1035,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                 style={{ width: '100%' }}
                 value={onboardName}
                 onChange={e => setOnboardName(e.target.value)}
-                placeholder="e.g. Koramangala Turf Arena"
+                placeholder="e.g. City Turf Arena"
               />
             </div>
             <div style={{ marginBottom: 12 }}>
@@ -1062,7 +1062,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                 style={{ width: '100%' }}
                 value={onboardCity}
                 onChange={e => setOnboardCity(e.target.value)}
-                placeholder="Bangalore"
+                placeholder="City"
               />
             </div>
             <div style={{ marginBottom: 18 }}>
@@ -3443,7 +3443,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Bangalore Corporate League / Tech FC"
+                  placeholder="e.g. Corporate League / Weekend FC"
                   className="nexus-input"
                   style={{ width: '100%' }}
                   value={inquiryClientName}

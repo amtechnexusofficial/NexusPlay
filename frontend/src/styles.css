@@ -378,7 +378,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   .marketplace-hero-card { padding: 16px !important; margin-bottom: 14px !important; border-radius: var(--radius-md) !important; }
   .marketplace-hero-title { font-size: 21px !important; line-height: 1.25 !important; }
   .venue-card-body { padding: 14px !important; }
-  .location-preset-row { flex-direction: column !important; align-items: flex-start !important; gap: 6px !important; }
 }
 
 /* Global header: full action row on desktop, compact on mobile (the
