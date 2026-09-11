@@ -372,25 +372,76 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   }
 
   .marketplace-hero {
-    padding: 18px 16px 14px !important;
-    margin-bottom: 14px !important;
+    padding: 10px 12px !important;
+    margin-bottom: 10px !important;
     border-radius: var(--radius-md) !important;
   }
-  .marketplace-hero-title { font-size: 26px !important; }
-  .marketplace-hero-top {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 12px;
+  .marketplace-kicker {
+    display: none !important;
   }
-  .marketplace-change-city { align-self: flex-start; }
-  .marketplace-toolbar { flex-direction: column; }
+  .marketplace-hero-title {
+    font-size: 18px !important;
+    letter-spacing: -0.02em !important;
+    line-height: 1.2 !important;
+  }
+  .marketplace-hero-pin {
+    width: 15px !important;
+    height: 15px !important;
+  }
+  .marketplace-hero-city {
+    gap: 5px !important;
+  }
+  .marketplace-hero-top {
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 8px !important;
+    margin-bottom: 8px !important;
+  }
+  .marketplace-hero-meta {
+    margin: 2px 0 0 !important;
+    font-size: 12px !important;
+  }
+  .marketplace-change-city {
+    align-self: center;
+    padding: 6px 10px !important;
+    font-size: 11.5px !important;
+    min-height: 34px;
+  }
+  .marketplace-toolbar {
+    flex-direction: row !important;
+    gap: 8px !important;
+  }
+  .marketplace-search {
+    min-height: 40px !important;
+    padding: 0 10px !important;
+  }
+  .marketplace-search input {
+    font-size: 13px !important;
+  }
   .marketplace-sort {
-    width: 100%;
+    width: auto;
     min-width: 0;
+    flex: 0 1 auto;
+    min-height: 40px !important;
+    padding: 0 8px 0 10px !important;
+  }
+  .marketplace-sort-label {
+    display: none !important;
   }
   .marketplace-sort select {
     flex: 1;
-    min-width: 0;
+    min-width: 0 !important;
+    font-size: 12px !important;
+    padding-right: 12px !important;
+  }
+  .marketplace-sports {
+    margin-top: 8px !important;
+    gap: 6px !important;
+  }
+  .marketplace-sport-chip {
+    padding: 6px 10px !important;
+    font-size: 12px !important;
+    min-height: 34px;
   }
   .marketplace-venue-body { padding: 14px !important; }
   .marketplace-city-gate { padding-top: 12px; }
@@ -680,6 +731,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .marketplace-hero-pin {
   color: var(--accent-neon);
   flex-shrink: 0;
+  width: 22px;
+  height: 22px;
 }
 
 .marketplace-hero-meta {

@@ -189,7 +189,7 @@ export default function PlayerMarketplace({ onSelectVenue }) {
             <p className="marketplace-kicker">Find & book today</p>
             <h1 className="font-display marketplace-hero-title">
               <span className="marketplace-hero-city">
-                <MapPin size={22} className="marketplace-hero-pin" />
+                <MapPin size={16} className="marketplace-hero-pin" />
                 {selectedCity}
               </span>
             </h1>
