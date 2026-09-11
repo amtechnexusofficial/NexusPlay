@@ -1,19 +1,28 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api.js';
-import { Search, MapPin, Sparkles, ChevronRight, Navigation, Check, Copy } from 'lucide-react';
+import { Search, MapPin, Sparkles, ChevronRight, Check, Copy } from 'lucide-react';
 
-// Haversine distance calculation in kilometers
-function calculateDistanceKm(lat1, lon1, lat2, lon2) {
-  if (!lat1 || !lon1 || !lat2 || !lon2) return null;
-  const R = 6371; // Earth's radius in km
-  const dLat = (lat2 - lat1) * (Math.PI / 180);
-  const dLon = (lon2 - lon1) * (Math.PI / 180);
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
-    Math.sin(dLon / 2) * Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return Math.round(R * c * 10) / 10;
+const CITY_STORAGE_KEY = 'nexus_selected_city';
+
+function normalizeCity(city) {
+  return (city || '').trim().toLowerCase();
+}
+
+function readSavedCity() {
+  try {
+    return localStorage.getItem(CITY_STORAGE_KEY) || '';
+  } catch {
+    return '';
+  }
+}
+
+function saveCity(city) {
+  try {
+    if (city) localStorage.setItem(CITY_STORAGE_KEY, city);
+    else localStorage.removeItem(CITY_STORAGE_KEY);
+  } catch {
+    /* ignore */
+  }
 }
 
 export default function PlayerMarketplace({ onSelectVenue }) {
@@ -22,18 +31,13 @@ export default function PlayerMarketplace({ onSelectVenue }) {
   const [selectedSport, setSelectedSport] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
-
-  // Geolocation state
-  const [userCoords, setUserCoords] = useState(null);
-  const [locatingUser, setLocatingUser] = useState(true);
-  const [locationStatusText, setLocationStatusText] = useState('Detecting your location…');
-  const [locationPermissionGranted, setLocationPermissionGranted] = useState(false);
-  const [sortBy, setSortBy] = useState('distance'); // 'distance', 'price_asc', 'slots_desc', 'rating'
+  const [sortBy, setSortBy] = useState('slots_desc');
   const [copiedSlug, setCopiedSlug] = useState(null);
-  // A failed fetch here used to only go to console.error — the page just
-  // rendered an empty grid with zero indication anything went wrong,
-  // which is indistinguishable from "there are genuinely no venues yet".
   const [loadError, setLoadError] = useState('');
+
+  const [selectedCity, setSelectedCity] = useState(() => readSavedCity());
+  const [cityDraft, setCityDraft] = useState(() => readSavedCity());
+  const [choosingCity, setChoosingCity] = useState(() => !readSavedCity());
 
   useEffect(() => {
     async function load() {
@@ -56,45 +60,36 @@ export default function PlayerMarketplace({ onSelectVenue }) {
     load();
   }, []);
 
-  function handleRequestLocation() {
-    if (!navigator.geolocation) {
-      setLocationStatusText('Geolocation is not supported by your browser.');
-      setLocatingUser(false);
-      return;
-    }
-    setLocatingUser(true);
-    setLocationStatusText('Detecting your location to show nearby turfs...');
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setUserCoords({
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude
-        });
-        setLocationPermissionGranted(true);
-        setLocatingUser(false);
-        setLocationStatusText('Location active — showing nearest turfs first.');
-        setSortBy('distance');
-      },
-      (err) => {
-        setLocatingUser(false);
-        console.warn('Geolocation denied or error:', err.message);
-        setLocationStatusText('Location access was denied or timed out. Tap retry to try again.');
-      },
-      { timeout: 10000, enableHighAccuracy: true }
-    );
+  const availableCities = Array.from(
+    new Set(
+      venues
+        .map((v) => (v.city || '').trim())
+        .filter(Boolean)
+    )
+  ).sort((a, b) => a.localeCompare(b));
+
+  function confirmCity(cityName) {
+    const trimmed = (cityName || '').trim();
+    if (!trimmed) return;
+    // Prefer the canonical spelling from published venues when it matches.
+    const match = availableCities.find((c) => normalizeCity(c) === normalizeCity(trimmed));
+    const canonical = match || trimmed;
+    setSelectedCity(canonical);
+    setCityDraft(canonical);
+    saveCity(canonical);
+    setChoosingCity(false);
+    setSearchQuery('');
   }
 
-  function handleClearLocation() {
-    setUserCoords(null);
-    setLocationPermissionGranted(false);
-    setLocationStatusText('Location cleared. Showing turfs without distance sorting.');
+  function handleCitySubmit(e) {
+    e.preventDefault();
+    confirmCity(cityDraft);
   }
 
-  // Ask for location as soon as the marketplace opens so guests see closest turfs.
-  useEffect(() => {
-    handleRequestLocation();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  function handleChangeCity() {
+    setCityDraft(selectedCity);
+    setChoosingCity(true);
+  }
 
   function handleCopyUniqueLink(e, venue) {
     e.stopPropagation();
@@ -104,48 +99,113 @@ export default function PlayerMarketplace({ onSelectVenue }) {
     setTimeout(() => setCopiedSlug(null), 2500);
   }
 
-  // Filter & calculate distances
-  const enrichedVenues = venues.map(v => {
-    let distance = null;
-    if (userCoords && v.lat && v.lng) {
-      distance = calculateDistanceKm(userCoords.lat, userCoords.lng, v.lat, v.lng);
-    }
-    return {
-      ...v,
-      distanceKm: distance
-    };
-  });
+  const cityVenues = venues.filter(
+    (v) => selectedCity && normalizeCity(v.city) === normalizeCity(selectedCity)
+  );
 
-  const filteredVenues = enrichedVenues.filter(v => {
+  const filteredVenues = cityVenues.filter((v) => {
     const matchesSport = selectedSport === 'all' || v.sport_ids?.includes(selectedSport);
     const matchesSearch = !searchQuery ||
       (v.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (v.address || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (v.city || '').toLowerCase().includes(searchQuery.toLowerCase());
+      (v.address || '').toLowerCase().includes(searchQuery.toLowerCase());
     return matchesSport && matchesSearch;
   });
 
-  // Sort venues
   filteredVenues.sort((a, b) => {
-    if (sortBy === 'distance') {
-      if (a.distanceKm !== null && b.distanceKm !== null) return a.distanceKm - b.distanceKm;
-      if (a.distanceKm !== null) return -1;
-      if (b.distanceKm !== null) return 1;
-      return 0;
+    if (sortBy === 'slots_desc') {
+      return (b.today_available_slots_count || 0) - (a.today_available_slots_count || 0);
     }
     if (sortBy === 'price_asc') {
       return (a.min_price || 0) - (b.min_price || 0);
     }
-    if (sortBy === 'slots_desc') {
-      return (b.today_available_slots_count || 0) - (a.today_available_slots_count || 0);
-    }
-    return 0;
+    return (a.name || '').localeCompare(b.name || '');
   });
+
+  if (choosingCity) {
+    return (
+      <div className="animate-fade-in marketplace-container" style={{ maxWidth: 520, margin: '0 auto', paddingTop: 24 }}>
+        <div
+          className="nexus-card"
+          style={{
+            padding: '28px 24px',
+            background: '#ffffff',
+            border: '1px solid #e2e8f0',
+            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)'
+          }}
+        >
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#4f46e5', fontSize: 11.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>
+            <MapPin size={13} /> Choose your city
+          </div>
+          <h1 className="font-display" style={{ fontSize: 24, fontWeight: 800, color: '#0f172a', lineHeight: 1.25, margin: 0 }}>
+            Where do you want to play?
+          </h1>
+          <p style={{ color: '#64748b', fontSize: 13.5, marginTop: 8, marginBottom: 20, lineHeight: 1.5 }}>
+            Enter your city and we’ll show turfs available there. You can change this anytime.
+          </p>
+
+          <form onSubmit={handleCitySubmit}>
+            <label style={{ display: 'block', fontSize: 11.5, fontWeight: 600, color: '#64748b', marginBottom: 6 }}>
+              CITY NAME
+            </label>
+            <input
+              id="marketplace-city-input"
+              type="text"
+              className="nexus-input"
+              autoFocus
+              placeholder="e.g. Madurai, Rajapalayam"
+              value={cityDraft}
+              onChange={(e) => setCityDraft(e.target.value)}
+              style={{ width: '100%', marginBottom: 12, fontSize: 15 }}
+            />
+            <button
+              type="submit"
+              className="btn-primary"
+              disabled={!cityDraft.trim()}
+              style={{ width: '100%', padding: '12px 16px', fontSize: 14 }}
+            >
+              Show turfs in this city
+            </button>
+          </form>
+
+          {!loading && availableCities.length > 0 && (
+            <div style={{ marginTop: 22 }}>
+              <div style={{ fontSize: 11.5, fontWeight: 600, color: '#64748b', marginBottom: 8 }}>
+                Cities with live turfs
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {availableCities.map((city) => (
+                  <button
+                    key={city}
+                    type="button"
+                    onClick={() => confirmCity(city)}
+                    style={{
+                      background: normalizeCity(city) === normalizeCity(cityDraft) ? '#4f46e5' : '#f1f5f9',
+                      color: normalizeCity(city) === normalizeCity(cityDraft) ? '#ffffff' : '#334155',
+                      border: '1px solid #cbd5e1',
+                      padding: '8px 14px',
+                      borderRadius: 8,
+                      fontSize: 13,
+                      fontWeight: 700,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {city}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {loading && (
+            <div style={{ marginTop: 16, fontSize: 12.5, color: '#64748b' }}>Loading available cities…</div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="animate-fade-in marketplace-container" style={{ maxWidth: 1200, margin: '0 auto' }}>
-      
-      {/* Search & Location Hero Header */}
       <div
         id="marketplace-hero"
         className="nexus-card marketplace-hero-card"
@@ -161,50 +221,32 @@ export default function PlayerMarketplace({ onSelectVenue }) {
               <Sparkles size={13} /> LIVE TURF DISCOVERY & LOCAL SLOTS
             </div>
             <h1 className="font-display marketplace-hero-title" style={{ fontSize: 26, fontWeight: 800, color: '#0f172a', lineHeight: 1.25, margin: 0 }}>
-              Find Sports Arenas Near You
+              Turfs in {selectedCity}
             </h1>
             <p style={{ color: '#64748b', fontSize: 13, marginTop: 4, marginBottom: 0 }}>
-              We detect your location to sort turfs by distance. Browse live slots and book as a guest — no account needed.
+              Showing arenas in your city. Browse live slots and book as a guest — no account needed.
             </p>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-start', flex: '0 0 auto' }}>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-              <button
-                id="btn-request-location"
-                onClick={handleRequestLocation}
-                disabled={locatingUser}
-                className={locationPermissionGranted ? "btn-secondary" : "btn-primary"}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  padding: '9px 16px',
-                  fontSize: 12.5,
-                  fontWeight: 700,
-                  width: 'auto'
-                }}
-              >
-                <Navigation size={14} style={{ transform: locatingUser ? 'rotate(45deg)' : 'none', transition: 'transform 0.3s' }} />
-                {locatingUser ? 'Locating...' : locationPermissionGranted ? 'Location Active' : 'Retry My Location'}
-              </button>
-              {locationPermissionGranted && (
-                <button
-                  type="button"
-                  onClick={handleClearLocation}
-                  style={{ background: 'transparent', border: 'none', color: '#64748b', textDecoration: 'underline', fontSize: 11.5, cursor: 'pointer', padding: 0 }}
-                >
-                  Clear
-                </button>
-              )}
-            </div>
-            <div style={{ fontSize: 11, color: locationPermissionGranted ? '#059669' : '#64748b' }}>
-              {locationStatusText}
-            </div>
-          </div>
+          <button
+            type="button"
+            id="btn-change-city"
+            onClick={handleChangeCity}
+            className="btn-secondary"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '9px 16px',
+              fontSize: 12.5,
+              fontWeight: 700,
+              width: 'auto'
+            }}
+          >
+            <MapPin size={14} /> Change city
+          </button>
         </div>
 
-        {/* Search Bar & Sort Dropdown */}
         <div className="mobile-stack" style={{ display: 'flex', gap: 10, marginTop: 14 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#ffffff', padding: '8px 12px', borderRadius: 8, border: '1px solid #cbd5e1', flex: 1, minHeight: 42 }}>
             <Search size={15} style={{ color: '#94a3b8' }} />
@@ -213,7 +255,7 @@ export default function PlayerMarketplace({ onSelectVenue }) {
               type="text"
               placeholder="Search by arena name or area..."
               value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
+              onChange={(e) => setSearchQuery(e.target.value)}
               style={{ background: 'transparent', border: 'none', color: '#0f172a', outline: 'none', width: '100%', fontSize: 13 }}
             />
           </div>
@@ -222,19 +264,18 @@ export default function PlayerMarketplace({ onSelectVenue }) {
             <select
               id="marketplace-sort-select"
               value={sortBy}
-              onChange={e => setSortBy(e.target.value)}
+              onChange={(e) => setSortBy(e.target.value)}
               className="nexus-input"
               style={{ padding: '8px 12px', fontSize: 13, width: '100%', background: '#ffffff', color: '#0f172a', borderColor: '#cbd5e1' }}
             >
-              <option value="distance">Sort: Nearest to Me</option>
               <option value="slots_desc">Sort: Most Live Slots Today</option>
               <option value="price_asc">Sort: Price (Lowest First)</option>
+              <option value="name">Sort: Name (A–Z)</option>
             </select>
           </div>
         </div>
       </div>
 
-      {/* Sport Category Filter Pills */}
       <div className="scroll-pills" style={{ marginBottom: 20 }}>
         <button
           onClick={() => setSelectedSport('all')}
@@ -251,9 +292,9 @@ export default function PlayerMarketplace({ onSelectVenue }) {
             boxShadow: '0 1px 2px rgba(0,0,0,0.04)'
           }}
         >
-          All Sports ({venues.length})
+          All Sports ({cityVenues.length})
         </button>
-        {sports.map(s => (
+        {sports.map((s) => (
           <button
             key={s.id}
             onClick={() => setSelectedSport(s.id)}
@@ -278,7 +319,6 @@ export default function PlayerMarketplace({ onSelectVenue }) {
         ))}
       </div>
 
-      {/* Venues Grid */}
       {loading ? (
         <div className="nexus-card" style={{ padding: 40, textAlign: 'center', color: '#64748b' }}>
           Loading turfs...
@@ -286,218 +326,208 @@ export default function PlayerMarketplace({ onSelectVenue }) {
       ) : loadError ? (
         <div className="nexus-card" style={{ padding: 32, textAlign: 'center', border: '1px solid #fecaca', background: '#fef2f2' }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: '#b91c1c', marginBottom: 6 }}>
-            Couldn't load turfs
+            Couldn&apos;t load turfs
           </div>
           <div style={{ fontSize: 12.5, color: '#7f1d1d' }}>{loadError}</div>
         </div>
       ) : filteredVenues.length === 0 ? (
         <div className="nexus-card" style={{ padding: 40, textAlign: 'center', color: '#64748b' }}>
-          {venues.length === 0
-            ? 'No turfs are published yet — once an owner publishes a venue, it appears here automatically.'
-            : 'No turfs match your current search/filter.'}
+          {cityVenues.length === 0 ? (
+            <>
+              <div style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', marginBottom: 6 }}>
+                No turfs in {selectedCity} yet
+              </div>
+              <p style={{ fontSize: 13.5, margin: '0 0 16px' }}>
+                Try another city, or check back once an owner publishes a venue here.
+              </p>
+              <button type="button" className="btn-primary" onClick={handleChangeCity} style={{ padding: '10px 18px' }}>
+                Change city
+              </button>
+            </>
+          ) : (
+            'No turfs match your current search/filter.'
+          )}
         </div>
       ) : (
-      <div className="marketplace-grid">
-        {filteredVenues.map(venue => {
-          const uniqueLink = `${window.location.origin}/?venue=${venue.slug || venue.id}`;
-          const isCopied = copiedSlug === (venue.slug || venue.id);
+        <div className="marketplace-grid">
+          {filteredVenues.map((venue) => {
+            const isCopied = copiedSlug === (venue.slug || venue.id);
 
-          return (
-            <div
-              key={venue.id}
-              className="nexus-card"
-              style={{
-                overflow: 'hidden',
-                display: 'flex',
-                flexDirection: 'column',
-                cursor: 'pointer',
-                background: '#ffffff',
-                border: '1px solid #e2e8f0',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
-              }}
-              onClick={() => onSelectVenue(venue.slug || venue.id)}
-            >
-              {/* Image & Badges */}
-              <div style={{ position: 'relative', height: 185 }}>
-                <img
-                  src={venue.photos?.[0] || 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=600&q=80'}
-                  alt={venue.name}
-                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                />
-                
-                {/* Distance / area badge */}
-                <div style={{ position: 'absolute', top: 12, left: 12, display: 'flex', gap: 6 }}>
-                  {venue.distanceKm !== null ? (
-                    <span
-                      style={{
-                        background: '#047857',
-                        color: '#ffffff',
-                        fontWeight: 700,
-                        fontSize: 11.5,
-                        padding: '4px 10px',
-                        borderRadius: 6,
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.35)',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 4
-                      }}
-                    >
-                      <MapPin size={12} /> {venue.distanceKm} km away
-                    </span>
-                  ) : venue.city ? (
-                    <span
-                      style={{
-                        background: 'rgba(15, 23, 42, 0.75)',
-                        backdropFilter: 'blur(4px)',
-                        color: '#e2e8f0',
-                        fontWeight: 600,
-                        fontSize: 11.5,
-                        padding: '4px 8px',
-                        borderRadius: 6
-                      }}
-                    >
-                      {venue.city}
-                    </span>
-                  ) : null}
+            return (
+              <div
+                key={venue.id}
+                className="nexus-card"
+                style={{
+                  overflow: 'hidden',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  cursor: 'pointer',
+                  background: '#ffffff',
+                  border: '1px solid #e2e8f0',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+                }}
+                onClick={() => onSelectVenue(venue.slug || venue.id)}
+              >
+                <div style={{ position: 'relative', height: 185 }}>
+                  <img
+                    src={venue.photos?.[0] || 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=600&q=80'}
+                    alt={venue.name}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
 
-                  {venue.review_count > 0 && (
-                    <span
-                      style={{
-                        background: 'rgba(15, 23, 42, 0.75)',
-                        backdropFilter: 'blur(4px)',
-                        color: '#fbbf24',
-                        fontWeight: 700,
-                        fontSize: 11.5,
-                        padding: '4px 8px',
-                        borderRadius: 6,
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 3
-                      }}
-                    >
-                      ★ {venue.avg_rating} <span style={{ color: '#cbd5e1', fontWeight: 500 }}>({venue.review_count})</span>
-                    </span>
-                  )}
-                </div>
+                  <div style={{ position: 'absolute', top: 12, left: 12, display: 'flex', gap: 6 }}>
+                    {venue.city && (
+                      <span
+                        style={{
+                          background: 'rgba(15, 23, 42, 0.75)',
+                          backdropFilter: 'blur(4px)',
+                          color: '#e2e8f0',
+                          fontWeight: 600,
+                          fontSize: 11.5,
+                          padding: '4px 8px',
+                          borderRadius: 6,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 4
+                        }}
+                      >
+                        <MapPin size={12} /> {venue.city}
+                      </span>
+                    )}
 
-                {/* Available slots today — real count, not a preview list */}
-                <div style={{ position: 'absolute', bottom: 10, right: 10, display: 'flex', flexDirection: 'column', gap: 5, alignItems: 'flex-end' }}>
-                  {venue.open_games_today_count > 0 && (
+                    {venue.review_count > 0 && (
+                      <span
+                        style={{
+                          background: 'rgba(15, 23, 42, 0.75)',
+                          backdropFilter: 'blur(4px)',
+                          color: '#fbbf24',
+                          fontWeight: 700,
+                          fontSize: 11.5,
+                          padding: '4px 8px',
+                          borderRadius: 6,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 3
+                        }}
+                      >
+                        ★ {venue.avg_rating} <span style={{ color: '#cbd5e1', fontWeight: 500 }}>({venue.review_count})</span>
+                      </span>
+                    )}
+                  </div>
+
+                  <div style={{ position: 'absolute', bottom: 10, right: 10, display: 'flex', flexDirection: 'column', gap: 5, alignItems: 'flex-end' }}>
+                    {venue.open_games_today_count > 0 && (
+                      <span
+                        style={{
+                          background: '#f59e0b',
+                          color: '#ffffff',
+                          fontWeight: 700,
+                          fontSize: 11.5,
+                          padding: '4px 9px',
+                          borderRadius: 6,
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.35)'
+                        }}
+                      >
+                        🔥 {venue.open_games_today_count} open game{venue.open_games_today_count === 1 ? '' : 's'} — join now
+                      </span>
+                    )}
                     <span
                       style={{
-                        background: '#f59e0b',
-                        color: '#ffffff',
+                        background: 'rgba(15, 23, 42, 0.88)',
+                        border: '1px solid rgba(16, 185, 129, 0.35)',
+                        color: venue.today_available_slots_count > 0 ? '#34d399' : '#94a3b8',
                         fontWeight: 700,
                         fontSize: 11.5,
                         padding: '4px 9px',
-                        borderRadius: 6,
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.35)'
+                        borderRadius: 6
                       }}
                     >
-                      🔥 {venue.open_games_today_count} open game{venue.open_games_today_count === 1 ? '' : 's'} — join now
+                      {venue.today_available_slots_count > 0
+                        ? `${venue.today_available_slots_count} slots open today`
+                        : 'Check availability'}
                     </span>
-                  )}
-                  <span
-                    style={{
-                      background: 'rgba(15, 23, 42, 0.88)',
-                      border: '1px solid rgba(16, 185, 129, 0.35)',
-                      color: venue.today_available_slots_count > 0 ? '#34d399' : '#94a3b8',
-                      fontWeight: 700,
-                      fontSize: 11.5,
-                      padding: '4px 9px',
-                      borderRadius: 6
-                    }}
-                  >
-                    {venue.today_available_slots_count > 0
-                      ? `${venue.today_available_slots_count} slots open today`
-                      : 'Check availability'}
-                  </span>
-                </div>
-              </div>
-
-              {/* Content Details */}
-              <div style={{ padding: '18px 20px', flex: 1, display: 'flex', flexDirection: 'column', background: '#ffffff' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
-                  <h3 style={{ fontSize: 17.5, fontWeight: 800, color: '#0f172a', lineHeight: 1.3, margin: 0 }}>
-                    {venue.name}
-                  </h3>
-                  {/* Share / Copy Unique Link button */}
-                  <button
-                    onClick={(e) => handleCopyUniqueLink(e, venue)}
-                    title="Copy Unique Turf Booking URL"
-                    style={{
-                      background: isCopied ? '#059669' : '#f1f5f9',
-                      color: isCopied ? '#ffffff' : '#334155',
-                      border: '1px solid #cbd5e1',
-                      borderRadius: 6,
-                      padding: '5px 8px',
-                      fontSize: 11,
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 4,
-                      flexShrink: 0
-                    }}
-                  >
-                    {isCopied ? <Check size={12} /> : <Copy size={12} />}
-                    {isCopied ? 'Copied' : 'Turf Link'}
-                  </button>
+                  </div>
                 </div>
 
-                <div style={{ fontSize: 12.5, color: '#64748b', display: 'flex', alignItems: 'center', gap: 5, marginTop: 6 }}>
-                  <MapPin size={13} style={{ color: '#4f46e5', flexShrink: 0 }} />
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{venue.address}</span>
-                </div>
-                <div style={{ fontSize: 11.5, color: '#94a3b8', marginTop: 3, marginBottom: 12 }}>
-                  {venue.open_time && venue.close_time ? `Open ${venue.open_time} – ${venue.close_time}` : ' '}
-                </div>
-
-                {/* Amenities pills */}
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 14 }}>
-                  {(Array.isArray(venue.amenities) ? venue.amenities : []).slice(0, 3).map((am, i) => (
-                    <span
-                      key={i}
+                <div style={{ padding: '18px 20px', flex: 1, display: 'flex', flexDirection: 'column', background: '#ffffff' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+                    <h3 style={{ fontSize: 17.5, fontWeight: 800, color: '#0f172a', lineHeight: 1.3, margin: 0 }}>
+                      {venue.name}
+                    </h3>
+                    <button
+                      onClick={(e) => handleCopyUniqueLink(e, venue)}
+                      title="Copy Unique Turf Booking URL"
                       style={{
-                        background: '#f1f5f9',
-                        borderRadius: 4,
-                        padding: '2px 7px',
+                        background: isCopied ? '#059669' : '#f1f5f9',
+                        color: isCopied ? '#ffffff' : '#334155',
+                        border: '1px solid #cbd5e1',
+                        borderRadius: 6,
+                        padding: '5px 8px',
                         fontSize: 11,
-                        color: '#475569',
-                        border: '1px solid #e2e8f0'
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        flexShrink: 0
                       }}
                     >
-                      {am}
-                    </span>
-                  ))}
-                  {venue.amenities?.length > 3 && (
-                    <span style={{ fontSize: 11, color: '#64748b', alignSelf: 'center' }}>
-                      +{venue.amenities.length - 3} more
-                    </span>
-                  )}
-                </div>
-
-                {/* Footer: Owner Price & Booking Action */}
-                <div style={{ marginTop: 'auto', paddingTop: 12, borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <div style={{ fontSize: 10.5, color: '#64748b', textTransform: 'uppercase', fontWeight: 600 }}>
-                      Starting From
-                    </div>
-                    <div style={{ fontSize: 16, fontWeight: 800, color: '#0f172a' }}>
-                      ₹{venue.min_price || 800}
-                      <span style={{ fontSize: 11, color: '#64748b', fontWeight: 400 }}>/hr</span>
-                    </div>
+                      {isCopied ? <Check size={12} /> : <Copy size={12} />}
+                      {isCopied ? 'Copied' : 'Turf Link'}
+                    </button>
                   </div>
 
-                  <span className="btn-primary" style={{ padding: '8px 16px', fontSize: 12.5 }}>
-                    Select Slot <ChevronRight size={14} />
-                  </span>
+                  <div style={{ fontSize: 12.5, color: '#64748b', display: 'flex', alignItems: 'center', gap: 5, marginTop: 6 }}>
+                    <MapPin size={13} style={{ color: '#4f46e5', flexShrink: 0 }} />
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{venue.address}</span>
+                  </div>
+                  <div style={{ fontSize: 11.5, color: '#94a3b8', marginTop: 3, marginBottom: 12 }}>
+                    {venue.open_time && venue.close_time ? `Open ${venue.open_time} – ${venue.close_time}` : ' '}
+                  </div>
+
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 14 }}>
+                    {(Array.isArray(venue.amenities) ? venue.amenities : []).slice(0, 3).map((am, i) => (
+                      <span
+                        key={i}
+                        style={{
+                          background: '#f1f5f9',
+                          borderRadius: 4,
+                          padding: '2px 7px',
+                          fontSize: 11,
+                          color: '#475569',
+                          border: '1px solid #e2e8f0'
+                        }}
+                      >
+                        {am}
+                      </span>
+                    ))}
+                    {venue.amenities?.length > 3 && (
+                      <span style={{ fontSize: 11, color: '#64748b', alignSelf: 'center' }}>
+                        +{venue.amenities.length - 3} more
+                      </span>
+                    )}
+                  </div>
+
+                  <div style={{ marginTop: 'auto', paddingTop: 12, borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <div style={{ fontSize: 10.5, color: '#64748b', textTransform: 'uppercase', fontWeight: 600 }}>
+                        Starting From
+                      </div>
+                      <div style={{ fontSize: 16, fontWeight: 800, color: '#0f172a' }}>
+                        ₹{venue.min_price || 800}
+                        <span style={{ fontSize: 11, color: '#64748b', fontWeight: 400 }}>/hr</span>
+                      </div>
+                    </div>
+
+                    <span className="btn-primary" style={{ padding: '8px 16px', fontSize: 12.5 }}>
+                      Select Slot <ChevronRight size={14} />
+                    </span>
+                  </div>
                 </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
       )}
     </div>
   );
