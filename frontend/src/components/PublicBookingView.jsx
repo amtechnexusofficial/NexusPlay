@@ -58,6 +58,7 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
   const [hostingGame, setHostingGame] = useState(false);
   const [hostError, setHostError] = useState('');
   const [hostSuccess, setHostSuccess] = useState('');
+  const [showVenueDetails, setShowVenueDetails] = useState(false);
 
   function handleProceedToJoinPayment() {
     if (!selectedSlot?.game) return;
@@ -86,7 +87,7 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
       setJoinGameSuccess(`Payment submitted! ${res.newPlayerCount}/${selectedSlot.game.required_players} spots filled. The venue will verify your ₹${selectedSlot.game.cost_per_player} payment shortly.`);
       setJoinPaymentStep('form');
       setJoinUtr('');
-      const res2 = await api.getVenueSlots(venue.id, selectedDate, selectedCourt?.id);
+      const res2 = await api.getVenueSlots(venue.id, selectedDate);
       setSlots(res2);
       const refreshed = res2.find(s => s.id === selectedSlot.id);
       if (refreshed) setSelectedSlot(refreshed);
@@ -193,14 +194,12 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
     load();
   }, [slug]);
 
-  // Load slots whenever date or court changes
+  // Load all courts' slots for the selected date (group by court in the UI)
   useEffect(() => {
     if (!venue) return;
     async function loadSlots() {
       try {
-        const courtId = selectedCourt ? selectedCourt.id : undefined;
-        const res = await api.getVenueSlots(venue.id, selectedDate, courtId);
-        // Client-side backstop: hide slots whose start time has passed (IST).
+        const res = await api.getVenueSlots(venue.id, selectedDate);
         const now = Date.now();
         setSlots((Array.isArray(res) ? res : []).filter((s) => {
           const day = String(s.date || '').slice(0, 10);
@@ -214,7 +213,7 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
       }
     }
     loadSlots();
-  }, [venue, selectedDate, selectedCourt]);
+  }, [venue, selectedDate]);
 
   // Handle Lock Countdown timer
   useEffect(() => {
@@ -311,7 +310,7 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
         rules: hostRules.trim() || undefined
       });
       setHostSuccess('Open game posted! Others can join spots on this slot.');
-      const refreshed = await api.getVenueSlots(venue.id, selectedDate, selectedCourt?.id);
+      const refreshed = await api.getVenueSlots(venue.id, selectedDate);
       setSlots(refreshed);
       const next = refreshed.find((s) => s.id === selectedSlot.id);
       if (next) setSelectedSlot(next);
@@ -407,133 +406,66 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
     : 0;
   const balanceAtVenue = selectedSlot ? selectedSlot.price - advanceAmount : 0;
 
+  function selectSlot(slot) {
+    const court = (venue.courts || []).find((c) => c.id === slot.court_id);
+    if (court) setSelectedCourt(court);
+    if (slot.sport_id) setSelectedSport(slot.sport_id);
+    setSelectedSlot(slot);
+    setErrorMsg('');
+    setJoinGameError(''); setJoinGameSuccess('');
+    setFullSlotError(''); setFullSlotSuccess('');
+    setJoinPaymentStep('form'); setJoinUtr('');
+    setSlotIntent('book');
+    setHostError('');
+    setHostSuccess('');
+    prepareHostDefaults(slot);
+  }
+
+  function formatSlotTime(t) {
+    return String(t || '').slice(0, 5);
+  }
+
   return (
-    <div className="animate-fade-in" style={{ maxWidth: 1120, margin: '0 auto', padding: '16px 20px 80px' }}>
-      {/* Navigation Topbar */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+    <div className="animate-fade-in turf-booking-page">
+      {/* Compact turf header — slots come next, not after a gallery */}
+      <div className="turf-booking-topbar">
         <button
+          type="button"
           onClick={onBack}
-          className="btn-secondary"
-          style={{ padding: '6px 14px', fontSize: 13, borderRadius: 8 }}
+          className="btn-secondary turf-back-btn"
         >
-          <ArrowLeft size={16} /> Back to Venues
+          <ArrowLeft size={16} />
+          <span className="header-label-full">Back to Venues</span>
+          <span className="header-label-short">Back</span>
         </button>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div className="turf-booking-title-block">
+          <h1 className="font-display turf-booking-title">{venue.name}</h1>
+          <div className="turf-booking-subtitle">
+            <MapPin size={13} />
+            <span>{venue.address}</span>
+            {venue.open_time && venue.close_time && (
+              <span className="turf-booking-hours">· {venue.open_time}–{venue.close_time}</span>
+            )}
+          </div>
+        </div>
+        <div className="turf-booking-top-actions">
           {venue.review_count > 0 && (
-            <span className="badge-neon" style={{ padding: '5px 12px', borderRadius: 999, fontSize: 12, fontWeight: 700 }}>
-              ★ {venue.avg_rating} ({venue.review_count} review{venue.review_count === 1 ? '' : 's'})
-            </span>
+            <span className="turf-rating-pill">★ {venue.avg_rating}</span>
           )}
           <button
+            type="button"
             onClick={() => {
               if (navigator.clipboard) {
                 navigator.clipboard.writeText(window.location.href);
                 alert('Venue shareable link copied to clipboard!');
               }
             }}
-            className="btn-secondary"
-            style={{ padding: '6px 12px', fontSize: 13 }}
+            className="btn-secondary turf-share-btn"
             title="Share Venue Link"
           >
-            <Share2 size={15} /> Share
+            <Share2 size={15} />
+            <span className="header-label-full">Share</span>
           </button>
-        </div>
-      </div>
-
-      {/* Hero Photos & Venue Header */}
-      <div className="nexus-card" style={{ overflow: 'hidden', marginBottom: 24 }}>
-        <div className="venue-gallery-grid">
-          <img
-            src={venue.photos?.[0] || 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=1200&q=80'}
-            alt={venue.name}
-            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-          />
-          <div className="venue-gallery-side" style={{ display: 'grid', gridTemplateRows: '1fr 1fr', gap: 4 }}>
-            <img
-              src={venue.photos?.[1] || 'https://images.unsplash.com/photo-1529900241452-94f4c281df69?auto=format&fit=crop&w=600&q=80'}
-              alt="Turf side"
-              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-            />
-            <img
-              src={venue.photos?.[2] || 'https://images.unsplash.com/photo-1626224583764-f87db24ac4ea?auto=format&fit=crop&w=600&q=80'}
-              alt="Night floodlights"
-              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-            />
-          </div>
-        </div>
-
-        <div style={{ padding: 24 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 16 }}>
-            <div>
-              <h1 className="font-display" style={{ fontSize: 32, fontWeight: 800, color: '#0f172a', marginBottom: 6 }}>
-                {venue.name}
-              </h1>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#64748b', fontSize: 14 }}>
-                <MapPin size={16} style={{ color: '#059669', flexShrink: 0 }} />
-                <span>{venue.address}</span>
-              </div>
-            </div>
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: 12, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                Operational Hours
-              </div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: '#059669' }}>
-                {venue.open_time} - {venue.close_time}
-              </div>
-            </div>
-          </div>
-
-          <p style={{ color: '#475569', marginTop: 14, fontSize: 14.5, lineHeight: 1.6, maxWidth: 840 }}>
-            {venue.description}
-          </p>
-
-          {/* Amenities Badges */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 18 }}>
-            {(Array.isArray(venue.amenities) ? venue.amenities : []).map((amenity, idx) => (
-              <span
-                key={idx}
-                style={{
-                  background: '#f1f5f9',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: 999,
-                  padding: '5px 12px',
-                  fontSize: 12.5,
-                  color: '#334155',
-                  fontWeight: 600
-                }}
-              >
-                ✓ {amenity}
-              </span>
-            ))}
-          </div>
-
-          {(venue.cancellation_policy || venue.rules) && (
-            <div
-              className="mobile-grid-1"
-              style={{ display: 'grid', gridTemplateColumns: venue.cancellation_policy && venue.rules ? '1fr 1fr' : '1fr', gap: 12, marginTop: 18 }}
-            >
-              {venue.cancellation_policy && (
-                <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 12, padding: '14px 16px' }}>
-                  <div style={{ fontSize: 11, fontWeight: 800, color: '#92400e', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
-                    Cancellation Policy
-                  </div>
-                  <div style={{ fontSize: 13.5, color: '#78350f', lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>
-                    {venue.cancellation_policy}
-                  </div>
-                </div>
-              )}
-              {venue.rules && (
-                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: '14px 16px' }}>
-                  <div style={{ fontSize: 11, fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
-                    House Rules
-                  </div>
-                  <div style={{ fontSize: 13.5, color: '#334155', lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>
-                    {venue.rules}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
         </div>
       </div>
 
@@ -634,228 +566,122 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
           </div>
         </div>
       ) : (
-        <div className="public-booking-layout">
-          {/* Left Column: Sport, Court, Date & Slots */}
-          <div>
-            {/* 1. Sport Selector */}
-            <div style={{ marginBottom: 20 }}>
-              <label style={{ display: 'block', fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: 10 }}>
-                1. Select Sport
-              </label>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-                {(Array.isArray(venue.sport_ids) ? venue.sport_ids : []).map(sport => {
-                  const sportInfo = sports.find(s => s.id === sport);
-                  return (
-                    <button
-                      key={sport}
-                      onClick={() => {
-                        setSelectedSport(sport);
-                        const matchingCourt = (Array.isArray(venue.courts) ? venue.courts : []).find(c => c.sport_id === sport);
-                        if (matchingCourt) setSelectedCourt(matchingCourt);
-                      }}
-                      style={{
-                        background: selectedSport === sport ? 'var(--accent-neon)' : 'var(--bg-card)',
-                        color: selectedSport === sport ? '#042f1f' : 'var(--text-primary)',
-                        border: `1px solid ${selectedSport === sport ? 'var(--accent-neon)' : 'var(--border-card)'}`,
-                        borderRadius: 12,
-                        padding: '10px 18px',
-                        fontSize: 14,
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        textTransform: 'capitalize',
-                        transition: 'all 0.15s'
-                      }}
-                    >
-                      {sportInfo ? `${sportInfo.icon} ${sportInfo.name}` : 'Sport'}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+        <>
+        <div className="turf-booking-chrome">
+          <div className="turf-date-strip scroll-pills" role="tablist" aria-label="Choose date">
+            {Array.from({ length: 7 }).map((_, i) => {
+              const d = new Date();
+              d.setDate(d.getDate() + i);
+              const dStr = d.toISOString().slice(0, 10);
+              const isSelected = selectedDate === dStr;
+              const dayName = d.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
+              const dayNum = d.getDate();
+              const monthName = d.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
+              return (
+                <button
+                  key={dStr}
+                  type="button"
+                  role="tab"
+                  aria-selected={isSelected}
+                  className={`turf-date-chip${isSelected ? ' is-selected' : ''}`}
+                  onClick={() => { setSelectedDate(dStr); setSelectedSlot(null); }}
+                >
+                  <span className="turf-date-dow">{i === 0 ? 'TODAY' : dayName}</span>
+                  <span className="turf-date-num">{dayNum}</span>
+                  <span className="turf-date-mon">{monthName}</span>
+                </button>
+              );
+            })}
+          </div>
 
-            {/* 2. Court Selector */}
-            {filteredCourts.length > 0 && (
-              <div style={{ marginBottom: 20 }}>
-                <label style={{ display: 'block', fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: 10 }}>
-                  2. Choose Court / Arena
-                </label>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12 }}>
-                  {filteredCourts.map(crt => (
-                    <div
-                      key={crt.id}
-                      onClick={() => { setSelectedCourt(crt); setSelectedSlot(null); }}
-                      style={{
-                        background: selectedCourt?.id === crt.id ? '#ecfdf5' : '#ffffff',
-                        border: `1.5px solid ${selectedCourt?.id === crt.id ? '#059669' : '#e2e8f0'}`,
-                        borderRadius: 12,
-                        padding: '14px 16px',
-                        cursor: 'pointer',
-                        boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
-                      }}
-                    >
-                      <div style={{ fontWeight: 700, fontSize: 14, color: '#0f172a', marginBottom: 4 }}>
-                        {crt.name}
-                      </div>
-                      <div style={{ fontSize: 12, color: '#64748b' }}>
-                        Capacity: {crt.capacity} players · {crt.slot_duration_minutes}m slots
-                      </div>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: '#059669', marginTop: 8 }}>
-                        From ₹{crt.base_price}/hr
+          {(Array.isArray(venue.sport_ids) ? venue.sport_ids : []).length > 1 && (
+            <div className="turf-filter-row scroll-pills" role="tablist" aria-label="Select sport">
+              {(Array.isArray(venue.sport_ids) ? venue.sport_ids : []).map((sport) => {
+                const sportInfo = sports.find((s) => s.id === sport);
+                return (
+                  <button
+                    key={sport}
+                    type="button"
+                    role="tab"
+                    aria-selected={selectedSport === sport}
+                    className={`turf-filter-chip${selectedSport === sport ? ' is-active' : ''}`}
+                    onClick={() => {
+                      setSelectedSport(sport);
+                      setSelectedSlot(null);
+                      const matchingCourt = (Array.isArray(venue.courts) ? venue.courts : []).find((c) => c.sport_id === sport);
+                      if (matchingCourt) setSelectedCourt(matchingCourt);
+                    }}
+                  >
+                    {sportInfo ? `${sportInfo.icon} ${sportInfo.name}` : sport}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className="public-booking-layout">
+          {/* Left: court cards with open slots (BookMyShow-style) */}
+          <div className="turf-courts-column">
+            {filteredCourts.length === 0 ? (
+              <div className="turf-empty-slots">No courts available for this sport.</div>
+            ) : (
+              filteredCourts.map((crt) => {
+                const courtSlots = slots.filter(
+                  (s) =>
+                    s.court_id === crt.id &&
+                    (s.status === 'open' || s.status === 'held')
+                );
+                return (
+                  <div key={crt.id} className="turf-court-card">
+                    <div className="turf-court-card-head">
+                      <div>
+                        <div className="turf-court-name">{crt.name}</div>
+                        <div className="turf-court-meta">
+                          {crt.capacity} players · {crt.slot_duration_minutes}m · from ₹{crt.base_price}/hr
+                        </div>
                       </div>
                     </div>
-                  ))}
-                </div>
-              </div>
+                    {courtSlots.length === 0 ? (
+                      <div className="turf-court-no-slots">No open slots on this date</div>
+                    ) : (
+                      <div className="turf-slot-row">
+                        {courtSlots.map((slot) => {
+                          const isOpen = slot.status === 'open';
+                          const isHeld = slot.status === 'held';
+                          const isSelected = selectedSlot?.id === slot.id;
+                          const hasOpenGame = isOpen && !!slot.game;
+                          const canTap = isOpen || (isHeld && !!slot.game);
+                          return (
+                            <button
+                              key={slot.id}
+                              type="button"
+                              disabled={!canTap}
+                              className={`turf-slot-btn${isSelected ? ' is-selected' : ''}${isHeld ? ' is-held' : ''}${!isOpen && !hasOpenGame ? ' is-locked' : ''}`}
+                              onClick={() => selectSlot(slot)}
+                            >
+                              <span className="turf-slot-time">{formatSlotTime(slot.start_time)}</span>
+                              <span className="turf-slot-sub">
+                                {isOpen
+                                  ? `₹${slot.price}`
+                                  : hasOpenGame
+                                  ? `${slot.game.current_players}/${slot.game.required_players} joined`
+                                  : 'Held'}
+                              </span>
+                              {hasOpenGame && isOpen && (
+                                <span className="turf-slot-game">
+                                  {slot.game.current_players}/{slot.game.required_players}
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })
             )}
-
-            {/* 3. Date Picker Horizontal Strip */}
-            <div style={{ marginBottom: 24 }}>
-              <label style={{ display: 'block', fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', marginBottom: 10 }}>
-                3. Choose Date
-              </label>
-              <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 6 }}>
-                {Array.from({ length: 7 }).map((_, i) => {
-                  const d = new Date();
-                  d.setDate(d.getDate() + i);
-                  const dStr = d.toISOString().slice(0, 10);
-                  const isSelected = selectedDate === dStr;
-                  const dayName = d.toLocaleDateString('en-US', { weekday: 'short' });
-                  const dayNum = d.getDate();
-                  const monthName = d.toLocaleDateString('en-US', { month: 'short' });
-
-                  return (
-                    <button
-                      key={dStr}
-                      onClick={() => { setSelectedDate(dStr); setSelectedSlot(null); }}
-                      style={{
-                        minWidth: 78,
-                        background: isSelected ? '#059669' : '#ffffff',
-                        color: isSelected ? '#ffffff' : '#0f172a',
-                        border: `1px solid ${isSelected ? '#059669' : '#cbd5e1'}`,
-                        borderRadius: 12,
-                        padding: '12px 8px',
-                        textAlign: 'center',
-                        cursor: 'pointer',
-                        boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
-                      }}
-                    >
-                      <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', opacity: 0.8 }}>
-                        {i === 0 ? 'Today' : i === 1 ? 'Tmrw' : dayName}
-                      </div>
-                      <div style={{ fontSize: 20, fontWeight: 800, margin: '2px 0' }}>
-                        {dayNum}
-                      </div>
-                      <div style={{ fontSize: 11, opacity: 0.8 }}>
-                        {monthName}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* 4. Slot Matrix */}
-            <div>
-              <div className="booking-slot-legend-row">
-                <label style={{ fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)' }}>
-                  4. Available Time Slots
-                </label>
-                <div className="booking-slot-legend">
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent-neon)' }} /> Available
-                  </span>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#fb923c' }} /> Held/Locking
-                  </span>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#475569' }} /> Booked
-                  </span>
-                </div>
-              </div>
-
-              {slots.length === 0 ? (
-                <div style={{ padding: 30, textAlign: 'center', background: 'var(--bg-card)', borderRadius: 12, color: 'var(--text-secondary)' }}>
-                  No slots currently configured for this date.
-                </div>
-              ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(135px, 1fr))', gap: 10 }}>
-                  {slots.map(slot => {
-                    const isOpen = slot.status === 'open';
-                    const isHeld = slot.status === 'held';
-                    const isSelected = selectedSlot?.id === slot.id;
-                    const hasOpenGame = isOpen && !!slot.game;
-
-                    return (
-                      <button
-                        key={slot.id}
-                        disabled={!isOpen}
-                        onClick={() => {
-                          setSelectedSlot(slot);
-                          setErrorMsg('');
-                          setJoinGameError(''); setJoinGameSuccess('');
-                          setFullSlotError(''); setFullSlotSuccess('');
-                          setJoinPaymentStep('form'); setJoinUtr('');
-                          setSlotIntent('book');
-                          setHostError('');
-                          setHostSuccess('');
-                          prepareHostDefaults(slot);
-                        }}
-                        style={{
-                          background: isSelected
-                            ? '#059669'
-                            : isOpen
-                            ? '#ffffff'
-                            : isHeld
-                            ? '#fffbeb'
-                            : '#f8fafc',
-                          color: isSelected
-                            ? '#ffffff'
-                            : isOpen
-                            ? '#0f172a'
-                            : isHeld
-                            ? '#d97706'
-                            : '#94a3b8',
-                          border: `1.5px solid ${
-                            isSelected
-                              ? '#059669'
-                              : isOpen
-                              ? '#cbd5e1'
-                              : isHeld
-                              ? '#fde68a'
-                              : '#e2e8f0'
-                          }`,
-                          borderRadius: 10,
-                          padding: '10px 8px',
-                          textAlign: 'center',
-                          cursor: isOpen ? 'pointer' : 'not-allowed',
-                          position: 'relative',
-                          boxShadow: isOpen ? '0 1px 2px rgba(0,0,0,0.03)' : 'none'
-                        }}
-                      >
-                        <div style={{ fontSize: 13, fontWeight: 700 }}>
-                          {slot.start_time} - {slot.end_time}
-                        </div>
-                        <div style={{ fontSize: 12, fontWeight: 700, marginTop: 4, color: isSelected ? '#ffffff' : isOpen ? '#059669' : undefined }}>
-                          {isOpen ? `₹${slot.price}` : isHeld ? 'Temporarily Held' : 'Booked'}
-                        </div>
-                        {hasOpenGame && (
-                          <div
-                            style={{
-                              fontSize: 10, fontWeight: 700, marginTop: 4, padding: '2px 6px', borderRadius: 999,
-                              background: isSelected ? 'rgba(255,255,255,0.25)' : '#fef3c7',
-                              color: isSelected ? '#ffffff' : '#92400e',
-                              display: 'inline-block'
-                            }}
-                          >
-                            {slot.game.current_players}/{slot.game.required_players} joined
-                          </div>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
           </div>
 
           {/* Right Column: Checkout Summary & Temporary Lock Widget */}
@@ -1415,12 +1241,102 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
                 </div>
               ) : (
                 <div style={{ textAlign: 'center', padding: '30px 10px', color: 'var(--text-muted)', fontSize: 13.5 }}>
-                  Select a court and available time slot to view price and reserve.
+                  Select an available time slot to view price and reserve.
                 </div>
               )}
             </div>
           </div>
         </div>
+
+        <div className="turf-about-section">
+          <button
+            type="button"
+            className="turf-about-toggle"
+            onClick={() => setShowVenueDetails((v) => !v)}
+            aria-expanded={showVenueDetails}
+          >
+            {showVenueDetails ? 'Hide venue details' : 'Photos, amenities & policies'}
+            <ChevronRight size={16} style={{ transform: showVenueDetails ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }} />
+          </button>
+          {showVenueDetails && (
+            <div className="nexus-card turf-about-body" style={{ overflow: 'hidden', marginTop: 10 }}>
+              <div className="venue-gallery-grid">
+                <img
+                  src={venue.photos?.[0] || 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=1200&q=80'}
+                  alt={venue.name}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                />
+                <div className="venue-gallery-side" style={{ display: 'grid', gridTemplateRows: '1fr 1fr', gap: 4 }}>
+                  <img
+                    src={venue.photos?.[1] || 'https://images.unsplash.com/photo-1529900241452-94f4c281df69?auto=format&fit=crop&w=600&q=80'}
+                    alt="Turf side"
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
+                  <img
+                    src={venue.photos?.[2] || 'https://images.unsplash.com/photo-1626224583764-f87db24ac4ea?auto=format&fit=crop&w=600&q=80'}
+                    alt="Night floodlights"
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
+                </div>
+              </div>
+              <div style={{ padding: 18 }}>
+                {venue.description && (
+                  <p style={{ color: '#475569', margin: '0 0 14px', fontSize: 14, lineHeight: 1.55 }}>
+                    {venue.description}
+                  </p>
+                )}
+                {(Array.isArray(venue.amenities) ? venue.amenities : []).length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
+                    {(Array.isArray(venue.amenities) ? venue.amenities : []).map((amenity, idx) => (
+                      <span
+                        key={idx}
+                        style={{
+                          background: '#f1f5f9',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: 999,
+                          padding: '5px 12px',
+                          fontSize: 12.5,
+                          color: '#334155',
+                          fontWeight: 600
+                        }}
+                      >
+                        ✓ {amenity}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {(venue.cancellation_policy || venue.rules) && (
+                  <div
+                    className="mobile-grid-1"
+                    style={{ display: 'grid', gridTemplateColumns: venue.cancellation_policy && venue.rules ? '1fr 1fr' : '1fr', gap: 12 }}
+                  >
+                    {venue.cancellation_policy && (
+                      <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 12, padding: '14px 16px' }}>
+                        <div style={{ fontSize: 11, fontWeight: 800, color: '#92400e', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
+                          Cancellation Policy
+                        </div>
+                        <div style={{ fontSize: 13.5, color: '#78350f', lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>
+                          {venue.cancellation_policy}
+                        </div>
+                      </div>
+                    )}
+                    {venue.rules && (
+                      <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: '14px 16px' }}>
+                        <div style={{ fontSize: 11, fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
+                          House Rules
+                        </div>
+                        <div style={{ fontSize: 13.5, color: '#334155', lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>
+                          {venue.rules}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+        </>
       )}
 
       <div className="card" style={{ marginTop: 28, padding: '22px 20px' }}>

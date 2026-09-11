@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api.js';
-import { Search, MapPin, ChevronRight, Check, Copy, ArrowUpDown } from 'lucide-react';
+import { Search, MapPin, ChevronRight, ArrowUpDown } from 'lucide-react';
 
 const CITY_STORAGE_KEY = 'nexus_selected_city';
 
@@ -32,7 +32,6 @@ export default function PlayerMarketplace({ onSelectVenue }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [sortBy, setSortBy] = useState('slots_desc');
-  const [copiedSlug, setCopiedSlug] = useState(null);
   const [loadError, setLoadError] = useState('');
 
   const [selectedCity, setSelectedCity] = useState(() => readSavedCity());
@@ -87,14 +86,6 @@ export default function PlayerMarketplace({ onSelectVenue }) {
 
   function handleChangeCity() {
     setChoosingCity(true);
-  }
-
-  function handleCopyUniqueLink(e, venue) {
-    e.stopPropagation();
-    const url = `${window.location.origin}/?venue=${venue.slug || venue.id}`;
-    navigator.clipboard.writeText(url);
-    setCopiedSlug(venue.slug || venue.id);
-    setTimeout(() => setCopiedSlug(null), 2500);
   }
 
   const cityVenues = venues.filter(
@@ -288,10 +279,7 @@ export default function PlayerMarketplace({ onSelectVenue }) {
         </div>
       ) : (
         <div className="marketplace-grid">
-          {filteredVenues.map((venue) => {
-            const isCopied = copiedSlug === (venue.slug || venue.id);
-
-            return (
+          {filteredVenues.map((venue) => (
               <div
                 key={venue.id}
                 className="nexus-card marketplace-venue-card"
@@ -333,15 +321,6 @@ export default function PlayerMarketplace({ onSelectVenue }) {
                 <div className="marketplace-venue-body">
                   <div className="marketplace-venue-title-row">
                     <h3>{venue.name}</h3>
-                    <button
-                      type="button"
-                      onClick={(e) => handleCopyUniqueLink(e, venue)}
-                      title="Copy turf booking link"
-                      className={`marketplace-link-btn${isCopied ? ' is-copied' : ''}`}
-                    >
-                      {isCopied ? <Check size={12} /> : <Copy size={12} />}
-                      {isCopied ? 'Copied' : 'Link'}
-                    </button>
                   </div>
 
                   <div className="marketplace-venue-address">
@@ -377,8 +356,7 @@ export default function PlayerMarketplace({ onSelectVenue }) {
                   </div>
                 </div>
               </div>
-            );
-          })}
+          ))}
         </div>
       )}
     </div>
