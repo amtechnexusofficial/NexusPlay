@@ -858,16 +858,6 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
       .replace(/\b\w/g, (c) => c.toUpperCase());
   }
 
-  function formatBookingDateLabel(dateStr) {
-    try {
-      const d = new Date(`${dateStr}T12:00:00`);
-      if (Number.isNaN(d.getTime())) return dateStr;
-      return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
-    } catch {
-      return dateStr;
-    }
-  }
-
   function handleShareInvoiceWhatsApp() {
     if (!receiptBooking) return;
     const ownerWa = selectedVenue?.whatsapp_number || bizWhatsapp;
@@ -882,7 +872,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
     }
     const turf = selectedVenue?.name || 'our turf';
     const sport = formatSportLabel(receiptBooking.sport_id);
-    const dateLabel = formatBookingDateLabel(receiptBooking.date);
+    const dateLabel = String(receiptBooking.date || '').slice(0, 10);
     const start = String(receiptBooking.start_time || '').slice(0, 5);
     const end = String(receiptBooking.end_time || '').slice(0, 5);
     const name = receiptBooking.customer_name?.trim() || 'there';
