@@ -898,6 +898,29 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
     window.open(`https://wa.me/${playerPhone}?text=${encodeURIComponent(message)}`, '_blank', 'noopener,noreferrer');
   }
 
+  function openSlotInvoice(slot) {
+    if (!slot?.booking?.id) {
+      alert('No booking found on this slot to invoice.');
+      return;
+    }
+    const b = slot.booking;
+    setReceiptBooking({
+      id: b.id,
+      date: slot.date,
+      start_time: slot.start_time,
+      end_time: slot.end_time,
+      court_name: slot.court_name,
+      sport_id: slot.sport_id || b.sport_id || '',
+      customer_name: slot.full_inquiry_client || b.customer_name,
+      customer_phone: slot.full_inquiry_phone || b.customer_phone,
+      payment_provider: b.payment_status,
+      payment_status: b.payment_status,
+      status: b.status || 'confirmed',
+      amount_paid: b.amount_paid ?? b.total_amount ?? slot.price,
+      total_amount: b.total_amount ?? slot.price
+    });
+  }
+
   async function handleVerifyUpi(row) {
     try {
       if (row.payment_type === 'game_join') {
@@ -2032,36 +2055,57 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                       )}
 
                       {isBooked && (
-                        <button
-                          type="button"
-                          id={`btn-cancel-slot-booking-${slot.id}`}
-                          onClick={() => {
-                            if (!slot.booking?.id) {
-                              alert('No booking found on this slot to cancel.');
-                              return;
-                            }
-                            handleCancelBooking({
-                              ...slot.booking,
-                              date: slot.date,
-                              start_time: slot.start_time,
-                              end_time: slot.end_time
-                            });
-                          }}
-                          style={{
-                            width: '100%',
-                            background: '#dc2626',
-                            color: '#ffffff',
-                            border: 'none',
-                            borderRadius: 8,
-                            padding: '10px 12px',
-                            fontSize: 13,
-                            fontWeight: 700,
-                            cursor: 'pointer',
-                            minHeight: 42
-                          }}
-                        >
-                          Cancel booking
-                        </button>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button
+                            type="button"
+                            id={`btn-invoice-slot-booking-${slot.id}`}
+                            onClick={() => openSlotInvoice(slot)}
+                            className="btn-secondary"
+                            style={{
+                              flex: 1,
+                              padding: '10px 12px',
+                              fontSize: 13,
+                              fontWeight: 700,
+                              minHeight: 42,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: 6
+                            }}
+                          >
+                            <Receipt size={14} /> Invoice
+                          </button>
+                          <button
+                            type="button"
+                            id={`btn-cancel-slot-booking-${slot.id}`}
+                            onClick={() => {
+                              if (!slot.booking?.id) {
+                                alert('No booking found on this slot to cancel.');
+                                return;
+                              }
+                              handleCancelBooking({
+                                ...slot.booking,
+                                date: slot.date,
+                                start_time: slot.start_time,
+                                end_time: slot.end_time
+                              });
+                            }}
+                            style={{
+                              flex: 1,
+                              background: '#dc2626',
+                              color: '#ffffff',
+                              border: 'none',
+                              borderRadius: 8,
+                              padding: '10px 12px',
+                              fontSize: 13,
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              minHeight: 42
+                            }}
+                          >
+                            Cancel booking
+                          </button>
+                        </div>
                       )}
 
                       {isBlocked && (
@@ -2305,34 +2349,52 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                               )}
 
                               {isBooked && (
-                                <button
-                                  type="button"
-                                  id={`btn-cancel-slot-booking-table-${slot.id}`}
-                                  onClick={() => {
-                                    if (!slot.booking?.id) {
-                                      alert('No booking found on this slot to cancel.');
-                                      return;
-                                    }
-                                    handleCancelBooking({
-                                      ...slot.booking,
-                                      date: slot.date,
-                                      start_time: slot.start_time,
-                                      end_time: slot.end_time
-                                    });
-                                  }}
-                                  style={{
-                                    background: '#dc2626',
-                                    color: '#ffffff',
-                                    border: 'none',
-                                    borderRadius: 6,
-                                    padding: '6px 12px',
-                                    fontSize: 11.5,
-                                    fontWeight: 700,
-                                    cursor: 'pointer'
-                                  }}
-                                >
-                                  Cancel booking
-                                </button>
+                                <>
+                                  <button
+                                    type="button"
+                                    id={`btn-invoice-slot-booking-table-${slot.id}`}
+                                    onClick={() => openSlotInvoice(slot)}
+                                    className="btn-secondary"
+                                    style={{
+                                      fontSize: 11.5,
+                                      fontWeight: 700,
+                                      padding: '6px 10px',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: 4
+                                    }}
+                                  >
+                                    <Receipt size={12} /> Invoice
+                                  </button>
+                                  <button
+                                    type="button"
+                                    id={`btn-cancel-slot-booking-table-${slot.id}`}
+                                    onClick={() => {
+                                      if (!slot.booking?.id) {
+                                        alert('No booking found on this slot to cancel.');
+                                        return;
+                                      }
+                                      handleCancelBooking({
+                                        ...slot.booking,
+                                        date: slot.date,
+                                        start_time: slot.start_time,
+                                        end_time: slot.end_time
+                                      });
+                                    }}
+                                    style={{
+                                      background: '#dc2626',
+                                      color: '#ffffff',
+                                      border: 'none',
+                                      borderRadius: 6,
+                                      padding: '6px 12px',
+                                      fontSize: 11.5,
+                                      fontWeight: 700,
+                                      cursor: 'pointer'
+                                    }}
+                                  >
+                                    Cancel booking
+                                  </button>
+                                </>
                               )}
                             </div>
                           </td>
