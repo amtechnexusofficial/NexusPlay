@@ -1778,14 +1778,10 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                             {slot.full_inquiry_phone || slot.booking?.customer_phone || ''}
                           </div>
                           {slot.booking && (
-                            <button
-                              type="button"
-                              onClick={() => setReceiptBooking({ ...slot.booking, date: slot.date, start_time: slot.start_time, end_time: slot.end_time, court_name: slot.court_name })}
-                              className="btn-secondary"
-                              style={{ marginTop: 8, padding: '4px 10px', fontSize: 11 }}
-                            >
-                              <Receipt size={11} /> Invoice
-                            </button>
+                            <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 4 }}>
+                              Paid ₹{slot.booking.amount_paid ?? slot.booking.total_amount ?? slot.price}
+                              {slot.booking.payment_status ? ` · ${slot.booking.payment_status}` : ''}
+                            </div>
                           )}
                         </div>
                       ) : isBlocked ? (
@@ -1945,6 +1941,39 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                             Remove
                           </button>
                         </div>
+                      )}
+
+                      {isBooked && (
+                        <button
+                          type="button"
+                          id={`btn-cancel-slot-booking-${slot.id}`}
+                          onClick={() => {
+                            if (!slot.booking?.id) {
+                              alert('No booking found on this slot to cancel.');
+                              return;
+                            }
+                            handleCancelBooking({
+                              ...slot.booking,
+                              date: slot.date,
+                              start_time: slot.start_time,
+                              end_time: slot.end_time
+                            });
+                          }}
+                          style={{
+                            width: '100%',
+                            background: '#dc2626',
+                            color: '#ffffff',
+                            border: 'none',
+                            borderRadius: 8,
+                            padding: '10px 12px',
+                            fontSize: 13,
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            minHeight: 42
+                          }}
+                        >
+                          Cancel booking
+                        </button>
                       )}
 
                       {isBlocked && (
@@ -2193,14 +2222,34 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                                 </>
                               )}
 
-                              {isBooked && slot.booking && (
+                              {isBooked && (
                                 <button
                                   type="button"
-                                  onClick={() => setReceiptBooking({ ...slot.booking, date: slot.date, start_time: slot.start_time, end_time: slot.end_time, court_name: slot.court_name })}
-                                  className="btn-secondary"
-                                  style={{ fontSize: 11, padding: '4px 8px' }}
+                                  id={`btn-cancel-slot-booking-table-${slot.id}`}
+                                  onClick={() => {
+                                    if (!slot.booking?.id) {
+                                      alert('No booking found on this slot to cancel.');
+                                      return;
+                                    }
+                                    handleCancelBooking({
+                                      ...slot.booking,
+                                      date: slot.date,
+                                      start_time: slot.start_time,
+                                      end_time: slot.end_time
+                                    });
+                                  }}
+                                  style={{
+                                    background: '#dc2626',
+                                    color: '#ffffff',
+                                    border: 'none',
+                                    borderRadius: 6,
+                                    padding: '6px 12px',
+                                    fontSize: 11.5,
+                                    fontWeight: 700,
+                                    cursor: 'pointer'
+                                  }}
                                 >
-                                  <Receipt size={11} /> Invoice
+                                  Cancel booking
                                 </button>
                               )}
                             </div>
