@@ -58,7 +58,7 @@ export async function listGames(sql, { sportId, venueId, date } = {}) {
 // No auth on this route (mirrors booking hold/confirm) — organizerName/
 // organizerPhone identify the caller the same way a booking's customer
 // details do.
-export async function createGame(env, input) {
+export async function createGame(env, input, { ownerOrgId = null } = {}) {
   const {
     venueId, courtId, sportId, title, organizerName, organizerPhone,
     skillLevel = "All Levels", requiredPlayers, costPerPlayer, date, startTime, endTime, rules, courtSlotId,
@@ -72,6 +72,13 @@ export async function createGame(env, input) {
     const { rows: venueRows } = await client.query("select * from venues where id = $1", [venueId]);
     const venue = venueRows[0];
     if (!venue) throw httpError(404, "Selected venue does not exist");
+
+    const isOwnerHost = ownerOrgId && String(ownerOrgId) === String(venue.organization_id);
+    // Guests may only host when the owner has left this enabled. Venue
+    // staff hosting from Owner Hub sends a bearer token and bypasses.
+    if (venue.allow_guest_open_games === false && !isOwnerHost) {
+      throw httpError(403, "This venue has disabled open-game hosting for players");
+    }
 
     // The owner "Host Open Game" form (and any other caller) sends a sport
     // slug like "badminton", not a uuid — sport_id is a uuid column, so

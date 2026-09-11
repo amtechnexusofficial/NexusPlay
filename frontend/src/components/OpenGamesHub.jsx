@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api.js';
 import {
-  Plus, Calendar, Clock, MapPin, CheckCircle,
+  Plus, Calendar, Clock, MapPin, CheckCircle, Users,
   AlertCircle, ShieldCheck, Trophy, Sparkles, Filter, Shield, Copy, CheckCircle2, Building2
 } from 'lucide-react';
 
@@ -151,7 +151,7 @@ export default function OpenGamesHub({ onNavigateToVenue, onNavigateToDashboard,
               Open Games Hub
             </h1>
             <p style={{ color: '#64748b', marginTop: 6, fontSize: 14, lineHeight: 1.5, margin: 0 }}>
-              Short of players for tonight's match? Join a spot or reserve the full turf as a guest. Venue owners host open games from the Owner Hub.
+              Short of players for tonight's match? Join a spot or reserve the full turf as a guest. You can also host an open game from any venue&apos;s open slot when the owner allows it.
             </p>
           </div>
 
@@ -170,10 +170,10 @@ export default function OpenGamesHub({ onNavigateToVenue, onNavigateToDashboard,
               <button
                 id="btn-hub-host-guest"
                 className="btn-secondary"
-                onClick={() => onNavigateToLogin?.('owner')}
+                onClick={() => onNavigateToLogin?.('marketplace')}
                 style={{ padding: '10px 18px', fontSize: 13, display: 'inline-flex', alignItems: 'center', gap: 7 }}
               >
-                <Building2 size={15} /> Owner Portal to Host
+                <Users size={15} /> Browse turfs to host
               </button>
             )}
           </div>
@@ -233,17 +233,17 @@ export default function OpenGamesHub({ onNavigateToVenue, onNavigateToDashboard,
           <Trophy size={40} style={{ color: '#94a3b8', margin: '0 auto 12px' }} />
           <h3 style={{ fontSize: 17, fontWeight: 700, color: '#0f172a' }}>No active pickup games for this sport yet</h3>
           <p style={{ color: '#64748b', fontSize: 13.5, marginTop: 4 }}>
-            Venue owners can start an open match from the Owner Hub after booking a slot.
+            Host a pickup from an open slot on a venue page, or owners can post one from the Owner Hub.
           </p>
           <button
             className="btn-primary"
             onClick={() => {
               if (currentUser?.role === 'owner') onNavigateToDashboard?.('owner');
-              else onNavigateToLogin?.('owner');
+              else onNavigateToLogin?.('marketplace');
             }}
             style={{ marginTop: 14 }}
           >
-            {currentUser?.role === 'owner' ? 'Open Owner Hub' : 'Owner Portal to Host'}
+            {currentUser?.role === 'owner' ? 'Open Owner Hub' : 'Browse turfs to host'}
           </button>
         </div>
       ) : (

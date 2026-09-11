@@ -151,7 +151,7 @@ export const api = {
   async createGame(data) {
     const res = await fetch(`${API_BASE}/games/create`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify(data)
     });
     const body = await res.json();

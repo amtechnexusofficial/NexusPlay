@@ -536,3 +536,7 @@ alter table venues add constraint venues_advance_payment_percent_check
 
 alter table bookings add column if not exists advance_amount integer;
 update bookings set advance_amount = total_amount where advance_amount is null;
+
+-- Guest open-game hosting opt-in (owners can always host from Owner Hub)
+alter table venues
+  add column if not exists allow_guest_open_games boolean not null default true;

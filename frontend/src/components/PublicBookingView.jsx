@@ -48,6 +48,17 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
   const [fullSlotError, setFullSlotError] = useState('');
   const [fullSlotSuccess, setFullSlotSuccess] = useState('');
 
+  // Guest host open game on an empty open slot (gated by venue.allow_guest_open_games)
+  const [slotIntent, setSlotIntent] = useState('book'); // 'book' | 'host'
+  const [hostTitle, setHostTitle] = useState('');
+  const [hostPlayers, setHostPlayers] = useState(10);
+  const [hostCostPerPlayer, setHostCostPerPlayer] = useState(250);
+  const [hostSkill, setHostSkill] = useState('All Levels');
+  const [hostRules, setHostRules] = useState('');
+  const [hostingGame, setHostingGame] = useState(false);
+  const [hostError, setHostError] = useState('');
+  const [hostSuccess, setHostSuccess] = useState('');
+
   function handleProceedToJoinPayment() {
     if (!selectedSlot?.game) return;
     if (!customerName.trim() || !customerPhone.trim()) {
@@ -249,6 +260,69 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
     }
   }
 
+  function prepareHostDefaults(slot) {
+    const capacity = selectedCourt?.capacity || 10;
+    const players = Math.max(2, Number(capacity) || 10);
+    setHostPlayers(players);
+    setHostCostPerPlayer(Math.max(1, Math.ceil((slot?.price || 0) / players)));
+    setHostTitle('');
+    setHostSkill('All Levels');
+    setHostRules('');
+    setHostError('');
+    setHostSuccess('');
+  }
+
+  function handleHostPlayersChange(val) {
+    const count = Math.max(2, Number(val) || 2);
+    setHostPlayers(count);
+    if (selectedSlot) {
+      setHostCostPerPlayer(Math.max(1, Math.ceil((selectedSlot.price || 0) / count)));
+    }
+  }
+
+  async function handleHostOpenGame(e) {
+    e?.preventDefault?.();
+    if (!selectedSlot || !venue) return;
+    if (!customerName.trim() || !customerPhone.trim()) {
+      setHostError('Enter your name and phone number to host this open game');
+      return;
+    }
+    if (!hostPlayers || !hostCostPerPlayer) {
+      setHostError('Set how many players and the cost per spot');
+      return;
+    }
+    setHostError('');
+    setHostingGame(true);
+    try {
+      await api.createGame({
+        venueId: venue.id,
+        courtId: selectedSlot.court_id || selectedCourt?.id,
+        courtSlotId: selectedSlot.id,
+        sportId: selectedSlot.sport_id || selectedCourt?.sport_id || selectedSport,
+        title: hostTitle.trim() || `Open Match at ${venue.name}`,
+        organizerName: customerName.trim(),
+        organizerPhone: customerPhone.trim(),
+        skillLevel: hostSkill,
+        requiredPlayers: Number(hostPlayers),
+        costPerPlayer: Number(hostCostPerPlayer),
+        date: selectedSlot.date || selectedDate,
+        startTime: selectedSlot.start_time,
+        endTime: selectedSlot.end_time,
+        rules: hostRules.trim() || undefined
+      });
+      setHostSuccess('Open game posted! Others can join spots on this slot.');
+      const refreshed = await api.getVenueSlots(venue.id, selectedDate, selectedCourt?.id);
+      setSlots(refreshed);
+      const next = refreshed.find((s) => s.id === selectedSlot.id);
+      if (next) setSelectedSlot(next);
+      setSlotIntent('book');
+    } catch (err) {
+      setHostError(err.message || 'Failed to host open game');
+    } finally {
+      setHostingGame(false);
+    }
+  }
+
   // Step 2: Confirm Payment & Submit UTR
   async function handleFinalizeBooking() {
     if (!activeHold?.bookingId) return;
@@ -327,6 +401,7 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
   // 100 (the default) means "pay in full to lock the slot", same as
   // before this setting existed.
   const advancePercent = venue.advance_payment_percent ?? 100;
+  const guestHostEnabled = venue.allow_guest_open_games !== false;
   const advanceAmount = selectedSlot
     ? (advancePercent >= 100 ? selectedSlot.price : Math.max(1, Math.round((selectedSlot.price * advancePercent) / 100)))
     : 0;
@@ -717,6 +792,10 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
                           setJoinGameError(''); setJoinGameSuccess('');
                           setFullSlotError(''); setFullSlotSuccess('');
                           setJoinPaymentStep('form'); setJoinUtr('');
+                          setSlotIntent('book');
+                          setHostError('');
+                          setHostSuccess('');
+                          prepareHostDefaults(slot);
                         }}
                         style={{
                           background: isSelected
@@ -939,6 +1018,126 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
                     </div>
                   </div>
 
+                  {guestHostEnabled && !activeHold && (
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: '1fr 1fr',
+                        gap: 6,
+                        padding: 4,
+                        marginBottom: 16,
+                        background: '#f1f5f9',
+                        borderRadius: 10,
+                        border: '1px solid #e2e8f0'
+                      }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => { setSlotIntent('book'); setHostError(''); }}
+                        style={{
+                          padding: '10px 8px',
+                          borderRadius: 8,
+                          border: slotIntent === 'book' ? '1px solid #cbd5e1' : '1px solid transparent',
+                          background: slotIntent === 'book' ? '#ffffff' : 'transparent',
+                          color: slotIntent === 'book' ? '#0f172a' : '#64748b',
+                          fontWeight: 700,
+                          fontSize: 12.5,
+                          cursor: 'pointer',
+                          boxShadow: slotIntent === 'book' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none'
+                        }}
+                      >
+                        Book full slot
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setSlotIntent('host'); setErrorMsg(''); prepareHostDefaults(selectedSlot); }}
+                        style={{
+                          padding: '10px 8px',
+                          borderRadius: 8,
+                          border: slotIntent === 'host' ? '1px solid #cbd5e1' : '1px solid transparent',
+                          background: slotIntent === 'host' ? '#ffffff' : 'transparent',
+                          color: slotIntent === 'host' ? '#0f172a' : '#64748b',
+                          fontWeight: 700,
+                          fontSize: 12.5,
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 6,
+                          boxShadow: slotIntent === 'host' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none'
+                        }}
+                      >
+                        <Users size={14} /> Host open game
+                      </button>
+                    </div>
+                  )}
+
+                  {hostSuccess && (
+                    <div style={{ background: '#ecfdf5', border: '1px solid #a7f3d0', color: '#065f46', padding: 10, borderRadius: 8, fontSize: 12.5, marginBottom: 14 }}>
+                      {hostSuccess}
+                    </div>
+                  )}
+
+                  {slotIntent === 'host' && guestHostEnabled && !activeHold ? (
+                    <form onSubmit={handleHostOpenGame}>
+                      <p style={{ fontSize: 13, color: '#64748b', marginBottom: 14, lineHeight: 1.45 }}>
+                        Post a pickup match on this slot. You take the first spot; others can join for the per-player price.
+                      </p>
+
+                      {hostError && (
+                        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', padding: 10, borderRadius: 8, fontSize: 12.5, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <AlertCircle size={16} /> {hostError}
+                        </div>
+                      )}
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 14 }}>
+                        <div>
+                          <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>YOUR NAME *</label>
+                          <input type="text" className="nexus-input" style={{ width: '100%' }} value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="Organizer name" required />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>PHONE NUMBER *</label>
+                          <input type="tel" className="nexus-input" style={{ width: '100%' }} value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} placeholder="+91 98765 43210" required />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>MATCH TITLE</label>
+                          <input type="text" className="nexus-input" style={{ width: '100%' }} value={hostTitle} onChange={(e) => setHostTitle(e.target.value)} placeholder={`Open Match at ${venue.name}`} />
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                          <div>
+                            <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>PLAYERS NEEDED *</label>
+                            <input type="number" min={2} max={30} className="nexus-input" style={{ width: '100%' }} value={hostPlayers} onChange={(e) => handleHostPlayersChange(e.target.value)} />
+                          </div>
+                          <div>
+                            <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>₹ / SPOT *</label>
+                            <input type="number" min={1} className="nexus-input" style={{ width: '100%' }} value={hostCostPerPlayer} onChange={(e) => setHostCostPerPlayer(Number(e.target.value) || 0)} />
+                          </div>
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>SKILL LEVEL</label>
+                          <select className="nexus-input" style={{ width: '100%' }} value={hostSkill} onChange={(e) => setHostSkill(e.target.value)}>
+                            <option>All Levels</option>
+                            <option>Beginner</option>
+                            <option>Intermediate</option>
+                            <option>Advanced</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>RULES (OPTIONAL)</label>
+                          <textarea className="nexus-input" rows={2} style={{ width: '100%', resize: 'vertical' }} value={hostRules} onChange={(e) => setHostRules(e.target.value)} placeholder="Turf shoes only, arrive 10 mins early…" />
+                        </div>
+                      </div>
+
+                      <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: 12, marginBottom: 14, fontSize: 12.5, color: '#475569' }}>
+                        Slot fee ₹{selectedSlot.price} · suggested ₹{Math.ceil((selectedSlot.price || 0) / Math.max(2, hostPlayers))}/spot for {hostPlayers} players
+                      </div>
+
+                      <button type="submit" className="btn-primary" style={{ width: '100%', padding: '12px' }} disabled={hostingGame}>
+                        {hostingGame ? 'Posting open game…' : `Host Open Game · ₹${hostCostPerPlayer}/spot`}
+                      </button>
+                    </form>
+                  ) : (
+                  <>
                   {/* Concurrency Timer if active lock exists */}
                   {activeHold && lockCountdown > 0 && (
                     <div style={{ background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: 10, padding: 12, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -1206,6 +1405,8 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
                         Cancel hold & choose different slot
                       </button>
                     </div>
+                  )}
+                  </>
                   )}
                 </div>
               ) : (

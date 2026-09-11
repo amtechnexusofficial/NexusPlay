@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api.js';
-import { Search, MapPin, ChevronRight, Check, Copy } from 'lucide-react';
+import { Search, MapPin, ChevronRight, Check, Copy, ArrowUpDown } from 'lucide-react';
 
 const CITY_STORAGE_KEY = 'nexus_selected_city';
 
@@ -105,10 +105,6 @@ export default function PlayerMarketplace({ onSelectVenue }) {
     cityVenues.flatMap((v) => (Array.isArray(v.sport_ids) ? v.sport_ids : []))
   );
   const visibleSports = sports.filter((s) => citySportIds.has(s.id));
-  const openSlotsToday = cityVenues.reduce(
-    (sum, v) => sum + (v.today_available_slots_count || 0),
-    0
-  );
 
   const filteredVenues = cityVenues.filter((v) => {
     const matchesSport = selectedSport === 'all' || v.sport_ids?.includes(selectedSport);
@@ -199,8 +195,6 @@ export default function PlayerMarketplace({ onSelectVenue }) {
             </h1>
             <p className="marketplace-hero-meta">
               {cityVenues.length} turf{cityVenues.length === 1 ? '' : 's'}
-              {openSlotsToday > 0 ? ` · ${openSlotsToday} open slot${openSlotsToday === 1 ? '' : 's'} today` : ''}
-              {' · '}book as a guest
             </p>
           </div>
           <button
@@ -225,17 +219,20 @@ export default function PlayerMarketplace({ onSelectVenue }) {
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </label>
-          <select
-            id="marketplace-sort-select"
-            className="marketplace-sort"
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
-            aria-label="Sort turfs"
-          >
-            <option value="slots_desc">Most slots today</option>
-            <option value="price_asc">Lowest price</option>
-            <option value="name">Name A–Z</option>
-          </select>
+          <label className="marketplace-sort" htmlFor="marketplace-sort-select">
+            <ArrowUpDown size={14} className="marketplace-sort-icon" aria-hidden="true" />
+            <span className="marketplace-sort-label">Sort</span>
+            <select
+              id="marketplace-sort-select"
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              aria-label="Sort turfs"
+            >
+              <option value="slots_desc">Most slots today</option>
+              <option value="price_asc">Lowest price</option>
+              <option value="name">Name A–Z</option>
+            </select>
+          </label>
         </div>
 
         {visibleSports.length > 0 && (

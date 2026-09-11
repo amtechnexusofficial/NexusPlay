@@ -27,6 +27,8 @@ alter table venues add column if not exists business_type text;
 alter table venues add column if not exists rules text;
 alter table venues add column if not exists cancellation_policy text;
 
+alter table venues add column if not exists allow_guest_open_games boolean not null default true;
+
 alter table court_slots add column if not exists block_reason text;
 alter table bookings add column if not exists upi_utr text;
 

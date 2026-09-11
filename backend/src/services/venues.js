@@ -46,7 +46,7 @@ export async function getPublicVenue(sql, slugOrId) {
   const [venue] = await sql`
     select id, name, slug, description, address, lat, lng, phone, email,
            photos, amenities, sport_ids, open_time, close_time, advance_payment_percent,
-           upi_id, upi_name, upi_qr_image, rules, cancellation_policy,
+           upi_id, upi_name, upi_qr_image, rules, cancellation_policy, allow_guest_open_games,
            (select round(avg(rating), 1) from reviews where venue_id = venues.id)::float as avg_rating,
            (select count(*)::int from reviews where venue_id = venues.id) as review_count
     from venues
@@ -149,7 +149,8 @@ export async function updateVenue(sql, organizationId, venueId, input) {
       upi_id = ${input.upiId ?? existing.upi_id},
       upi_name = ${input.upiName ?? existing.upi_name},
       upi_qr_image = ${input.upiQrImage ?? existing.upi_qr_image},
-      advance_payment_percent = ${input.advancePaymentPercent ?? existing.advance_payment_percent}
+      advance_payment_percent = ${input.advancePaymentPercent ?? existing.advance_payment_percent},
+      allow_guest_open_games = ${input.allowGuestOpenGames ?? existing.allow_guest_open_games}
     where id = ${venueId} and organization_id = ${organizationId}
     returning *
   `;

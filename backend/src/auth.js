@@ -323,3 +323,16 @@ export function requireOrg() {
     await next();
   };
 }
+
+/** Optional bearer parse for public routes that still allow owner bypass. */
+export async function tryGetOwnerOrgId(c) {
+  const header = c.req.header("Authorization");
+  if (!header?.startsWith("Bearer ") || !c.env.JWT_SECRET) return null;
+  try {
+    const payload = await verifyToken(header.slice(7), c.env.JWT_SECRET);
+    if (payload?.role === "owner" && payload.organizationId) return payload.organizationId;
+  } catch {
+    /* ignore — treat as unauthenticated guest */
+  }
+  return null;
+}

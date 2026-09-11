@@ -115,6 +115,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
   const [bizUpiId, setBizUpiId] = useState('');
   const [bizUpiName, setBizUpiName] = useState('');
   const [bizAdvancePercent, setBizAdvancePercent] = useState(100);
+  const [bizAllowGuestOpenGames, setBizAllowGuestOpenGames] = useState(true);
   const [savingBiz, setSavingBiz] = useState(false);
   const [bizSuccessMsg, setBizSuccessMsg] = useState('');
 
@@ -249,6 +250,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
     setBizUpiId(v.upi_id || '');
     setBizUpiName(v.upi_name || v.name || '');
     setBizAdvancePercent(v.advance_payment_percent ?? 100);
+    setBizAllowGuestOpenGames(v.allow_guest_open_games !== false);
   }
 
   async function loadLiveSlots(vId, date) {
@@ -435,7 +437,8 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
         photos: bizPhotos,
         upi_id: bizUpiId.trim(),
         upi_name: bizUpiName.trim(),
-        advance_payment_percent: Math.min(100, Math.max(1, Number(bizAdvancePercent) || 100))
+        advance_payment_percent: Math.min(100, Math.max(1, Number(bizAdvancePercent) || 100)),
+        allow_guest_open_games: bizAllowGuestOpenGames
       });
 
       setBizSuccessMsg('Business details updated successfully! Changes are live on your public booking page.');
@@ -2684,6 +2687,55 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                       {bizAdvancePercent >= 100
                         ? 'Players pay the full slot price via UPI to lock it — no balance left at the venue.'
                         : `Players only pay ${bizAdvancePercent}% of the slot price up front to lock it. The remaining ${100 - bizAdvancePercent}% is collected at the venue when they arrive.`}
+                    </div>
+                  </div>
+
+                  <div style={{ marginTop: 4, paddingTop: 16, borderTop: '1px solid #e2e8f0' }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 14 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <label htmlFor="biz-allow-guest-open-games" style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
+                          ALLOW PLAYERS TO HOST OPEN GAMES
+                        </label>
+                        <div style={{ fontSize: 12.5, color: '#475569', lineHeight: 1.45 }}>
+                          When on, guests can turn an open slot into a pickup match (name + phone). You can still host from the Owner Hub either way.
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        id="biz-allow-guest-open-games"
+                        role="switch"
+                        aria-checked={bizAllowGuestOpenGames}
+                        onClick={() => setBizAllowGuestOpenGames((v) => !v)}
+                        style={{
+                          flexShrink: 0,
+                          width: 48,
+                          height: 28,
+                          borderRadius: 999,
+                          border: 'none',
+                          cursor: 'pointer',
+                          padding: 3,
+                          background: bizAllowGuestOpenGames ? '#059669' : '#cbd5e1',
+                          transition: 'background 0.15s ease'
+                        }}
+                      >
+                        <span
+                          style={{
+                            display: 'block',
+                            width: 22,
+                            height: 22,
+                            borderRadius: '50%',
+                            background: '#ffffff',
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                            transform: bizAllowGuestOpenGames ? 'translateX(20px)' : 'translateX(0)',
+                            transition: 'transform 0.15s ease'
+                          }}
+                        />
+                      </button>
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8, background: '#f8fafc', padding: 8, borderRadius: 6 }}>
+                      {bizAllowGuestOpenGames
+                        ? 'Players can host open games on available slots from your public booking page.'
+                        : 'Guest hosting is off. Only your team can post open games from the Owner Hub.'}
                     </div>
                   </div>
                 </div>

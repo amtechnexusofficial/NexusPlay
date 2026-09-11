@@ -565,6 +565,10 @@ export async function updateVenueProfile(sql, organizationId, venueId, body) {
     upiName: body.upi_name,
     upiQrImage: body.upi_qr_image,
     advancePaymentPercent: body.advance_payment_percent,
+    allowGuestOpenGames:
+      body.allow_guest_open_games === undefined
+        ? undefined
+        : Boolean(body.allow_guest_open_games),
     // A new venue defaults to 'draft' (see createVenue) and there was
     // previously no way to flip it — it simply never showed up on the
     // marketplace or even its own direct link. updateVenue's `??` means

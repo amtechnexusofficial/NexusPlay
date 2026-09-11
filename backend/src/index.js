@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { getDb } from "./db.js";
 import { httpError } from "./errors.js";
-import { requestOtp, verifyOtp, adminLogin, registerOwner, loginOwnerPassword, requireAuth, requireOrg } from "./auth.js";
+import { requestOtp, verifyOtp, adminLogin, registerOwner, loginOwnerPassword, requireAuth, requireOrg, tryGetOwnerOrgId } from "./auth.js";
 import { uploadImage, serveUpload } from "./uploads.js";
 import { listSports } from "./services/sports.js";
 import {
@@ -246,7 +246,8 @@ app.get("/api/games", async (c) => {
 });
 
 app.post("/api/games/create", async (c) => {
-  const result = await createGame(c.env, await c.req.json());
+  const ownerOrgId = await tryGetOwnerOrgId(c);
+  const result = await createGame(c.env, await c.req.json(), { ownerOrgId });
   return c.json({ success: true, ...result });
 });
 
