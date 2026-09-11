@@ -784,45 +784,34 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   flex-shrink: 0;
 }
 
-.turf-booking-summary-col.is-open .turf-summary-close {
-  display: inline-flex;
+/* Mobile booking sheet — portaled to document.body so it always covers the viewport */
+.turf-booking-sheet-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(18, 32, 27, 0.5);
+  backdrop-filter: blur(3px);
+  padding: 12px;
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
-@media (max-width: 768px) {
-  .turf-booking-summary-col {
-    display: none;
-  }
+.turf-booking-sheet-overlay .turf-booking-summary {
+  width: 100%;
+  max-width: 520px;
+  max-height: min(90dvh, 920px);
+  overflow-y: auto;
+  margin-top: auto;
+  border-radius: 16px !important;
+  box-shadow: 0 -8px 32px rgba(15, 23, 42, 0.2);
+}
 
-  .turf-booking-summary-col.is-open {
-    display: flex;
-    position: fixed;
-    inset: 0;
-    z-index: 1100;
-    align-items: flex-end;
-    justify-content: center;
-    background: rgba(18, 32, 27, 0.45);
-    backdrop-filter: blur(3px);
-    padding: 12px;
-    padding-bottom: max(12px, env(safe-area-inset-bottom));
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  .turf-booking-summary-col.is-open .turf-booking-summary {
-    width: 100%;
-    max-width: 520px;
-    max-height: min(92vh, 920px);
-    overflow-y: auto;
-    margin-top: auto;
-    border-radius: 16px !important;
-    position: relative !important;
-    top: auto !important;
-    box-shadow: 0 -8px 32px rgba(15, 23, 42, 0.18);
-  }
-
-  .turf-summary-close {
-    display: inline-flex !important;
-  }
+.turf-booking-sheet-overlay .turf-summary-close {
+  display: inline-flex !important;
 }
 
 @media (max-width: 768px) {

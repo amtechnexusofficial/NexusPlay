@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { api } from '../api.js';
 import {
   Calendar, Clock, MapPin, Phone, ShieldCheck, ChevronRight,
@@ -63,6 +64,9 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
   const [hostSuccess, setHostSuccess] = useState('');
   const [showVenueDetails, setShowVenueDetails] = useState(false);
   const [showBookingSheet, setShowBookingSheet] = useState(false);
+  const [isMobileBooking, setIsMobileBooking] = useState(() =>
+    typeof window !== 'undefined' ? window.matchMedia('(max-width: 960px)').matches : false
+  );
 
   function handleProceedToJoinPayment() {
     if (!selectedSlot?.game) return;
@@ -142,6 +146,28 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
   const [submittingReview, setSubmittingReview] = useState(false);
   const [reviewError, setReviewError] = useState('');
   const [reviewSuccess, setReviewSuccess] = useState('');
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const mq = window.matchMedia('(max-width: 960px)');
+    const apply = () => setIsMobileBooking(mq.matches);
+    apply();
+    mq.addEventListener?.('change', apply);
+    mq.addListener?.(apply);
+    return () => {
+      mq.removeEventListener?.('change', apply);
+      mq.removeListener?.(apply);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isMobileBooking || !showBookingSheet || !selectedSlot) return undefined;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [isMobileBooking, showBookingSheet, selectedSlot]);
 
   async function loadReviews(venueSlug) {
     const data = await api.getVenueReviews(venueSlug).catch(() => []);
@@ -485,7 +511,7 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
   }
 
   return (
-    <div className="animate-fade-in turf-booking-page">
+    <div className="turf-booking-page">
       {/* Compact turf header — slots come next, not after a gallery */}
       <div className="turf-booking-topbar">
         <button
@@ -756,16 +782,18 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
             )}
           </div>
 
-          {/* Right Column: Checkout Summary — sticky on desktop, sheet/modal on phone */}
-          <div
-            className={`turf-booking-summary-col${selectedSlot && showBookingSheet ? ' is-open' : ''}`}
-            onClick={(e) => {
-              if (e.target === e.currentTarget) closeBookingSheet();
-            }}
-          >
+          {/* Right Column: Checkout Summary — in-grid on desktop; portaled viewport sheet on phone */}
+          {(() => {
+            const summaryCard = (
             <div
               className="nexus-card turf-booking-summary"
-              style={{ padding: 22, position: 'sticky', top: 20, background: '#ffffff', border: '1px solid #e2e8f0' }}
+              style={{
+                padding: 22,
+                position: isMobileBooking ? 'relative' : 'sticky',
+                top: isMobileBooking ? undefined : 20,
+                background: '#ffffff',
+                border: '1px solid #e2e8f0'
+              }}
               onClick={(e) => e.stopPropagation()}
             >
               <div className="turf-summary-header">
@@ -1336,7 +1364,32 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
                 </div>
               )}
             </div>
-          </div>
+            );
+
+            if (isMobileBooking) {
+              if (!showBookingSheet || !selectedSlot) return null;
+              return createPortal(
+                <div
+                  className="turf-booking-sheet-overlay"
+                  role="dialog"
+                  aria-modal="true"
+                  aria-label="Booking summary"
+                  onClick={(e) => {
+                    if (e.target === e.currentTarget) closeBookingSheet();
+                  }}
+                >
+                  {summaryCard}
+                </div>,
+                document.body
+              );
+            }
+
+            return (
+              <div className="turf-booking-summary-col">
+                {summaryCard}
+              </div>
+            );
+          })()}
         </div>
 
         <div className="turf-about-section">
