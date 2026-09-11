@@ -540,3 +540,7 @@ update bookings set advance_amount = total_amount where advance_amount is null;
 -- Guest open-game hosting opt-in (owners can always host from Owner Hub)
 alter table venues
   add column if not exists allow_guest_open_games boolean not null default true;
+
+-- Owner WhatsApp for sharing booking confirmations with players
+alter table venues
+  add column if not exists whatsapp_number text;

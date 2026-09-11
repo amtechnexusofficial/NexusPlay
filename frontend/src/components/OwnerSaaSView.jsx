@@ -99,6 +99,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
   const [bizCity, setBizCity] = useState('');
   const [bizPincode, setBizPincode] = useState('');
   const [bizPhone, setBizPhone] = useState('');
+  const [bizWhatsapp, setBizWhatsapp] = useState('');
   const [bizEmail, setBizEmail] = useState('');
   const [bizGstin, setBizGstin] = useState('');
   const [bizType, setBizType] = useState('Private Limited Company');
@@ -124,11 +125,14 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
   const [generatingSlots, setGeneratingSlots] = useState(false);
   const [generateSlotsMsg, setGenerateSlotsMsg] = useState('');
 
-  // Walk-in modal
+  // Walk-in modal — when opened from a calendar slot, date/time/court are locked
   const [showWalkInModal, setShowWalkInModal] = useState(false);
+  const [walkInFromSlot, setWalkInFromSlot] = useState(false);
   const [walkInCourtId, setWalkInCourtId] = useState('');
   const [walkInDate, setWalkInDate] = useState(new Date().toISOString().slice(0, 10));
   const [walkInStartTime, setWalkInStartTime] = useState('18:00');
+  const [walkInEndTime, setWalkInEndTime] = useState('');
+  const [walkInSportId, setWalkInSportId] = useState('');
   const [walkInCustomerName, setWalkInCustomerName] = useState('');
   const [walkInCustomerPhone, setWalkInCustomerPhone] = useState('');
   const [walkInAmount, setWalkInAmount] = useState(1200);
@@ -233,6 +237,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
     setBizCity(v.city || '');
     setBizPincode(v.pincode || '');
     setBizPhone(v.phone || '');
+    setBizWhatsapp(v.whatsapp_number || '');
     setBizEmail(v.email || '');
     setBizGstin(v.gstin || '');
     setBizType(v.business_type || 'Private Limited Company');
@@ -424,6 +429,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
         city: bizCity.trim(),
         pincode: bizPincode.trim(),
         phone: bizPhone.trim(),
+        whatsapp_number: bizWhatsapp.trim(),
         email: bizEmail.trim(),
         gstin: bizGstin.trim(),
         business_type: bizType.trim(),
@@ -756,12 +762,16 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
       setWalkInFeedback('This venue has no courts yet. Add a court first (Courts tab) before taking a walk-in booking.');
       return;
     }
-    // The modal only collects a start time — derive an end time from the
-    // court's own slot length so the booking isn't a zero-duration slot.
-    const duration = court.slot_duration_minutes || 60;
-    const [h, m] = walkInStartTime.split(':').map(Number);
-    const endMinutes = h * 60 + m + duration;
-    const endTime = `${String(Math.floor(endMinutes / 60) % 24).padStart(2, '0')}:${String(endMinutes % 60).padStart(2, '0')}`;
+    // Prefer the slot's own end time when walk-in was opened from the calendar;
+    // otherwise derive end time from the court's slot length.
+    let endTime = walkInEndTime;
+    if (!endTime) {
+      const duration = court.slot_duration_minutes || 60;
+      const [h, m] = walkInStartTime.split(':').map(Number);
+      const endMinutes = h * 60 + m + duration;
+      endTime = `${String(Math.floor(endMinutes / 60) % 24).padStart(2, '0')}:${String(endMinutes % 60).padStart(2, '0')}`;
+    }
+    const sportId = walkInSportId || court.sport_id || '';
 
     setWalkInSubmitting(true);
     try {
@@ -777,6 +787,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
         paymentMode: walkInPaymentMode
       });
       setShowWalkInModal(false);
+      setWalkInFromSlot(false);
       if (selectedVenue) {
         loadLiveSlots(selectedVenue.id, calendarDate);
         api.getOwnerBookings({ venueId: selectedVenue.id }).then(setBookings);
@@ -789,6 +800,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
         start_time: walkInStartTime,
         end_time: endTime,
         court_name: court.name,
+        sport_id: sportId,
         customer_name: walkInCustomerName,
         customer_phone: walkInCustomerPhone,
         payment_provider: walkInPaymentMode,
@@ -802,6 +814,88 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
     } finally {
       setWalkInSubmitting(false);
     }
+  }
+
+  function openWalkInFromSlot(slot) {
+    setWalkInFromSlot(true);
+    setWalkInCourtId(slot.court_id);
+    setWalkInDate(slot.date);
+    setWalkInStartTime(String(slot.start_time || '').slice(0, 5));
+    setWalkInEndTime(String(slot.end_time || '').slice(0, 5));
+    setWalkInSportId(slot.sport_id || '');
+    setWalkInAmount(slot.price);
+    setWalkInCustomerName('');
+    setWalkInCustomerPhone('');
+    setWalkInPaymentMode('cash');
+    setWalkInFeedback('');
+    setShowWalkInModal(true);
+  }
+
+  function openWalkInFromToolbar() {
+    setWalkInFromSlot(false);
+    setWalkInCourtId(selectedVenue?.courts?.[0]?.id || '');
+    setWalkInDate(calendarDate || new Date().toISOString().slice(0, 10));
+    setWalkInStartTime('18:00');
+    setWalkInEndTime('');
+    setWalkInSportId(selectedVenue?.courts?.[0]?.sport_id || '');
+    setWalkInCustomerName('');
+    setWalkInCustomerPhone('');
+    setWalkInFeedback('');
+    setShowWalkInModal(true);
+  }
+
+  function toWhatsAppDigits(phone) {
+    const digits = String(phone || '').replace(/\D/g, '');
+    if (digits.length === 10) return `91${digits}`;
+    if (digits.startsWith('0') && digits.length === 11) return `91${digits.slice(1)}`;
+    return digits;
+  }
+
+  function formatSportLabel(sportId) {
+    if (!sportId) return 'Sport';
+    return String(sportId)
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, (c) => c.toUpperCase());
+  }
+
+  function formatBookingDateLabel(dateStr) {
+    try {
+      const d = new Date(`${dateStr}T12:00:00`);
+      if (Number.isNaN(d.getTime())) return dateStr;
+      return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+    } catch {
+      return dateStr;
+    }
+  }
+
+  function handleShareInvoiceWhatsApp() {
+    if (!receiptBooking) return;
+    const ownerWa = selectedVenue?.whatsapp_number || bizWhatsapp;
+    if (!ownerWa || !String(ownerWa).trim()) {
+      alert('Add your WhatsApp number under Business Setup before sharing booking confirmations.');
+      return;
+    }
+    const playerPhone = toWhatsAppDigits(receiptBooking.customer_phone);
+    if (!playerPhone || playerPhone.length < 10) {
+      alert('Player phone number is missing or invalid.');
+      return;
+    }
+    const turf = selectedVenue?.name || 'our turf';
+    const sport = formatSportLabel(receiptBooking.sport_id);
+    const dateLabel = formatBookingDateLabel(receiptBooking.date);
+    const start = String(receiptBooking.start_time || '').slice(0, 5);
+    const end = String(receiptBooking.end_time || '').slice(0, 5);
+    const name = receiptBooking.customer_name?.trim() || 'there';
+    const message =
+      `Hi ${name}, your booking is confirmed at ${turf}!\n\n` +
+      `Sport: ${sport}\n` +
+      `Date: ${dateLabel}\n` +
+      `Time: ${start} – ${end}\n\n` +
+      `See you on the turf!`;
+    // Opens WhatsApp chat to the player with a prefilled confirmation.
+    // Send from the owner's WhatsApp account on this device (the number
+    // collected in Business Setup).
+    window.open(`https://wa.me/${playerPhone}?text=${encodeURIComponent(message)}`, '_blank', 'noopener,noreferrer');
   }
 
   async function handleVerifyUpi(row) {
@@ -1525,7 +1619,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
               </button>
 
               <button
-                onClick={() => setShowWalkInModal(true)}
+                onClick={openWalkInFromToolbar}
                 className="btn-primary"
                 style={{ fontSize: 12.5, padding: '7px 14px', flex: '1 1 auto' }}
               >
@@ -1908,13 +2002,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                           </button>
 
                           <button
-                            onClick={() => {
-                              setWalkInCourtId(slot.court_id);
-                              setWalkInDate(slot.date);
-                              setWalkInStartTime(slot.start_time);
-                              setWalkInAmount(slot.price);
-                              setShowWalkInModal(true);
-                            }}
+                            onClick={() => openWalkInFromSlot(slot)}
                             className="btn-secondary"
                             style={{ flex: 1, fontSize: 11, padding: '7px 8px', justifyContent: 'center' }}
                           >
@@ -2167,13 +2255,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                                     Full Inquiry
                                   </button>
                                   <button
-                                    onClick={() => {
-                                      setWalkInCourtId(slot.court_id);
-                                      setWalkInDate(slot.date);
-                                      setWalkInStartTime(slot.start_time);
-                                      setWalkInAmount(slot.price);
-                                      setShowWalkInModal(true);
-                                    }}
+                                    onClick={() => openWalkInFromSlot(slot)}
                                     className="btn-secondary"
                                     style={{ fontSize: 11, padding: '4px 8px' }}
                                   >
@@ -2531,16 +2613,33 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                     </div>
                     <div>
                       <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
-                        OFFICIAL EMAIL
+                        OWNER WHATSAPP *
                       </label>
                       <input
-                        type="email"
+                        type="tel"
+                        required
+                        placeholder="+91 98765 43210"
                         className="nexus-input"
                         style={{ width: '100%' }}
-                        value={bizEmail}
-                        onChange={e => setBizEmail(e.target.value)}
+                        value={bizWhatsapp}
+                        onChange={e => setBizWhatsapp(e.target.value)}
                       />
                     </div>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
+                      OFFICIAL EMAIL
+                    </label>
+                    <input
+                      type="email"
+                      className="nexus-input"
+                      style={{ width: '100%' }}
+                      value={bizEmail}
+                      onChange={e => setBizEmail(e.target.value)}
+                    />
+                    <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6, marginBottom: 0 }}>
+                      WhatsApp is used to share walk-in booking confirmations with players from your number.
+                    </p>
                   </div>
                 </div>
               </div>
@@ -3434,6 +3533,9 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
               <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text-muted)' }}>Booking Ref</span><span style={{ fontWeight: 600 }}>{receiptBooking.id?.slice(0, 8)}</span></div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text-muted)' }}>Date</span><span>{receiptBooking.date} · {receiptBooking.start_time}-{receiptBooking.end_time}</span></div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text-muted)' }}>Court</span><span>{receiptBooking.court_name}</span></div>
+              {receiptBooking.sport_id && (
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text-muted)' }}>Sport</span><span>{formatSportLabel(receiptBooking.sport_id)}</span></div>
+              )}
               <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text-muted)' }}>Payment Method</span><span style={{ textTransform: 'uppercase' }}>{receiptBooking.payment_provider || receiptBooking.payment_status}</span></div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: 'var(--text-muted)' }}>Status</span><span style={{ textTransform: 'capitalize' }}>{receiptBooking.status}</span></div>
             </div>
@@ -3467,9 +3569,19 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                 No GSTIN on file for this venue — add one under Business Setup to show a GST breakdown on invoices.
               </div>
             )}
-            <button onClick={() => window.print()} className="btn-primary" style={{ width: '100%', padding: '10px', marginTop: hasGstin ? 4 : 0 }}>
-              Print Invoice
-            </button>
+            <div style={{ display: 'flex', gap: 10, marginTop: hasGstin ? 4 : 0 }}>
+              <button
+                type="button"
+                onClick={handleShareInvoiceWhatsApp}
+                className="btn-secondary"
+                style={{ flex: 1, padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+              >
+                <Share2 size={15} /> Share on WhatsApp
+              </button>
+              <button type="button" onClick={() => window.print()} className="btn-primary" style={{ flex: 1, padding: '10px' }}>
+                Print Invoice
+              </button>
+            </div>
           </div>
         </div>
         );
@@ -3765,45 +3877,74 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
             )}
 
             <form onSubmit={handleWalkInSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {selectedVenue?.courts?.length > 1 && (
-                <div>
-                  <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>COURT</label>
-                  <select
-                    className="nexus-input"
-                    style={{ width: '100%' }}
-                    value={walkInCourtId || selectedVenue.courts[0].id}
-                    onChange={e => setWalkInCourtId(e.target.value)}
-                  >
-                    {selectedVenue.courts.map(c => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
-                  </select>
+              {walkInFromSlot ? (
+                <div style={{
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: 8,
+                  padding: '12px 14px',
+                  fontSize: 13,
+                  color: '#0f172a'
+                }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 6 }}>
+                    Slot
+                  </div>
+                  <div style={{ fontWeight: 700 }}>
+                    {walkInDate} · {String(walkInStartTime).slice(0, 5)}
+                    {walkInEndTime ? `–${String(walkInEndTime).slice(0, 5)}` : ''}
+                  </div>
+                  <div style={{ color: 'var(--text-secondary)', marginTop: 4 }}>
+                    {(selectedVenue?.courts?.find(c => c.id === walkInCourtId) || selectedVenue?.courts?.[0])?.name || 'Court'}
+                    {walkInSportId ? ` · ${formatSportLabel(walkInSportId)}` : ''}
+                  </div>
                 </div>
+              ) : (
+                <>
+                  {selectedVenue?.courts?.length > 1 && (
+                    <div>
+                      <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>COURT</label>
+                      <select
+                        className="nexus-input"
+                        style={{ width: '100%' }}
+                        value={walkInCourtId || selectedVenue.courts[0].id}
+                        onChange={e => {
+                          setWalkInCourtId(e.target.value);
+                          const c = selectedVenue.courts.find(x => x.id === e.target.value);
+                          if (c?.sport_id) setWalkInSportId(c.sport_id);
+                        }}
+                      >
+                        {selectedVenue.courts.map(c => (
+                          <option key={c.id} value={c.id}>{c.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                  <div className="mobile-grid-1" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>DATE</label>
+                      <input
+                        type="date"
+                        required
+                        className="nexus-input"
+                        style={{ width: '100%' }}
+                        value={walkInDate}
+                        onChange={e => setWalkInDate(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>START TIME</label>
+                      <input
+                        type="time"
+                        required
+                        className="nexus-input"
+                        style={{ width: '100%' }}
+                        value={walkInStartTime}
+                        onChange={e => setWalkInStartTime(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </>
               )}
-              <div className="mobile-grid-1" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>DATE</label>
-                  <input
-                    type="date"
-                    required
-                    className="nexus-input"
-                    style={{ width: '100%' }}
-                    value={walkInDate}
-                    onChange={e => setWalkInDate(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>START TIME</label>
-                  <input
-                    type="time"
-                    required
-                    className="nexus-input"
-                    style={{ width: '100%' }}
-                    value={walkInStartTime}
-                    onChange={e => setWalkInStartTime(e.target.value)}
-                  />
-                </div>
-              </div>
 
               <div>
                 <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>CUSTOMER PHONE *</label>
@@ -3857,7 +3998,13 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
               </div>
 
               <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
-                <button type="button" className="btn-secondary" style={{ flex: 1 }} onClick={() => { setShowWalkInModal(false); setWalkInFeedback(''); }} disabled={walkInSubmitting}>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  style={{ flex: 1 }}
+                  onClick={() => { setShowWalkInModal(false); setWalkInFromSlot(false); setWalkInFeedback(''); }}
+                  disabled={walkInSubmitting}
+                >
                   Cancel
                 </button>
                 <button type="submit" className="btn-primary" style={{ flex: 1.5 }} disabled={walkInSubmitting}>

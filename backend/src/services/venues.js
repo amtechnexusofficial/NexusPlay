@@ -150,7 +150,8 @@ export async function updateVenue(sql, organizationId, venueId, input) {
       upi_name = ${input.upiName ?? existing.upi_name},
       upi_qr_image = ${input.upiQrImage ?? existing.upi_qr_image},
       advance_payment_percent = ${input.advancePaymentPercent ?? existing.advance_payment_percent},
-      allow_guest_open_games = ${input.allowGuestOpenGames ?? existing.allow_guest_open_games}
+      allow_guest_open_games = ${input.allowGuestOpenGames ?? existing.allow_guest_open_games},
+      whatsapp_number = ${input.whatsappNumber !== undefined ? input.whatsappNumber : existing.whatsapp_number}
     where id = ${venueId} and organization_id = ${organizationId}
     returning *
   `;
