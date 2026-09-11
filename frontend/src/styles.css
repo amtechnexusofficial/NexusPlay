@@ -332,12 +332,89 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   .mobile-grid-1 { grid-template-columns: 1fr !important; }
   .mobile-stack { flex-direction: column !important; align-items: stretch !important; }
 
+  .mobile-btn-group {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    width: 100%;
+  }
+  .mobile-btn-group > * {
+    width: 100% !important;
+    flex: 1 1 auto !important;
+  }
+
   /* Keep modals centered on mobile too (same as desktop) so owners
      don't have to hunt for walk-in / host-game / inquiry panels. */
-  .modal-overlay { align-items: center; padding: 16px; }
+  .modal-overlay { align-items: center; padding: 12px; }
   .modal-content {
     max-height: 90vh;
   }
+  .modal-close-btn {
+    min-width: 44px !important;
+    min-height: 44px !important;
+    width: 44px !important;
+    height: 44px !important;
+  }
+
+  .app-main {
+    padding-left: 14px !important;
+    padding-right: 14px !important;
+    padding-bottom: 96px !important;
+  }
+
+  .marketplace-container {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  .marketplace-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+
+  .marketplace-hero {
+    padding: 18px 16px 14px !important;
+    margin-bottom: 14px !important;
+    border-radius: var(--radius-md) !important;
+  }
+  .marketplace-hero-title { font-size: 26px !important; }
+  .marketplace-hero-top {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  .marketplace-change-city { align-self: flex-start; }
+  .marketplace-toolbar { flex-direction: column; }
+  .marketplace-sort {
+    width: 100%;
+    min-width: 0;
+  }
+  .marketplace-sort select {
+    flex: 1;
+    min-width: 0;
+  }
+  .marketplace-venue-body { padding: 14px !important; }
+  .marketplace-city-gate { padding-top: 12px; }
+
+  .booking-cta-row {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+  .booking-cta-row .btn-primary,
+  .booking-cta-row .btn-secondary {
+    width: 100%;
+    white-space: normal;
+  }
+
+  .booking-slot-legend-row {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+  }
+
+  .header-label-full { display: none !important; }
+  .header-label-short { display: inline !important; }
+
+  .auth-modal-header { padding: 16px !important; }
+  .auth-modal-body { padding: 16px !important; }
 
   .section-title { font-size: 19px; }
 }
@@ -378,6 +455,40 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   margin: 0 auto;
   padding: 8px 0 24px;
 }
+
+/* Card grids that must not overflow narrow phones */
+.responsive-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
+  gap: 16px;
+}
+
+.booking-cta-row {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.booking-slot-legend-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.booking-slot-legend {
+  display: flex;
+  gap: 14px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  flex-wrap: wrap;
+}
+
+.header-label-short { display: none; }
+.header-label-full { display: inline; }
 
 /* —— City gate —— */
 .marketplace-city-gate {
@@ -960,39 +1071,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   display: inline-flex !important;
   align-items: center;
   gap: 4px;
-}
-
-@media (max-width: 640px) {
-  .marketplace-grid { grid-template-columns: 1fr !important; gap: 12px !important; }
-  .marketplace-container { padding: 0 0 16px !important; }
-  .marketplace-city-gate { padding-top: 12px; }
-  .marketplace-hero {
-    padding: 18px 16px 14px !important;
-    margin-bottom: 14px !important;
-    border-radius: var(--radius-md) !important;
-  }
-  .marketplace-hero-title { font-size: 26px !important; }
-  .marketplace-hero-top {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 12px;
-  }
-  .marketplace-change-city {
-    align-self: flex-start;
-  }
-  .marketplace-toolbar {
-    flex-direction: column;
-  }
-  .marketplace-sort {
-    width: 100%;
-    min-width: 0;
-  }
-
-  .marketplace-sort select {
-    flex: 1;
-    min-width: 0;
-  }
-  .marketplace-venue-body { padding: 14px !important; }
 }
 
 /* Global header: full action row on desktop, compact on mobile (the

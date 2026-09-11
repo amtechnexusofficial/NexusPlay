@@ -346,7 +346,9 @@ export default function App() {
                 cursor: 'pointer'
               }}
             >
-              <Compass size={14} /> Explore other venues on NexusPlay
+              <Compass size={14} />
+              <span className="header-label-full">Explore other venues on NexusPlay</span>
+              <span className="header-label-short">Explore venues</span>
             </button>
           )}
 
@@ -485,7 +487,7 @@ export default function App() {
       </header>
 
       {/* Main Screen Views — guests browse/book; owners manage */}
-      <main style={{ flex: 1, padding: '20px 0 80px' }}>
+      <main className="app-main" style={{ flex: 1, padding: '20px 0 80px' }}>
         {activeView === 'marketplace' && (
           <PlayerMarketplace
             onSelectVenue={handleSelectVenue}
@@ -546,7 +548,8 @@ export default function App() {
             style={{ flex: 'none', padding: '0 20px' }}
           >
             <Compass size={20} />
-            <span>Explore other venues</span>
+            <span className="header-label-full">Explore other venues</span>
+            <span className="header-label-short">Explore venues</span>
           </button>
         </div>
       )}

@@ -141,7 +141,7 @@ export function AuthModal({ isOpen, onClose, onAuthSuccess }) {
         style={{ maxWidth: '460px', borderRadius: '16px', overflow: 'hidden' }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div style={{ background: '#f8fafc', padding: '20px 24px 16px', borderBottom: '1px solid #e2e8f0' }}>
+        <div className="auth-modal-header" style={{ background: '#f8fafc', padding: '20px 24px 16px', borderBottom: '1px solid #e2e8f0' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <img src="/logo-mark.png" alt="NexusPlay" style={{ width: '32px', height: '32px', borderRadius: '8px', objectFit: 'contain' }} />
@@ -156,15 +156,17 @@ export function AuthModal({ isOpen, onClose, onAuthSuccess }) {
             </div>
             <button
               id="auth-close-btn"
+              className="modal-close-btn"
               onClick={onClose}
-              style={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '8px', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b' }}
+              aria-label="Close"
+              style={{ background: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '8px', width: '44px', height: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b', flexShrink: 0 }}
             >
               <X size={18} />
             </button>
           </div>
         </div>
 
-        <div style={{ padding: '20px 24px' }}>
+        <div className="auth-modal-body" style={{ padding: '20px 24px' }}>
           {errorMsg && (
             <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', padding: '10px 14px', marginBottom: '16px', fontSize: '13px', color: '#b91c1c' }}>
               {errorMsg}

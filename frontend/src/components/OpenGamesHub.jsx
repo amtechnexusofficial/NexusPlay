@@ -247,7 +247,7 @@ export default function OpenGamesHub({ onNavigateToVenue, onNavigateToDashboard,
           </button>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(330px, 1fr))', gap: 18 }}>
+        <div className="responsive-cards" style={{ gap: 18 }}>
           {filteredGames.map(game => {
             const spotsRemaining = Math.max(0, game.required_players - game.current_players);
             const fillPercent = Math.round((game.current_players / game.required_players) * 100);

@@ -1762,7 +1762,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
             /* ========================================================================= */
             /* RESPONSIVE MOBILE-FIRST SLOT CARD GRID                                     */
             /* ========================================================================= */
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(310px, 1fr))', gap: 14 }}>
+            <div className="responsive-cards" style={{ gap: 14 }}>
               {displaySlots.map(slot => {
                 const hasGame = !!slot.game;
                 const registeredCount = slot.game?.current_players || 0;
@@ -2515,9 +2515,10 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
                           type="button"
                           onClick={() => handleRemovePhoto(url)}
                           title="Remove photo"
-                          style={{ position: 'absolute', top: -6, right: -6, width: 20, height: 20, borderRadius: '50%', background: '#dc2626', color: '#fff', border: '2px solid #fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                          aria-label="Remove photo"
+                          style={{ position: 'absolute', top: -8, right: -8, width: 36, height: 36, minWidth: 36, minHeight: 36, borderRadius: '50%', background: '#dc2626', color: '#fff', border: '2px solid #fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 4px rgba(0,0,0,0.2)' }}
                         >
-                          <X size={11} />
+                          <X size={14} />
                         </button>
                       </div>
                     ))}
@@ -2580,7 +2581,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
           )}
 
           <form onSubmit={handleSaveBusinessDetails}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 20 }}>
+            <div className="responsive-cards" style={{ gap: 20 }}>
               
               {/* Card 1: Business Identity & Legal Details */}
               <div className="nexus-card" style={{ padding: 22 }}>
@@ -3160,7 +3161,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
               <div style={{ fontSize: 13, marginTop: 4 }}>No pending UPI payments awaiting verification.</div>
             </div>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 16 }}>
+            <div className="responsive-cards" style={{ gap: 16 }}>
               {pendingUpiBookings.map(b => (
                 <div key={`${b.payment_type}-${b.id}`} className="nexus-card" style={{ padding: 18, borderLeft: '3px solid #f59e0b' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -3274,7 +3275,7 @@ export default function OwnerSaaSView({ onNavigateToPublicPage }) {
             );
           })()}
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 18 }}>
+          <div className="responsive-cards" style={{ gap: 18 }}>
             {selectedVenue.courts?.map(c => {
               const isActive = c.status === 'active';
               return (

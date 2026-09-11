@@ -508,7 +508,10 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
           </div>
 
           {(venue.cancellation_policy || venue.rules) && (
-            <div style={{ display: 'grid', gridTemplateColumns: venue.cancellation_policy && venue.rules ? '1fr 1fr' : '1fr', gap: 12, marginTop: 18 }}>
+            <div
+              className="mobile-grid-1"
+              style={{ display: 'grid', gridTemplateColumns: venue.cancellation_policy && venue.rules ? '1fr 1fr' : '1fr', gap: 12, marginTop: 18 }}
+            >
               {venue.cancellation_policy && (
                 <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 12, padding: '14px 16px' }}>
                   <div style={{ fontSize: 11, fontWeight: 800, color: '#92400e', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
@@ -621,7 +624,7 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
             </div>
           )}
 
-          <div style={{ display: 'flex', justifyContent: 'center', gap: 14 }}>
+          <div className="booking-cta-row">
             <button className="btn-primary" onClick={() => { setCheckoutStep('slots'); setSelectedSlot(null); setConfirmedBooking(null); setActiveHold(null); setUpiUtr(''); }}>
               Book Another Slot
             </button>
@@ -753,11 +756,11 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
 
             {/* 4. Slot Matrix */}
             <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <div className="booking-slot-legend-row">
                 <label style={{ fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)' }}>
                   4. Available Time Slots
                 </label>
-                <div style={{ display: 'flex', gap: 14, fontSize: 12, color: 'var(--text-secondary)' }}>
+                <div className="booking-slot-legend">
                   <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                     <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent-neon)' }} /> Available
                   </span>
@@ -1020,6 +1023,7 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
 
                   {guestHostEnabled && !activeHold && (
                     <div
+                      className="mobile-grid-1"
                       style={{
                         display: 'grid',
                         gridTemplateColumns: '1fr 1fr',
@@ -1103,7 +1107,7 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
                           <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>MATCH TITLE</label>
                           <input type="text" className="nexus-input" style={{ width: '100%' }} value={hostTitle} onChange={(e) => setHostTitle(e.target.value)} placeholder={`Open Match at ${venue.name}`} />
                         </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                        <div className="mobile-grid-1" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                           <div>
                             <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>PLAYERS NEEDED *</label>
                             <input type="number" min={2} max={30} className="nexus-input" style={{ width: '100%' }} value={hostPlayers} onChange={(e) => handleHostPlayersChange(e.target.value)} />
