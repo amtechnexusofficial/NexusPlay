@@ -134,6 +134,15 @@ export async function createVenue(sql, organizationId, input) {
 
 export async function updateVenue(sql, organizationId, venueId, input) {
   const existing = await getVenueForOrg(sql, organizationId, venueId);
+  // Neon returns jsonb as parsed objects. Binding those objects raw into a
+  // parameter produces invalid JSON text ("invalid input syntax for type json")
+  // on partial updates (e.g. logo-only). Always stringify jsonb writes.
+  const photosJson = JSON.stringify(
+    input.photos !== undefined ? input.photos : (existing.photos ?? [])
+  );
+  const amenitiesJson = JSON.stringify(
+    input.amenities !== undefined ? input.amenities : (existing.amenities ?? [])
+  );
   const [updated] = await sql`
     update venues set
       name = ${input.name ?? existing.name},
@@ -149,9 +158,9 @@ export async function updateVenue(sql, organizationId, venueId, input) {
       lng = ${input.lng ?? existing.lng},
       phone = ${input.phone ?? existing.phone},
       email = ${input.email ?? existing.email},
-      photos = ${input.photos !== undefined ? JSON.stringify(input.photos) : existing.photos},
+      photos = ${photosJson}::jsonb,
       logo_url = ${input.logoUrl !== undefined ? (input.logoUrl || null) : existing.logo_url},
-      amenities = ${input.amenities !== undefined ? JSON.stringify(input.amenities) : existing.amenities},
+      amenities = ${amenitiesJson}::jsonb,
       sport_ids = ${input.sportIds ?? existing.sport_ids},
       open_time = ${input.openTime ?? existing.open_time},
       close_time = ${input.closeTime ?? existing.close_time},
