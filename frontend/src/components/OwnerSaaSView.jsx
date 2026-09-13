@@ -2914,6 +2914,11 @@ export default function OwnerSaaSView() {
             const hours = heatHours.length ? heatHours : [6, 8, 10, 12, 14, 16, 18, 20, 22];
             const heatLookup = new Map(heat.map((h) => [`${h.dow}-${h.hour}`, h.bookings]));
             const occDowMap = new Map(occDow.map((d) => [d.dow, d]));
+            const overallBooked = occDow.reduce((s, d) => s + (Number(d.booked) || 0), 0);
+            const overallBookable = occDow.reduce((s, d) => s + (Number(d.bookable) || 0), 0);
+            const overallOccupancyRate = overallBookable > 0
+              ? Math.round((overallBooked / overallBookable) * 100)
+              : (a.occupancyRate ?? null);
             const selectedSportName = filterSports.find((s) => s.id === analyticsSportId)?.name
               || sports.find((s) => s.sport_id === analyticsSportId)?.sport
               || '';
@@ -3109,11 +3114,13 @@ export default function OwnerSaaSView() {
               </div>
             </div>
             <div className="nexus-card" style={{ padding: 16 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Lost revenue est.</div>
-              <div className="font-display" style={{ fontSize: 24, fontWeight: 800, color: '#b45309', marginTop: 4 }}>
-                {fmt(a.lostRevenue)}
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Overall occupancy</div>
+              <div className="font-display" style={{ fontSize: 24, fontWeight: 800, color: '#059669', marginTop: 4 }}>
+                {overallOccupancyRate != null ? `${overallOccupancyRate}%` : '—'}
               </div>
-              <div style={{ fontSize: 11.5, color: '#64748b', marginTop: 2 }}>Open slots × price (30d)</div>
+              <div style={{ fontSize: 11.5, color: '#64748b', marginTop: 2 }}>
+                {overallBookable > 0 ? `${overallBooked}/${overallBookable} slots · 30d` : 'Booked vs bookable · 30d'}
+              </div>
             </div>
             <div className="nexus-card" style={{ padding: 16 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Gateway fee saved</div>
