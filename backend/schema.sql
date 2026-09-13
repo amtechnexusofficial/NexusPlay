@@ -90,6 +90,7 @@ create table if not exists venues (
   phone            text,
   email            text,
   photos           jsonb not null default '[]',
+  logo_url         text,
   amenities        jsonb not null default '[]',
   sport_ids        uuid[] not null default '{}',
   open_time        text not null default '06:00',
@@ -545,3 +546,7 @@ alter table venues
 -- Owner WhatsApp for sharing booking confirmations with players
 alter table venues
   add column if not exists whatsapp_number text;
+
+-- Venue logo for printable booking posters (separate from gallery photos)
+alter table venues
+  add column if not exists logo_url text;

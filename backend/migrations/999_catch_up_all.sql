@@ -31,6 +31,8 @@ alter table venues add column if not exists allow_guest_open_games boolean not n
 
 alter table venues add column if not exists whatsapp_number text;
 
+alter table venues add column if not exists logo_url text;
+
 alter table court_slots add column if not exists block_reason text;
 alter table bookings add column if not exists upi_utr text;
 alter table bookings add column if not exists payment_proof_url text;

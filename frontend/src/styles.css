@@ -2110,3 +2110,200 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
     flex-direction: column;
   }
 }
+
+/* Printable venue booking QR poster */
+.venue-qr-modal {
+  width: min(440px, 100%);
+  max-height: 92vh;
+  overflow: auto;
+  background: #e8ece9;
+  border-radius: 16px;
+  padding: 14px;
+  box-shadow: var(--shadow-lg);
+}
+
+.venue-qr-modal-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.venue-booking-poster {
+  background: #ffffff;
+  border: 1px solid #d5ddd8;
+  border-radius: 4px;
+  padding: 28px 24px 22px;
+  text-align: center;
+  box-shadow: 0 1px 0 rgba(18, 32, 27, 0.04);
+}
+
+.venue-booking-poster-header {
+  margin-bottom: 22px;
+}
+
+.venue-booking-poster-brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  text-align: left;
+}
+
+.venue-booking-poster-logo {
+  width: 64px;
+  height: 64px;
+  border-radius: 14px;
+  object-fit: contain;
+  flex-shrink: 0;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  padding: 4px;
+}
+
+.venue-booking-poster-logo--fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #12201b;
+  color: #ecfdf5;
+  font-weight: 800;
+  font-size: 28px;
+  border: none;
+}
+
+.venue-booking-poster-name {
+  margin: 0;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 22px;
+  font-weight: 800;
+  color: #12201b;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+.venue-booking-poster-address {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  color: #5b6b63;
+  line-height: 1.35;
+}
+
+.venue-booking-poster-qr-wrap {
+  display: inline-flex;
+  padding: 14px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  margin-bottom: 18px;
+}
+
+.venue-booking-poster-qr {
+  width: min(240px, 62vw);
+  height: auto;
+  display: block;
+  aspect-ratio: 1;
+}
+
+.venue-booking-poster-cta-title {
+  font-size: 20px;
+  font-weight: 800;
+  color: #12201b;
+  letter-spacing: -0.02em;
+  margin-bottom: 4px;
+}
+
+.venue-booking-poster-cta-sub {
+  font-size: 13px;
+  color: #5b6b63;
+  margin-bottom: 22px;
+}
+
+.venue-booking-poster-footer {
+  border-top: 1px solid #e4e9e6;
+  padding-top: 14px;
+}
+
+.venue-booking-poster-powered {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: #5b6b63;
+  margin-bottom: 6px;
+}
+
+.venue-booking-poster-powered strong {
+  color: #12201b;
+  font-weight: 800;
+}
+
+.venue-booking-poster-nexus {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  object-fit: contain;
+}
+
+.venue-booking-poster-url {
+  font-size: 10.5px;
+  color: #94a39c;
+  word-break: break-all;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+@media print {
+  @page {
+    size: A5 portrait;
+    margin: 10mm;
+  }
+
+  body * {
+    visibility: hidden !important;
+  }
+
+  .venue-qr-overlay,
+  .venue-qr-overlay * {
+    visibility: visible !important;
+  }
+
+  .venue-qr-overlay {
+    position: fixed !important;
+    inset: 0 !important;
+    background: #ffffff !important;
+    backdrop-filter: none !important;
+    display: flex !important;
+    align-items: flex-start !important;
+    justify-content: center !important;
+    padding: 0 !important;
+    z-index: 99999 !important;
+    overflow: visible !important;
+  }
+
+  .no-print,
+  .venue-qr-modal-toolbar {
+    display: none !important;
+  }
+
+  .venue-qr-modal {
+    box-shadow: none !important;
+    background: transparent !important;
+    padding: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    width: 100% !important;
+    max-width: 140mm !important;
+  }
+
+  .venue-booking-poster {
+    box-shadow: none !important;
+    border-color: #cbd5e1 !important;
+    break-inside: avoid;
+  }
+
+  .venue-booking-poster-qr {
+    width: 70mm !important;
+  }
+}

@@ -7,7 +7,7 @@ import {
   Building, Settings, QrCode, Copy, CheckCircle2,
   FileText, Check, MapPin, Share2, Flame,
   Tag, AlertCircle, Edit3, Save, Navigation, Sparkles, Trophy,
-  Download, Receipt, Link2, X
+  Download, Receipt, Link2, X, Printer
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -114,8 +114,11 @@ export default function OwnerSaaSView() {
   const [bizCancellationPolicy, setBizCancellationPolicy] = useState('');
   const [bizAmenities, setBizAmenities] = useState([]);
   const [bizPhotos, setBizPhotos] = useState([]);
+  const [bizLogoUrl, setBizLogoUrl] = useState('');
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
   const [photoUploadError, setPhotoUploadError] = useState('');
+  const [logoUploadError, setLogoUploadError] = useState('');
   const [bizUpiId, setBizUpiId] = useState('');
   const [bizUpiName, setBizUpiName] = useState('');
   const [bizAdvancePercent, setBizAdvancePercent] = useState(100);
@@ -273,6 +276,7 @@ export default function OwnerSaaSView() {
       'Free Parking (Car & 2-Wheeler)', 'Cafeteria & Energy Drinks', 'Bibs & Match Balls', 'First Aid Kit'
     ]);
     setBizPhotos(Array.isArray(v.photos) ? v.photos : []);
+    setBizLogoUrl(v.logo_url || '');
     setBizUpiId(v.upi_id || '');
     setBizUpiName(v.upi_name || v.name || '');
     setBizAdvancePercent(v.advance_payment_percent ?? 100);
@@ -458,6 +462,38 @@ export default function OwnerSaaSView() {
     if (!selectedVenue) return;
     await api.updateVenueProfile(selectedVenue.id, { photos: nextPhotos });
     setSelectedVenue(prev => prev ? { ...prev, photos: nextPhotos, min_price: prev.min_price } : prev);
+  }
+
+  async function persistLogo(nextLogoUrl) {
+    if (!selectedVenue) return;
+    await api.updateVenueProfile(selectedVenue.id, { logo_url: nextLogoUrl || null });
+    setSelectedVenue(prev => prev ? { ...prev, logo_url: nextLogoUrl || null, min_price: prev.min_price } : prev);
+  }
+
+  async function handleLogoUpload(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setLogoUploadError('');
+    setUploadingLogo(true);
+    try {
+      const res = await api.uploadImage(file);
+      setBizLogoUrl(res.url);
+      await persistLogo(res.url);
+    } catch (err) {
+      setLogoUploadError(err.message || 'Failed to upload logo');
+    } finally {
+      setUploadingLogo(false);
+      e.target.value = '';
+    }
+  }
+
+  async function handleRemoveLogo() {
+    setBizLogoUrl('');
+    try {
+      await persistLogo('');
+    } catch (err) {
+      setLogoUploadError('Failed to remove logo: ' + err.message);
+    }
   }
 
   async function handlePhotoUpload(e) {
@@ -2328,18 +2364,18 @@ export default function OwnerSaaSView() {
           {selectedVenue?.slug && (
             <div className="nexus-card" style={{ padding: 22, marginBottom: 20, display: 'flex', flexWrap: 'wrap', gap: 20, alignItems: 'center' }}>
               <img
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(`${window.location.origin}/?venue=${selectedVenue.slug}`)}`}
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=140x140&margin=8&data=${encodeURIComponent(`${window.location.origin}/?venue=${selectedVenue.slug}`)}`}
                 alt="Direct booking QR code"
                 width={110}
                 height={110}
-                style={{ borderRadius: 8, border: '1px solid #e2e8f0', flexShrink: 0 }}
+                style={{ borderRadius: 8, border: '1px solid #e2e8f0', flexShrink: 0, background: '#fff' }}
               />
               <div style={{ flex: 1, minWidth: 220 }}>
                 <h3 style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <QrCode size={16} style={{ color: '#10b981' }} /> Your Direct Booking Link
+                  <QrCode size={16} style={{ color: '#059669' }} /> Your Direct Booking QR
                 </h3>
                 <p style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginBottom: 10, lineHeight: 1.5 }}>
-                  Print this QR at your venue or share the link on your own profile page — it opens straight to {selectedVenue.name}'s booking page, not the full marketplace.
+                  Print a poster for your turf entrance — includes your venue mark, NexusPlay branding, and a scan-to-book QR.
                 </p>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                   <code style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 6, padding: '6px 10px', fontSize: 11.5, color: '#334155', wordBreak: 'break-all' }}>
@@ -2358,6 +2394,66 @@ export default function OwnerSaaSView() {
                     {directLinkCopied ? <CheckCircle2 size={13} /> : <Copy size={13} />}
                     {directLinkCopied ? 'Copied' : 'Copy Link'}
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowQrModal(true)}
+                    className="btn-primary"
+                    style={{ padding: '6px 12px', fontSize: 12 }}
+                  >
+                    <Printer size={13} /> Open print poster
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Venue logo — used on printable booking QR posters */}
+          {selectedVenue && (
+            <div className="nexus-card" style={{ padding: 22, marginBottom: 20 }}>
+              <h3 style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', marginBottom: 4 }}>
+                Venue logo
+              </h3>
+              <p style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginBottom: 14 }}>
+                Used on your printable booking QR poster. Square logos work best (PNG or JPG).
+              </p>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'center' }}>
+                {bizLogoUrl ? (
+                  <img
+                    src={bizLogoUrl}
+                    alt={`${selectedVenue.name} logo`}
+                    style={{ width: 72, height: 72, borderRadius: 14, objectFit: 'cover', border: '1px solid #e2e8f0', background: '#fff' }}
+                  />
+                ) : (
+                  <div
+                    style={{
+                      width: 72,
+                      height: 72,
+                      borderRadius: 14,
+                      background: '#12201b',
+                      color: '#ecfdf5',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontWeight: 800,
+                      fontSize: 28
+                    }}
+                  >
+                    {(selectedVenue.name || 'V').trim().charAt(0).toUpperCase()}
+                  </div>
+                )}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <label className="btn-secondary" style={{ padding: '8px 14px', fontSize: 12.5, cursor: uploadingLogo ? 'wait' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6, width: 'fit-content' }}>
+                    <input type="file" accept="image/png,image/jpeg,image/webp,image/*" onChange={handleLogoUpload} disabled={uploadingLogo} style={{ display: 'none' }} />
+                    {uploadingLogo ? 'Uploading…' : bizLogoUrl ? 'Replace logo' : 'Upload logo'}
+                  </label>
+                  {bizLogoUrl && (
+                    <button type="button" onClick={handleRemoveLogo} style={{ background: 'none', border: 'none', color: '#b91c1c', fontSize: 12, cursor: 'pointer', textAlign: 'left', padding: 0 }}>
+                      Remove logo
+                    </button>
+                  )}
+                  {logoUploadError && (
+                    <div style={{ fontSize: 12, color: '#b91c1c' }}>{logoUploadError}</div>
+                  )}
                 </div>
               </div>
             </div>
@@ -4618,35 +4714,72 @@ export default function OwnerSaaSView() {
         </div>
       )}
 
-      {/* MODAL: TURF QR CODE */}
-      {showQrModal && selectedVenue && (
-        <div className="modal-overlay">
-          <div className="nexus-card animate-fade-in" style={{ maxHeight: '90vh', overflowY: 'auto', maxWidth: 360, width: '100%', padding: 26, background: '#ffffff', textAlign: 'center' }}>
-            <h3 style={{ fontSize: 18, fontWeight: 800, color: '#0f172a', marginBottom: 4 }}>
-              {selectedVenue.name}
-            </h3>
-            <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 18 }}>
-              Scan to open the unique public booking page for this turf
-            </div>
+      {/* MODAL: printable direct-booking poster */}
+      {showQrModal && selectedVenue && (() => {
+        const venueLogo = selectedVenue.logo_url || bizLogoUrl || null;
+        const venueInitial = (selectedVenue.name || 'V').trim().charAt(0).toUpperCase();
+        const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=480x480&margin=12&data=${encodeURIComponent(uniqueTurfUrl)}`;
+        return (
+          <div className="modal-overlay venue-qr-overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowQrModal(false); }}>
+            <div className="venue-qr-modal animate-fade-in" onClick={(e) => e.stopPropagation()}>
+              <div className="venue-qr-modal-toolbar no-print">
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 800, color: '#0f172a' }}>Printable booking poster</div>
+                  <div style={{ fontSize: 12, color: '#64748b' }}>A5 / phone-friendly · paste at reception or entrance</div>
+                </div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <button type="button" className="btn-primary" onClick={() => window.print()} style={{ padding: '8px 14px', fontSize: 13 }}>
+                    <Printer size={14} /> Print poster
+                  </button>
+                  <button type="button" className="btn-secondary" onClick={() => setShowQrModal(false)} style={{ padding: '8px 14px', fontSize: 13 }}>
+                    Close
+                  </button>
+                </div>
+              </div>
 
-            <div style={{ background: '#fff', padding: 14, borderRadius: 12, display: 'inline-block', marginBottom: 16 }}>
-              <img
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(uniqueTurfUrl)}`}
-                alt="Turf QR Code"
-                style={{ width: 180, height: 180, display: 'block' }}
-              />
-            </div>
+              <article id="venue-booking-poster" className="venue-booking-poster">
+                <header className="venue-booking-poster-header">
+                  <div className="venue-booking-poster-brand">
+                    {venueLogo ? (
+                      <img src={venueLogo} alt="" className="venue-booking-poster-logo" />
+                    ) : (
+                      <div className="venue-booking-poster-logo venue-booking-poster-logo--fallback" aria-hidden>
+                        {venueInitial}
+                      </div>
+                    )}
+                    <div>
+                      <h2 className="venue-booking-poster-name">{selectedVenue.name}</h2>
+                      {(selectedVenue.address || selectedVenue.city) && (
+                        <p className="venue-booking-poster-address">
+                          {[selectedVenue.address, selectedVenue.city].filter(Boolean).join(', ')}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </header>
 
-            <div style={{ fontSize: 11.5, color: '#2563eb', fontFamily: 'monospace', wordBreak: 'break-all', marginBottom: 16 }}>
-              {uniqueTurfUrl}
-            </div>
+                <div className="venue-booking-poster-qr-wrap">
+                  <img src={qrSrc} alt={`QR code to book ${selectedVenue.name}`} className="venue-booking-poster-qr" />
+                </div>
 
-            <button className="btn-secondary" style={{ width: '100%' }} onClick={() => setShowQrModal(false)}>
-              Close QR
-            </button>
+                <div className="venue-booking-poster-cta">
+                  <div className="venue-booking-poster-cta-title">Scan to book a slot</div>
+                  <div className="venue-booking-poster-cta-sub">Open camera · point here · reserve instantly</div>
+                </div>
+
+                <footer className="venue-booking-poster-footer">
+                  <div className="venue-booking-poster-powered">
+                    <span>Booked on</span>
+                    <img src="/logo-mark.png" alt="NexusPlay" className="venue-booking-poster-nexus" />
+                    <strong>NexusPlay</strong>
+                  </div>
+                  <div className="venue-booking-poster-url">{uniqueTurfUrl.replace(/^https?:\/\//, '')}</div>
+                </footer>
+              </article>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* MODAL: OWNER HOST OPEN GAME ON COURT SLOT */}
       {showOwnerHostModal && ownerHostSlot && (

@@ -760,6 +760,7 @@ export async function updateVenueProfile(sql, organizationId, venueId, body) {
     email: body.email,
     amenities: body.amenities,
     photos: body.photos,
+    logoUrl: body.logo_url !== undefined ? body.logo_url : body.logoUrl,
     openTime: body.open_time ?? body.openTime,
     closeTime: body.close_time ?? body.closeTime,
     upiId: body.upi_id,

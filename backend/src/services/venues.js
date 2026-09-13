@@ -150,6 +150,7 @@ export async function updateVenue(sql, organizationId, venueId, input) {
       phone = ${input.phone ?? existing.phone},
       email = ${input.email ?? existing.email},
       photos = ${input.photos !== undefined ? JSON.stringify(input.photos) : existing.photos},
+      logo_url = ${input.logoUrl !== undefined ? (input.logoUrl || null) : existing.logo_url},
       amenities = ${input.amenities !== undefined ? JSON.stringify(input.amenities) : existing.amenities},
       sport_ids = ${input.sportIds ?? existing.sport_ids},
       open_time = ${input.openTime ?? existing.open_time},
