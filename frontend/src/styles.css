@@ -809,11 +809,33 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .turf-booking-sheet-overlay .turf-booking-summary {
   width: 100%;
   max-width: 520px;
-  max-height: min(90dvh, 920px);
+  max-height: min(92dvh, 920px);
   overflow-y: auto;
   margin-top: auto;
   border-radius: 16px !important;
   box-shadow: 0 -8px 32px rgba(15, 23, 42, 0.2);
+  padding: 14px 14px 12px !important;
+}
+
+.turf-booking-sheet-overlay .turf-summary-header {
+  margin-bottom: 10px;
+}
+
+.turf-booking-sheet-overlay .turf-summary-header h3 {
+  font-size: 16px !important;
+}
+
+.turf-booking-sheet-overlay .turf-pay-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.turf-booking-sheet-overlay .turf-pay-grid button {
+  padding: 10px 8px !important;
+  font-size: 12.5px !important;
+  border-radius: 8px !important;
 }
 
 .turf-booking-sheet-overlay .turf-summary-close {

@@ -36,7 +36,6 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
   const [paymentProofFile, setPaymentProofFile] = useState(null);
   const [paymentProofPreview, setPaymentProofPreview] = useState('');
   const [copiedUpi, setCopiedUpi] = useState(false);
-  const [splitCount, setSplitCount] = useState(1);
 
   // A slot can already have an open pickup game on it (see slot.game from
   // getVenueSlots) — direct instant booking is blocked server-side for
@@ -360,11 +359,11 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
         paymentProvider: 'upi',
         utr: isMobileBooking ? '' : upiUtr.trim(),
         paymentProofUrl: paymentProofUrl || undefined,
-        splitCount,
-        participants: Array.from({ length: splitCount }).map((_, i) => ({
-          name: i === 0 ? (customerName || 'Organizer') : `Player ${i + 1}`,
-          phone: i === 0 ? customerPhone : ''
-        }))
+        splitCount: 1,
+        participants: [{
+          name: customerName || 'Organizer',
+          phone: customerPhone || ''
+        }]
       });
       setConfirmedBooking({ ...res, paymentProofUrl });
       setCheckoutStep('confirmed');
@@ -882,7 +881,7 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
             >
               <div className="turf-summary-header">
                 <h3 className="font-display" style={{ fontSize: 20, fontWeight: 700, color: '#0f172a', margin: 0 }}>
-                  Booking Summary
+                  {isMobileBooking && activeHold ? 'Pay now' : 'Booking Summary'}
                 </h3>
                 <button
                   type="button"
@@ -1042,6 +1041,7 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
                 </div>
               ) : selectedSlot ? (
                 <div>
+                  {!(isMobileBooking && activeHold) && (
                   <div style={{ background: '#f8fafc', borderRadius: 10, padding: 14, marginBottom: 16, border: '1px solid #e2e8f0' }}>
                     <div style={{ fontSize: 13, color: '#64748b' }}>{venue.name}</div>
                     <div style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', marginTop: 2 }}>{selectedCourt?.name}</div>
@@ -1049,6 +1049,7 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
                       {selectedDate} · {selectedSlot.start_time} to {selectedSlot.end_time}
                     </div>
                   </div>
+                  )}
 
                   {guestHostEnabled && !activeHold && (
                     <div
@@ -1171,13 +1172,12 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
                     </form>
                   ) : (
                   <>
-                  {/* Concurrency Timer if active lock exists */}
-                  {activeHold && lockCountdown > 0 && (
+                  {!(isMobileBooking && activeHold) && activeHold && lockCountdown > 0 && (
                     <div style={{ background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: 10, padding: 12, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
                       <Lock size={20} style={{ color: '#059669' }} />
                       <div>
                         <div style={{ fontSize: 12, color: 'var(--accent-neon)', fontWeight: 700 }}>SLOT LOCKED FOR YOU</div>
-                        <div style={{ fontSize: 13, color: '#fff' }}>
+                        <div style={{ fontSize: 13, color: '#065f46' }}>
                           Lock expires in <strong>{Math.floor(lockCountdown / 60)}m {lockCountdown % 60}s</strong>
                         </div>
                       </div>
@@ -1185,101 +1185,73 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
                   )}
 
                   {errorMsg && (
-                    <div style={{ background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#fca5a5', padding: 10, borderRadius: 8, fontSize: 12.5, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <div style={{ background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#b91c1c', padding: 10, borderRadius: 8, fontSize: 12.5, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
                       <AlertCircle size={16} /> {errorMsg}
                     </div>
                   )}
 
-                  {/* Customer Information Form */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
-                    <div>
-                      <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
-                        PHONE NUMBER *
-                      </label>
-                      <input
-                        type="tel"
-                        placeholder="+91 98765 43210"
-                        className="nexus-input"
-                        style={{ width: '100%' }}
-                        value={customerPhone}
-                        onChange={e => setCustomerPhone(e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
-                        YOUR NAME
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="Player Name"
-                        className="nexus-input"
-                        style={{ width: '100%' }}
-                        value={customerName}
-                        onChange={e => setCustomerName(e.target.value)}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Payment Method — UPI direct to the venue owner is the
-                      only option. "Pay at Turf" (book instantly with
-                      nothing collected) used to be offered here too, but a
-                      booking with zero payment secured nothing — removed
-                      in favor of the owner's own advance-payment setting
-                      below, which already covers "I don't want to collect
-                      the full amount up front" without giving up a deposit
-                      entirely. */}
-                  <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8, background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: 8, padding: '10px 12px' }}>
-                    <QrCode size={16} style={{ color: '#059669', flexShrink: 0 }} />
-                    <span style={{ fontSize: 12.5, color: '#065f46', fontWeight: 600 }}>
-                      Pay via the venue owner's UPI QR to lock this slot
-                    </span>
-                  </div>
-
-                  {/* Split Bill Feature */}
-                  <div style={{ background: '#f8fafc', padding: 12, borderRadius: 8, border: '1px solid #e2e8f0', marginBottom: 18 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: 12, fontWeight: 600, color: '#475569', display: 'flex', alignItems: 'center', gap: 5 }}>
-                        <Split size={14} /> Split with players
-                      </span>
-                      <select
-                        value={splitCount}
-                        onChange={e => setSplitCount(Number(e.target.value))}
-                        style={{ background: '#ffffff', color: '#0f172a', border: '1px solid #cbd5e1', borderRadius: 6, padding: '3px 8px', fontSize: 12 }}
-                      >
-                        <option value={1}>1 Player (Full)</option>
-                        <option value={2}>2 Players (₹{Math.round(selectedSlot.price / 2)} each)</option>
-                        <option value={4}>4 Players (₹{Math.round(selectedSlot.price / 4)} each)</option>
-                        <option value={10}>10 Players (₹{Math.round(selectedSlot.price / 10)} each)</option>
-                        <option value={14}>14 Players (₹{Math.round(selectedSlot.price / 14)} each)</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Price Breakdown — advancePercent < 100 means the venue
-                      only requires a deposit to lock the slot (owner's
-                      Business Setup setting), balance settled in person. */}
-                  <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: 14, marginBottom: 18 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#64748b', marginBottom: 6 }}>
-                      <span>Slot Fee</span>
-                      <span style={{ fontWeight: 600, color: '#0f172a' }}>₹{selectedSlot.price}</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#64748b', marginBottom: 8 }}>
-                      <span>Platform Fee</span>
-                      <span style={{ color: '#059669', fontWeight: 600 }}>₹0 (Direct UPI to Venue)</span>
-                    </div>
-                    {advancePercent < 100 && (
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#92400e', marginBottom: 8 }}>
-                        <span>Balance Due at Venue</span>
-                        <span style={{ fontWeight: 600 }}>₹{balanceAtVenue}</span>
+                  {/* Pre-lock: contact + fee. Post-lock on mobile: jump straight to pay. */}
+                  {!(isMobileBooking && activeHold) && (
+                    <>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
+                        <div>
+                          <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
+                            PHONE NUMBER *
+                          </label>
+                          <input
+                            type="tel"
+                            placeholder="+91 98765 43210"
+                            className="nexus-input"
+                            style={{ width: '100%' }}
+                            value={customerPhone}
+                            onChange={e => setCustomerPhone(e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
+                            YOUR NAME
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Player Name"
+                            className="nexus-input"
+                            style={{ width: '100%' }}
+                            value={customerName}
+                            onChange={e => setCustomerName(e.target.value)}
+                          />
+                        </div>
                       </div>
-                    )}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 18, fontWeight: 800, color: '#0f172a' }}>
-                      <span>{advancePercent < 100 ? 'Pay Now (Advance)' : 'Total Due'}</span>
-                      <span>₹{advanceAmount}</span>
-                    </div>
-                  </div>
 
-                  {/* Active Hold & Owner UPI QR Payment Screen */}
+                      <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8, background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: 8, padding: '10px 12px' }}>
+                        <QrCode size={16} style={{ color: '#059669', flexShrink: 0 }} />
+                        <span style={{ fontSize: 12.5, color: '#065f46', fontWeight: 600 }}>
+                          Pay via the venue owner's UPI QR to lock this slot
+                        </span>
+                      </div>
+
+                      <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: 14, marginBottom: 18 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#64748b', marginBottom: 6 }}>
+                          <span>Slot Fee</span>
+                          <span style={{ fontWeight: 600, color: '#0f172a' }}>₹{selectedSlot.price}</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#64748b', marginBottom: 8 }}>
+                          <span>Platform Fee</span>
+                          <span style={{ color: '#059669', fontWeight: 600 }}>₹0 (Direct UPI to Venue)</span>
+                        </div>
+                        {advancePercent < 100 && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#92400e', marginBottom: 8 }}>
+                            <span>Balance Due at Venue</span>
+                            <span style={{ fontWeight: 600 }}>₹{balanceAtVenue}</span>
+                          </div>
+                        )}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 18, fontWeight: 800, color: '#0f172a' }}>
+                          <span>{advancePercent < 100 ? 'Pay Now (Advance)' : 'Total Due'}</span>
+                          <span>₹{advanceAmount}</span>
+                        </div>
+                      </div>
+                    </>
+                  )}
+
                   {!activeHold ? (
                     <button
                       className="btn-primary"
@@ -1289,6 +1261,141 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
                     >
                       {isHolding ? 'Locking Slot...' : (isMobileBooking ? 'Lock Slot & Pay (10m Hold)' : 'Lock Slot & Show UPI QR (10m Hold)')}
                     </button>
+                  ) : isMobileBooking ? (
+                    (() => {
+                      const amountDue = activeHold.advanceAmount ?? selectedSlot.price;
+                      const holdBalance = (activeHold.totalAmount ?? selectedSlot.price) - amountDue;
+                      const links = buildUpiPayLinks({
+                        upiId: activeHold.paymentOrder?.upiId || venue.upi_id,
+                        payeeName: activeHold.paymentOrder?.payeeName || venue.upi_name || venue.name,
+                        amount: amountDue,
+                        bookingId: activeHold.bookingId
+                      });
+                      const upiId = activeHold.paymentOrder?.upiId || venue.upi_id;
+                      return (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
+                            <div>
+                              <div style={{ fontSize: 11, color: '#64748b' }}>
+                                {selectedCourt?.name} · {selectedSlot.start_time}–{selectedSlot.end_time}
+                              </div>
+                              <div style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', lineHeight: 1.15 }}>
+                                Pay ₹{amountDue}
+                              </div>
+                              {holdBalance > 0 && (
+                                <div style={{ fontSize: 11, color: '#92400e', marginTop: 2 }}>
+                                  ₹{holdBalance} balance at venue
+                                </div>
+                              )}
+                            </div>
+                            {lockCountdown > 0 && (
+                              <div style={{ fontSize: 11, fontWeight: 700, color: '#059669', whiteSpace: 'nowrap' }}>
+                                {Math.floor(lockCountdown / 60)}:{String(lockCountdown % 60).padStart(2, '0')} left
+                              </div>
+                            )}
+                          </div>
+
+                          {!links ? (
+                            <div style={{ fontSize: 12.5, color: '#dc2626' }}>
+                              This turf has not set a UPI ID yet. Payment cannot start.
+                            </div>
+                          ) : (
+                            <div className="turf-pay-grid">
+                              <button type="button" onClick={() => openUpiPayLink(links.gpay)} style={{ border: 'none', color: '#fff', background: '#1a73e8', fontWeight: 700, cursor: 'pointer' }}>
+                                GPay
+                              </button>
+                              <button type="button" onClick={() => openUpiPayLink(links.phonepe)} style={{ border: 'none', color: '#fff', background: '#5f259f', fontWeight: 700, cursor: 'pointer' }}>
+                                PhonePe
+                              </button>
+                              <button type="button" onClick={() => openUpiPayLink(links.paytm)} style={{ border: 'none', color: '#fff', background: '#00baf2', fontWeight: 700, cursor: 'pointer' }}>
+                                Paytm
+                              </button>
+                              <button type="button" onClick={() => openUpiPayLink(links.generic)} style={{ border: '1px solid #cbd5e1', color: '#0f172a', background: '#fff', fontWeight: 700, cursor: 'pointer' }}>
+                                Other UPI
+                              </button>
+                            </div>
+                          )}
+
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '8px 10px' }}>
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ fontSize: 10, color: '#64748b' }}>UPI ID</div>
+                              <div style={{ fontSize: 12.5, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {upiId || 'Not set'}
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (!upiId) return;
+                                navigator.clipboard.writeText(upiId);
+                                setCopiedUpi(true);
+                                setTimeout(() => setCopiedUpi(false), 2000);
+                              }}
+                              style={{
+                                flexShrink: 0,
+                                background: copiedUpi ? '#ecfdf5' : '#fff',
+                                border: '1px solid #cbd5e1',
+                                borderRadius: 6,
+                                color: copiedUpi ? '#059669' : '#334155',
+                                padding: '5px 8px',
+                                fontSize: 11,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 4
+                              }}
+                            >
+                              {copiedUpi ? <CheckCircle2 size={12} /> : <Copy size={12} />}
+                              {copiedUpi ? 'Copied' : 'Copy'}
+                            </button>
+                          </div>
+
+                          <div>
+                            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#059669', marginBottom: 4, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                              Payment screenshot *
+                            </label>
+                            <input
+                              type="file"
+                              accept="image/png,image/jpeg,image/webp,image/*"
+                              onChange={handlePaymentProofPick}
+                              style={{ width: '100%', fontSize: 12 }}
+                            />
+                            {paymentProofPreview && (
+                              <img
+                                src={paymentProofPreview}
+                                alt="Payment screenshot preview"
+                                style={{ width: '100%', maxHeight: 96, objectFit: 'contain', borderRadius: 6, border: '1px solid #e2e8f0', background: '#fff', marginTop: 6 }}
+                              />
+                            )}
+                          </div>
+
+                          <button
+                            className="btn-primary"
+                            style={{ width: '100%', background: '#059669', padding: '11px' }}
+                            disabled={isHolding}
+                            onClick={handleFinalizeBooking}
+                          >
+                            {isHolding ? 'Submitting...' : 'Confirm and send to turf'}
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={handleCancelHold}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: '#64748b',
+                              fontSize: 12,
+                              cursor: 'pointer',
+                              textDecoration: 'underline',
+                              padding: 0
+                            }}
+                          >
+                            Cancel hold
+                          </button>
+                        </div>
+                      );
+                    })()
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                       {(() => {
@@ -1298,7 +1405,7 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
                         <div style={{ background: '#f8fafc', border: '1px solid #a7f3d0', borderRadius: 12, padding: 16 }}>
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                             <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.05em', color: '#059669', textTransform: 'uppercase' }}>
-                              {isMobileBooking ? 'STEP 1: PAY IN UPI APP' : 'STEP 1: SCAN & PAY TO VENUE'}
+                              STEP 1: SCAN & PAY TO VENUE
                             </span>
                             <span style={{ fontSize: 14, fontWeight: 800, color: '#0f172a' }}>
                               ₹{amountDue}
@@ -1310,93 +1417,19 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
                             </div>
                           )}
 
-                          {/* Desktop: QR. Mobile: open UPI app link. */}
-                          {!isMobileBooking ? (
-                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 14 }}>
-                              <div style={{ background: '#ffffff', padding: 10, borderRadius: 12, border: '1px solid #e2e8f0', boxShadow: '0 4px 14px rgba(0,0,0,0.06)', marginBottom: 8 }}>
-                                <img
-                                  src={activeHold.paymentOrder?.qrCodeUrl || `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(activeHold.paymentOrder?.upiUri || `upi://pay?pa=${venue.upi_id || ''}&pn=${encodeURIComponent(venue.name)}&am=${amountDue}&cu=INR`)}`}
-                                  alt="Venue Owner UPI QR Code"
-                                  style={{ width: 170, height: 170, display: 'block' }}
-                                />
-                              </div>
-                              <div style={{ fontSize: 11.5, color: '#64748b', textAlign: 'center' }}>
-                                Scan using GPay, PhonePe, Paytm or BHIM
-                              </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 14 }}>
+                            <div style={{ background: '#ffffff', padding: 10, borderRadius: 12, border: '1px solid #e2e8f0', boxShadow: '0 4px 14px rgba(0,0,0,0.06)', marginBottom: 8 }}>
+                              <img
+                                src={activeHold.paymentOrder?.qrCodeUrl || `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(activeHold.paymentOrder?.upiUri || `upi://pay?pa=${venue.upi_id || ''}&pn=${encodeURIComponent(venue.name)}&am=${amountDue}&cu=INR`)}`}
+                                alt="Venue Owner UPI QR Code"
+                                style={{ width: 170, height: 170, display: 'block' }}
+                              />
                             </div>
-                          ) : (
-                            (() => {
-                              const links = buildUpiPayLinks({
-                                upiId: activeHold.paymentOrder?.upiId || venue.upi_id,
-                                payeeName: activeHold.paymentOrder?.payeeName || venue.upi_name || venue.name,
-                                amount: amountDue,
-                                bookingId: activeHold.bookingId
-                              });
-                              if (!links) {
-                                return (
-                                  <div style={{ fontSize: 12.5, color: '#dc2626', marginBottom: 14 }}>
-                                    This turf has not set a UPI ID yet. Payment cannot start.
-                                  </div>
-                                );
-                              }
-                              const btnStyle = {
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: 8,
-                                width: '100%',
-                                border: 'none',
-                                color: '#ffffff',
-                                padding: '12px 14px',
-                                borderRadius: 10,
-                                fontSize: 13.5,
-                                fontWeight: 700,
-                                cursor: 'pointer'
-                              };
-                              return (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
-                                  <button
-                                    type="button"
-                                    onClick={() => openUpiPayLink(links.gpay)}
-                                    style={{ ...btnStyle, background: '#1a73e8' }}
-                                  >
-                                    Pay with GPay
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => openUpiPayLink(links.phonepe)}
-                                    style={{ ...btnStyle, background: '#5f259f' }}
-                                  >
-                                    Pay with PhonePe
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => openUpiPayLink(links.paytm)}
-                                    style={{ ...btnStyle, background: '#00baf2' }}
-                                  >
-                                    Pay with Paytm
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => openUpiPayLink(links.generic)}
-                                    style={{
-                                      ...btnStyle,
-                                      background: '#ffffff',
-                                      color: '#0f172a',
-                                      border: '1px solid #cbd5e1'
-                                    }}
-                                  >
-                                    Other UPI app
-                                  </button>
-                                  <div style={{ fontSize: 11, color: '#64748b', textAlign: 'center' }}>
-                                    Opens your UPI app with amount filled. Then upload the payment screenshot below.
-                                  </div>
-                                </div>
-                              );
-                            })()
-                          )}
+                            <div style={{ fontSize: 11.5, color: '#64748b', textAlign: 'center' }}>
+                              Scan using GPay, PhonePe, Paytm or BHIM
+                            </div>
+                          </div>
 
-                          {/* Payee Info & Copy UPI ID */}
                           <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', padding: 10, borderRadius: 8, marginBottom: 12, fontSize: 12 }}>
                             <div style={{ color: '#64748b', fontSize: 11 }}>Payee Name</div>
                             <div style={{ color: '#0f172a', fontWeight: 600, marginBottom: 6 }}>
@@ -1437,48 +1470,21 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
                             </div>
                           </div>
 
-                          {/* Step 2: Desktop UTR / Mobile screenshot */}
                           <div style={{ borderTop: '1px dashed #e2e8f0', paddingTop: 12 }}>
-                            {isMobileBooking ? (
-                              <>
-                                <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#059669', marginBottom: 6, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
-                                  STEP 2: UPLOAD PAYMENT SCREENSHOT *
-                                </label>
-                                <input
-                                  type="file"
-                                  accept="image/png,image/jpeg,image/webp,image/*"
-                                  onChange={handlePaymentProofPick}
-                                  style={{ width: '100%', fontSize: 13, marginBottom: 8 }}
-                                />
-                                {paymentProofPreview && (
-                                  <img
-                                    src={paymentProofPreview}
-                                    alt="Payment screenshot preview"
-                                    style={{ width: '100%', maxHeight: 220, objectFit: 'contain', borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff' }}
-                                  />
-                                )}
-                                <div style={{ fontSize: 11, color: '#64748b', marginTop: 6 }}>
-                                  After confirming, WhatsApp opens so you can send booking details + this screenshot to the turf.
-                                </div>
-                              </>
-                            ) : (
-                              <>
-                                <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#059669', marginBottom: 4, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
-                                  STEP 2: ENTER 12-DIGIT UPI REFERENCE / UTR *
-                                </label>
-                                <input
-                                  type="text"
-                                  placeholder="e.g. 423891029381"
-                                  className="nexus-input"
-                                  style={{ width: '100%', letterSpacing: '0.08em', fontWeight: 600 }}
-                                  value={upiUtr}
-                                  onChange={e => setUpiUtr(e.target.value.replace(/[^0-9a-zA-Z]/g, ''))}
-                                />
-                                <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
-                                  Found in your UPI receipt (GPay / PhonePe / Paytm / BHIM)
-                                </div>
-                              </>
-                            )}
+                            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#059669', marginBottom: 4, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                              STEP 2: ENTER 12-DIGIT UPI REFERENCE / UTR *
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="e.g. 423891029381"
+                              className="nexus-input"
+                              style={{ width: '100%', letterSpacing: '0.08em', fontWeight: 600 }}
+                              value={upiUtr}
+                              onChange={e => setUpiUtr(e.target.value.replace(/[^0-9a-zA-Z]/g, ''))}
+                            />
+                            <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
+                              Found in your UPI receipt (GPay / PhonePe / Paytm / BHIM)
+                            </div>
                           </div>
 
                           {venue.cancellation_policy && (
@@ -1496,11 +1502,7 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
                         disabled={isHolding}
                         onClick={handleFinalizeBooking}
                       >
-                        {isHolding
-                          ? 'Submitting...'
-                          : isMobileBooking
-                          ? 'Confirm and send to turf'
-                          : 'Submit UTR & Confirm Slot'}
+                        {isHolding ? 'Submitting...' : 'Submit UTR & Confirm Slot'}
                       </button>
 
                       <button
