@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Calendar, Users, DollarSign, Clock,
   Plus, CheckCircle, XCircle, AlertTriangle, ChevronRight,
   TrendingUp, Activity, Lock, Unlock, Phone, RefreshCw,
-  Building, Settings, QrCode, Copy, ShieldCheck, CheckCircle2,
+  Building, Settings, QrCode, Copy, CheckCircle2,
   FileText, Check, MapPin, Share2, Flame,
   Tag, AlertCircle, Edit3, Save, Navigation, Sparkles, Trophy,
   Download, Receipt, Link2, X
@@ -28,7 +28,7 @@ export default function OwnerSaaSView() {
   // the failure is happening fresh, inside the new instance's own fetch.
   const [mountId] = useState(() => Math.random().toString(36).slice(2, 8));
 
-  // Tabs: 'dashboard', 'live_slots', 'business_setup', 'upi_verification', 'crm', 'courts'
+  // Tabs: 'dashboard', 'live_slots', 'business_setup', 'crm', 'courts'
   const [activeTab, setActiveTab] = useState('live_slots');
   const [context, setContext] = useState(null);
   const [venues, setVenues] = useState([]);
@@ -36,7 +36,6 @@ export default function OwnerSaaSView() {
   const [analytics, setAnalytics] = useState(null);
   const [bookings, setBookings] = useState([]);
   const [customers, setCustomers] = useState([]);
-  const [pendingUpiBookings, setPendingUpiBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [notSignedIn, setNotSignedIn] = useState(false);
   const [notSignedInDetail, setNotSignedInDetail] = useState('');
@@ -216,13 +215,11 @@ export default function OwnerSaaSView() {
         Promise.all([
           api.getOwnerAnalytics(vId).catch(() => null),
           api.getOwnerBookings({ venueId: vId }).catch(() => []),
-          api.getCustomers().catch(() => []),
-          api.getPendingUpiBookings(vId).catch(() => [])
-        ]).then(([anData, bData, cData, pendingUpi]) => {
+          api.getCustomers().catch(() => [])
+        ]).then(([anData, bData, cData]) => {
           setAnalytics(anData);
           setBookings(bData || []);
           setCustomers(cData || []);
-          setPendingUpiBookings(pendingUpi || []);
         });
 
         await slotsPromise;
@@ -337,13 +334,11 @@ export default function OwnerSaaSView() {
       Promise.all([
         api.getOwnerAnalytics(v.id).catch(() => null),
         api.getOwnerBookings({ venueId: v.id }).catch(() => []),
-        api.getCustomers().catch(() => []),
-        api.getPendingUpiBookings(v.id).catch(() => [])
-      ]).then(([anData, bData, cData, pendingUpi]) => {
+        api.getCustomers().catch(() => [])
+      ]).then(([anData, bData, cData]) => {
         setAnalytics(anData);
         setBookings(bData || []);
         setCustomers(cData || []);
-        setPendingUpiBookings(pendingUpi || []);
       });
     }
   }
@@ -941,35 +936,6 @@ export default function OwnerSaaSView() {
     });
   }
 
-  async function handleVerifyUpi(row) {
-    try {
-      if (row.payment_type === 'game_join') {
-        await api.verifyGameParticipantPayment(row.id, { action: 'verify_credit' });
-      } else {
-        await api.verifyUpiPayment(row.id, { action: 'verify_credit' });
-      }
-      await loadData(selectedVenue?.id);
-      alert('✅ UPI Payment verified as credited! Customer notified and booking confirmed.');
-    } catch (err) {
-      alert('Verification failed: ' + err.message);
-    }
-  }
-
-  async function handleRejectUpi(row) {
-    const reason = prompt('Reason for rejection:', 'Payment not received in owner UPI bank account');
-    if (reason === null) return;
-    try {
-      if (row.payment_type === 'game_join') {
-        await api.verifyGameParticipantPayment(row.id, { action: 'reject', notes: reason });
-      } else {
-        await api.verifyUpiPayment(row.id, { action: 'reject', notes: reason });
-      }
-      await loadData(selectedVenue?.id);
-      alert('❌ Payment rejected and spot released.');
-    } catch (err) {
-      alert('Rejection failed: ' + err.message);
-    }
-  }
 
   async function refreshBookings() {
     if (selectedVenue) {
@@ -1321,19 +1287,6 @@ export default function OwnerSaaSView() {
           <LayoutDashboard size={14} />
           <span className="owner-tab-full">Overview & Analytics</span>
           <span className="owner-tab-short">Overview</span>
-        </button>
-
-        <button
-          type="button"
-          className={`owner-tab${activeTab === 'upi_verification' ? ' is-active' : ''}`}
-          onClick={() => setActiveTab('upi_verification')}
-        >
-          <ShieldCheck size={14} />
-          <span className="owner-tab-full">UPI Direct Audit</span>
-          <span className="owner-tab-short">UPI</span>
-          {pendingUpiBookings.length > 0 && (
-            <span className="owner-tab-badge">{pendingUpiBookings.length}</span>
-          )}
         </button>
 
         <button
@@ -3053,81 +3006,6 @@ export default function OwnerSaaSView() {
               )}
             </div>
           </div>
-        </div>
-      )}
-
-      {/* ========================================================================= */}
-      {/* TAB: UPI DIRECT AUDIT */}
-      {/* ========================================================================= */}
-      {activeTab === 'upi_verification' && (
-        <div className="animate-fade-in">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-            <div>
-              <h2 className="font-display" style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                Direct UPI Bank Settlement & UTR Audit Queue
-              </h2>
-              <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: '4px 0 0 0' }}>
-                Verify 12-digit bank UTR numbers for player reservations directly paid to your UPI ID (<strong>{selectedVenue?.upi_id}</strong>).
-              </p>
-            </div>
-          </div>
-
-          {pendingUpiBookings.length === 0 ? (
-            <div className="nexus-card" style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
-              <CheckCircle size={36} style={{ color: '#10b981', margin: '0 auto 10px' }} />
-              <div style={{ fontSize: 16, fontWeight: 700, color: '#0f172a' }}>All Caught Up!</div>
-              <div style={{ fontSize: 13, marginTop: 4 }}>No pending UPI payments awaiting verification.</div>
-            </div>
-          ) : (
-            <div className="responsive-cards" style={{ gap: 16 }}>
-              {pendingUpiBookings.map(b => (
-                <div key={`${b.payment_type}-${b.id}`} className="nexus-card" style={{ padding: 18, borderLeft: '3px solid #f59e0b' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div>
-                      <div style={{ fontWeight: 700, color: '#0f172a' }}>{b.customer_name || 'Player'}</div>
-                      <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{b.customer_phone}</div>
-                    </div>
-                    <div style={{ fontSize: 16, fontWeight: 800, color: '#059669' }}>
-                      ₹{b.amount}
-                    </div>
-                  </div>
-
-                  <div style={{ background: '#f8fafc', padding: '8px 10px', borderRadius: 6, margin: '12px 0', fontSize: 12 }}>
-                    <div style={{ marginBottom: 4 }}>
-                      <span style={{
-                        display: 'inline-block', fontSize: 10.5, fontWeight: 700, padding: '2px 7px', borderRadius: 999,
-                        background: b.payment_type === 'game_join' ? '#e0e7ff' : '#d1fae5',
-                        color: b.payment_type === 'game_join' ? '#4338ca' : '#065f46'
-                      }}>
-                        {b.payment_type === 'game_join' ? 'Join a Spot' : 'Full Slot Booking'}
-                      </span>
-                    </div>
-                    <div>Slot: <strong>{b.date} · {b.start_time} - {b.end_time}</strong></div>
-                    <div>Court: <strong>{b.court_name}</strong></div>
-                    <div style={{ color: '#2563eb', fontFamily: 'monospace', marginTop: 2 }}>
-                      UTR: {b.upi_utr || 'Pending submission'}
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button
-                      onClick={() => handleVerifyUpi(b)}
-                      className="btn-primary"
-                      style={{ flex: 2, fontSize: 12, padding: '7px 10px' }}
-                    >
-                      <Check size={13} /> Verify & Credit
-                    </button>
-                    <button
-                      onClick={() => handleRejectUpi(b)}
-                      style={{ flex: 1, background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#f87171', borderRadius: 6, fontSize: 12, cursor: 'pointer' }}
-                    >
-                      Reject
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
       )}
 

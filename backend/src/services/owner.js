@@ -380,7 +380,7 @@ export async function listCustomers(sql, organizationId) {
 export async function listPendingUpi(sql, organizationId, venueId) {
   const venueIdParam = venueId || null;
   const bookingRows = await sql`
-    select b.id, 'booking' as payment_type, b.total_amount as amount, b.upi_utr, b.created_at,
+    select b.id, 'booking' as payment_type, b.total_amount as amount, b.upi_utr, b.payment_proof_url, b.created_at,
            cs.date, cs.start_time, cs.end_time,
            c.name as customer_name, c.phone as customer_phone, c.email as customer_email,
            crt.name as court_name, v.name as venue_name, v.upi_id as venue_upi_id, v.upi_name as venue_upi_name
@@ -400,7 +400,7 @@ export async function listPendingUpi(sql, organizationId, venueId) {
   // Surfaced here in the same queue, tagged 'game_join' so the frontend
   // and verifyUpiPayment know which table to act on.
   const gameJoinRows = await sql`
-    select gp.id, 'game_join' as payment_type, gp.share_amount as amount, gp.upi_utr, gp.joined_at as created_at,
+    select gp.id, 'game_join' as payment_type, gp.share_amount as amount, gp.upi_utr, null::text as payment_proof_url, gp.joined_at as created_at,
            cs.date, cs.start_time, cs.end_time,
            c.name as customer_name, c.phone as customer_phone, c.email as customer_email,
            crt.name as court_name, v.name as venue_name, v.upi_id as venue_upi_id, v.upi_name as venue_upi_name

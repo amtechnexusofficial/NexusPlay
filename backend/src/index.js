@@ -3,7 +3,7 @@ import { cors } from "hono/cors";
 import { getDb } from "./db.js";
 import { httpError } from "./errors.js";
 import { requestOtp, verifyOtp, adminLogin, registerOwner, loginOwnerPassword, requireAuth, requireOrg, tryGetOwnerOrgId } from "./auth.js";
-import { uploadImage, serveUpload } from "./uploads.js";
+import { uploadImage, uploadPaymentProof, serveUpload } from "./uploads.js";
 import { listSports } from "./services/sports.js";
 import {
   listVenuesForOrg,
@@ -32,9 +32,6 @@ import {
   createWalkIn,
   updateBookingAction,
   listCustomers,
-  listPendingUpi,
-  verifyUpiPayment,
-  verifyGameParticipantPayment,
   updateVenueProfile,
   getVenueProfile,
   convertSlotToFullInquiry,
@@ -417,25 +414,6 @@ app.put("/api/owner/venues/:id", ...ownerAuth, async (c) => {
   return c.json({ success: true, venue });
 });
 
-app.get("/api/owner/upi-pending", ...ownerAuth, async (c) => {
-  const sql = getDb(c.env);
-  return c.json(await listPendingUpi(sql, c.get("organizationId"), c.req.query("venueId") || undefined));
-});
-
-app.post("/api/owner/bookings/:bookingId/verify-upi", ...ownerAuth, async (c) => {
-  const result = await verifyUpiPayment(c.env, c.get("organizationId"), c.req.param("bookingId"), await c.req.json());
-  return c.json({ success: true, ...result });
-});
-
-// Same UPI-verify action, but for a player who paid to join an open
-// game's spot rather than a direct booking (see listPendingUpi's
-// payment_type field, which tells the owner dashboard which of these
-// two endpoints to call for a given queue row).
-app.post("/api/owner/game-participants/:participantId/verify-upi", ...ownerAuth, async (c) => {
-  const result = await verifyGameParticipantPayment(c.env, c.get("organizationId"), c.req.param("participantId"), await c.req.json());
-  return c.json({ success: true, ...result });
-});
-
 // ===========================================================================
 // Owner: courts (nested under a venue)
 // ===========================================================================
@@ -504,6 +482,12 @@ app.patch("/api/admin/venues/:id/status", adminAuth, async (c) => {
 
 app.post("/api/uploads", requireAuth(["owner", "admin"]), async (c) => {
   const result = await uploadImage(c);
+  return c.json(result, 201);
+});
+
+// Guest payment screenshots — gated inside uploadPaymentProof to pending_payment bookings.
+app.post("/api/public/payment-proof", async (c) => {
+  const result = await uploadPaymentProof(c);
   return c.json(result, 201);
 });
 

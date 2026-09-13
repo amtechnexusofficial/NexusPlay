@@ -33,6 +33,8 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
   const [customerPhone, setCustomerPhone] = useState(() => currentUser?.phone || '');
   const [customerEmail, setCustomerEmail] = useState(() => currentUser?.email || '');
   const [upiUtr, setUpiUtr] = useState('');
+  const [paymentProofFile, setPaymentProofFile] = useState(null);
+  const [paymentProofPreview, setPaymentProofPreview] = useState('');
   const [copiedUpi, setCopiedUpi] = useState(false);
   const [splitCount, setSplitCount] = useState(1);
 
@@ -324,39 +326,110 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
     }
   }
 
-  // Step 2: Confirm Payment & Submit UTR
+  // Step 2: Confirm Payment — desktop uses UTR; mobile uses screenshot + WhatsApp
   async function handleFinalizeBooking() {
     if (!activeHold?.bookingId) return;
 
-    if (!upiUtr.trim()) {
-      setErrorMsg('Please enter your 12-digit UPI Reference / UTR Number from your UPI payment app receipt');
-      return;
-    }
-    if (upiUtr.trim().length < 8) {
-      setErrorMsg('UPI Reference / UTR must be at least 8 to 12 digits');
-      return;
+    if (isMobileBooking) {
+      if (!paymentProofFile) {
+        setErrorMsg('Please upload a screenshot of your UPI payment');
+        return;
+      }
+    } else {
+      if (!upiUtr.trim()) {
+        setErrorMsg('Please enter your 12-digit UPI Reference / UTR Number from your UPI payment app receipt');
+        return;
+      }
+      if (upiUtr.trim().length < 8) {
+        setErrorMsg('UPI Reference / UTR must be at least 8 to 12 digits');
+        return;
+      }
     }
 
     setIsHolding(true);
     setErrorMsg('');
     try {
+      let paymentProofUrl = '';
+      if (isMobileBooking && paymentProofFile) {
+        const uploaded = await api.uploadPaymentProof(activeHold.bookingId, paymentProofFile);
+        paymentProofUrl = uploaded.url;
+      }
+
       const res = await api.confirmBooking({
         bookingId: activeHold.bookingId,
         paymentProvider: 'upi',
-        utr: upiUtr.trim(),
+        utr: isMobileBooking ? '' : upiUtr.trim(),
+        paymentProofUrl: paymentProofUrl || undefined,
         splitCount,
         participants: Array.from({ length: splitCount }).map((_, i) => ({
           name: i === 0 ? (customerName || 'Organizer') : `Player ${i + 1}`,
           phone: i === 0 ? customerPhone : ''
         }))
       });
-      setConfirmedBooking(res);
+      setConfirmedBooking({ ...res, paymentProofUrl });
       setCheckoutStep('confirmed');
+
+      if (isMobileBooking && paymentProofUrl) {
+        openOwnerWhatsAppWithProof(paymentProofUrl);
+      }
     } catch (err) {
       setErrorMsg(err.message);
     } finally {
       setIsHolding(false);
     }
+  }
+
+  function normalizeWhatsAppDigits(raw) {
+    const digits = String(raw || '').replace(/\D/g, '');
+    if (!digits) return '';
+    if (digits.length === 10) return `91${digits}`;
+    return digits;
+  }
+
+  function openOwnerWhatsAppWithProof(proofUrl) {
+    const wa = normalizeWhatsAppDigits(venue?.whatsapp_number);
+    if (!wa) {
+      setErrorMsg('Booking confirmed, but this turf has no WhatsApp number set. The owner will verify your screenshot in Owner Hub.');
+      return;
+    }
+    const sportInfo = sports.find((s) => {
+      const sel = String(selectedSport || selectedSlot?.sport_id || '');
+      return String(s.id) === sel || s.slug === sel;
+    });
+    const sportLabel = sportInfo?.name || selectedSlot?.sport_slug || 'Sport';
+    const courtLabel = selectedSlot?.court_name || selectedCourt?.name || 'Court';
+    const dateLabel = String(selectedSlot?.date || selectedDate || '').slice(0, 10);
+    const timeLabel = `${String(selectedSlot?.start_time || '').slice(0, 5)}–${String(selectedSlot?.end_time || '').slice(0, 5)}`;
+    const amountDue = activeHold?.advanceAmount ?? selectedSlot?.price;
+    const text = [
+      `Hi, I booked ${venue.name}.`,
+      `Date: ${dateLabel}`,
+      `Time: ${timeLabel}`,
+      `Turf/Court: ${courtLabel}`,
+      `Sport: ${sportLabel}`,
+      `Amount paid: ₹${amountDue}`,
+      `Player: ${customerName || 'Player'} (${customerPhone || 'n/a'})`,
+      `Payment screenshot: ${proofUrl}`,
+      '',
+      'Please verify and confirm my booking.'
+    ].join('\n');
+    window.open(`https://wa.me/${wa}?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
+  }
+
+  function handlePaymentProofPick(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!/^image\/(png|jpeg|jpg|webp)$/i.test(file.type)) {
+      setErrorMsg('Please upload a PNG, JPG or WEBP screenshot');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setErrorMsg('Screenshot must be under 5MB');
+      return;
+    }
+    setErrorMsg('');
+    setPaymentProofFile(file);
+    setPaymentProofPreview(URL.createObjectURL(file));
   }
 
   async function handleCancelHold() {
@@ -370,6 +443,8 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
     setShowBookingSheet(false);
     setCheckoutStep('slots');
     setUpiUtr('');
+    setPaymentProofFile(null);
+    setPaymentProofPreview('');
     setErrorMsg('');
   }
 
@@ -526,26 +601,30 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
       {/* MAIN BOOKING INTERFACE */}
       {checkoutStep === 'confirmed' && confirmedBooking ? (
         <div className="nexus-card animate-fade-in" style={{ padding: 36, textAlign: 'center', background: '#ffffff', border: '1px solid #e2e8f0' }}>
-          <div style={{ display: 'inline-flex', padding: 16, borderRadius: '50%', background: confirmedBooking.paymentStatus === 'pending_verification' ? '#fef3c7' : '#d1fae5', color: confirmedBooking.paymentStatus === 'pending_verification' ? '#d97706' : '#059669', marginBottom: 16 }}>
-            {confirmedBooking.paymentStatus === 'pending_verification' ? <Clock size={48} /> : <CheckCircle size={48} />}
+          <div style={{ display: 'inline-flex', padding: 16, borderRadius: '50%', background: '#d1fae5', color: '#059669', marginBottom: 16 }}>
+            <CheckCircle size={48} />
           </div>
           <h2 className="font-display" style={{ fontSize: 28, fontWeight: 800, color: '#0f172a' }}>
-            {confirmedBooking.paymentStatus === 'pending_verification' ? 'Booking Reserved — Pending UPI Credit Verification' : 'Booking Confirmed!'}
+            Booking Confirmed!
           </h2>
           <p style={{ color: '#64748b', marginTop: 8, fontSize: 14 }}>
             Booking Ref: <strong style={{ color: '#0f172a' }}>{confirmedBooking.booking?.id}</strong>
           </p>
 
-          {confirmedBooking.paymentStatus === 'pending_verification' && (
-            <div style={{ maxWidth: 520, margin: '16px auto', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 12, padding: 16, textAlign: 'left' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#b45309', fontWeight: 700, fontSize: 14, marginBottom: 4 }}>
-                <ShieldCheck size={18} /> Slot 100% Reserved & Held
-              </div>
-              <p style={{ fontSize: 13, color: '#475569', margin: 0, lineHeight: 1.5 }}>
-                Your 12-digit UTR <strong>{confirmedBooking.utr || confirmedBooking.booking?.upi_utr}</strong> has been submitted directly to {venue.name}. The owner will verify the ₹{confirmedBooking.booking?.amount_paid ?? confirmedBooking.booking?.total_amount} credit in their bank account. You will receive an SMS confirmation once credited.
-              </p>
+          <div style={{ maxWidth: 520, margin: '16px auto', background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: 12, padding: 16, textAlign: 'left' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#059669', fontWeight: 700, fontSize: 14, marginBottom: 4 }}>
+              <ShieldCheck size={18} /> Slot booked
             </div>
-          )}
+            <p style={{ fontSize: 13, color: '#475569', margin: 0, lineHeight: 1.5 }}>
+              Your payment proof has been submitted to {venue.name}. Amount recorded: ₹{confirmedBooking.booking?.amount_paid ?? confirmedBooking.booking?.total_amount}.
+              {confirmedBooking.utr || confirmedBooking.booking?.upi_utr ? (
+                <> UTR <strong>{confirmedBooking.utr || confirmedBooking.booking?.upi_utr}</strong> is on file.</>
+              ) : null}
+              {confirmedBooking.paymentProofUrl || confirmedBooking.booking?.payment_proof_url ? (
+                <> If WhatsApp opened, tap Send to share the booking details and screenshot with the turf.</>
+              ) : null}
+            </p>
+          </div>
 
           <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 14, padding: 20, maxWidth: 520, margin: '20px auto', textAlign: 'left' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: 10, borderBottom: '1px solid #e2e8f0' }}>
@@ -1178,7 +1257,7 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
                       disabled={isHolding}
                       onClick={handleLockSlot}
                     >
-                      {isHolding ? 'Locking Slot...' : 'Lock Slot & Show UPI QR (10m Hold)'}
+                      {isHolding ? 'Locking Slot...' : (isMobileBooking ? 'Lock Slot & Pay (10m Hold)' : 'Lock Slot & Show UPI QR (10m Hold)')}
                     </button>
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -1189,7 +1268,7 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
                         <div style={{ background: '#f8fafc', border: '1px solid #a7f3d0', borderRadius: 12, padding: 16 }}>
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                             <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.05em', color: '#059669', textTransform: 'uppercase' }}>
-                              STEP 1: SCAN & PAY TO VENUE
+                              {isMobileBooking ? 'STEP 1: PAY IN UPI APP' : 'STEP 1: SCAN & PAY TO VENUE'}
                             </span>
                             <span style={{ fontSize: 14, fontWeight: 800, color: '#0f172a' }}>
                               ₹{amountDue}
@@ -1201,19 +1280,42 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
                             </div>
                           )}
 
-                          {/* Dynamic QR Code Container */}
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 14 }}>
-                            <div style={{ background: '#ffffff', padding: 10, borderRadius: 12, border: '1px solid #e2e8f0', boxShadow: '0 4px 14px rgba(0,0,0,0.06)', marginBottom: 8 }}>
-                              <img
-                                src={activeHold.paymentOrder?.qrCodeUrl || `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(activeHold.paymentOrder?.upiUri || `upi://pay?pa=${venue.upi_id || ''}&pn=${encodeURIComponent(venue.name)}&am=${amountDue}&cu=INR`)}`}
-                                alt="Venue Owner UPI QR Code"
-                                style={{ width: 170, height: 170, display: 'block' }}
-                              />
+                          {/* Desktop: QR. Mobile: open UPI app link. */}
+                          {!isMobileBooking ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 14 }}>
+                              <div style={{ background: '#ffffff', padding: 10, borderRadius: 12, border: '1px solid #e2e8f0', boxShadow: '0 4px 14px rgba(0,0,0,0.06)', marginBottom: 8 }}>
+                                <img
+                                  src={activeHold.paymentOrder?.qrCodeUrl || `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(activeHold.paymentOrder?.upiUri || `upi://pay?pa=${venue.upi_id || ''}&pn=${encodeURIComponent(venue.name)}&am=${amountDue}&cu=INR`)}`}
+                                  alt="Venue Owner UPI QR Code"
+                                  style={{ width: 170, height: 170, display: 'block' }}
+                                />
+                              </div>
+                              <div style={{ fontSize: 11.5, color: '#64748b', textAlign: 'center' }}>
+                                Scan using GPay, PhonePe, Paytm or BHIM
+                              </div>
                             </div>
-                            <div style={{ fontSize: 11.5, color: '#64748b', textAlign: 'center' }}>
-                              Scan using GPay, PhonePe, Paytm or BHIM
-                            </div>
-                          </div>
+                          ) : (
+                            <a
+                              href={activeHold.paymentOrder?.upiUri || `upi://pay?pa=${encodeURIComponent(venue.upi_id || '')}&pn=${encodeURIComponent(venue.upi_name || venue.name || '')}&am=${amountDue}&cu=INR`}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: 8,
+                                background: 'linear-gradient(135deg, #059669, #10b981)',
+                                color: '#ffffff',
+                                textDecoration: 'none',
+                                padding: '14px 16px',
+                                borderRadius: 10,
+                                fontSize: 14,
+                                fontWeight: 700,
+                                marginBottom: 14,
+                                boxShadow: '0 4px 12px rgba(5,150,105,0.25)'
+                              }}
+                            >
+                              <ExternalLink size={16} /> Pay ₹{amountDue} in UPI App
+                            </a>
+                          )}
 
                           {/* Payee Info & Copy UPI ID */}
                           <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', padding: 10, borderRadius: 8, marginBottom: 12, fontSize: 12 }}>
@@ -1229,6 +1331,7 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
                                 </span>
                               </div>
                               <button
+                                type="button"
                                 onClick={() => {
                                   const id = activeHold.paymentOrder?.upiId || venue.upi_id;
                                   if (!id) return;
@@ -1255,46 +1358,49 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
                             </div>
                           </div>
 
-                          {/* Mobile Intent Button */}
-                          {activeHold.paymentOrder?.upiUri && (
-                            <a
-                              href={activeHold.paymentOrder.upiUri}
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: 6,
-                                background: '#eff6ff',
-                                border: '1px solid #bfdbfe',
-                                color: '#1d4ed8',
-                                textDecoration: 'none',
-                                padding: '8px 12px',
-                                borderRadius: 8,
-                                fontSize: 12,
-                                fontWeight: 600,
-                                marginBottom: 14
-                              }}
-                            >
-                              <ExternalLink size={13} /> Open in UPI App (Mobile)
-                            </a>
-                          )}
-
-                          {/* Step 2: UTR Reference Input */}
+                          {/* Step 2: Desktop UTR / Mobile screenshot */}
                           <div style={{ borderTop: '1px dashed #e2e8f0', paddingTop: 12 }}>
-                            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#059669', marginBottom: 4, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
-                              STEP 2: ENTER 12-DIGIT UPI REFERENCE / UTR *
-                            </label>
-                            <input
-                              type="text"
-                              placeholder="e.g. 423891029381"
-                              className="nexus-input"
-                              style={{ width: '100%', letterSpacing: '0.08em', fontWeight: 600 }}
-                              value={upiUtr}
-                              onChange={e => setUpiUtr(e.target.value.replace(/[^0-9a-zA-Z]/g, ''))}
-                            />
-                            <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
-                              Found in your UPI receipt (GPay / PhonePe / Paytm / BHIM)
-                            </div>
+                            {isMobileBooking ? (
+                              <>
+                                <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#059669', marginBottom: 6, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                                  STEP 2: UPLOAD PAYMENT SCREENSHOT *
+                                </label>
+                                <input
+                                  type="file"
+                                  accept="image/png,image/jpeg,image/webp"
+                                  capture="environment"
+                                  onChange={handlePaymentProofPick}
+                                  style={{ width: '100%', fontSize: 13, marginBottom: 8 }}
+                                />
+                                {paymentProofPreview && (
+                                  <img
+                                    src={paymentProofPreview}
+                                    alt="Payment screenshot preview"
+                                    style={{ width: '100%', maxHeight: 220, objectFit: 'contain', borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff' }}
+                                  />
+                                )}
+                                <div style={{ fontSize: 11, color: '#64748b', marginTop: 6 }}>
+                                  After confirming, WhatsApp opens so you can send booking details + this screenshot to the turf.
+                                </div>
+                              </>
+                            ) : (
+                              <>
+                                <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#059669', marginBottom: 4, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                                  STEP 2: ENTER 12-DIGIT UPI REFERENCE / UTR *
+                                </label>
+                                <input
+                                  type="text"
+                                  placeholder="e.g. 423891029381"
+                                  className="nexus-input"
+                                  style={{ width: '100%', letterSpacing: '0.08em', fontWeight: 600 }}
+                                  value={upiUtr}
+                                  onChange={e => setUpiUtr(e.target.value.replace(/[^0-9a-zA-Z]/g, ''))}
+                                />
+                                <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
+                                  Found in your UPI receipt (GPay / PhonePe / Paytm / BHIM)
+                                </div>
+                              </>
+                            )}
                           </div>
 
                           {venue.cancellation_policy && (
@@ -1312,7 +1418,11 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
                         disabled={isHolding}
                         onClick={handleFinalizeBooking}
                       >
-                        {isHolding ? 'Submitting...' : 'Submit UTR & Confirm Slot'}
+                        {isHolding
+                          ? 'Submitting...'
+                          : isMobileBooking
+                          ? 'Confirm and send to turf'
+                          : 'Submit UTR & Confirm Slot'}
                       </button>
 
                       <button

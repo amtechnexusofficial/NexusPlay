@@ -160,12 +160,9 @@ export async function joinGame(env, gameId, { playerName, playerPhone, utr }) {
     const player = await findOrCreateCustomerInTx(client, game.organization_id, { name: playerName, phone: playerPhone });
 
     try {
-      // pending_verification, not paid — matches every other UPI payment
-      // in this app: no gateway holds the money, so it's not actually
-      // confirmed until the owner checks their bank statement and
-      // verifies it (see verifyUpiPayment / the owner's UPI queue).
+      // Marked paid on UTR submit — no owner UPI audit queue.
       await client.query(
-        "insert into game_participants (game_id, customer_id, payment_status, share_amount, upi_utr) values ($1, $2, 'pending_verification', $3, $4)",
+        "insert into game_participants (game_id, customer_id, payment_status, share_amount, upi_utr) values ($1, $2, 'paid', $3, $4)",
         [gameId, player.id, game.price_per_player, utr.trim()]
       );
     } catch (err) {

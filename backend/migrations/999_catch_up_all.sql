@@ -33,6 +33,7 @@ alter table venues add column if not exists whatsapp_number text;
 
 alter table court_slots add column if not exists block_reason text;
 alter table bookings add column if not exists upi_utr text;
+alter table bookings add column if not exists payment_proof_url text;
 
 -- Open Games (pickup matches + full-slot inquiries)
 alter table games add column if not exists skill_level text;

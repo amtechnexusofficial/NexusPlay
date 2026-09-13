@@ -113,6 +113,19 @@ export const api = {
     return body;
   },
 
+  async uploadPaymentProof(bookingId, file) {
+    const formData = new FormData();
+    formData.append('bookingId', bookingId);
+    formData.append('file', file);
+    const res = await fetch(`${API_BASE}/public/payment-proof`, {
+      method: 'POST',
+      body: formData
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.error || 'Failed to upload payment screenshot');
+    return body;
+  },
+
   async releaseHold(data) {
     const res = await fetch(`${API_BASE}/bookings/release-hold`, {
       method: 'POST',
@@ -419,36 +432,6 @@ export const api = {
     });
     const body = await res.json();
     if (!res.ok) throw new Error(body.error || 'Failed to update slot price');
-    return body;
-  },
-
-  // Owner Direct UPI Verification & Credit Audit
-  async getPendingUpiBookings(venueId) {
-    const q = venueId ? `?venueId=${venueId}` : '';
-    const res = await ownerFetch(`${API_BASE}/owner/upi-pending${q}`);
-    if (!res.ok) throw new Error('Failed to fetch pending UPI payments');
-    return res.json();
-  },
-
-  async verifyUpiPayment(bookingId, { action = 'verify_credit', notes = '' }) {
-    const res = await ownerFetch(`${API_BASE}/owner/bookings/${bookingId}/verify-upi`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action, notes })
-    });
-    const body = await res.json();
-    if (!res.ok) throw new Error(body.error || 'Failed to verify UPI payment');
-    return body;
-  },
-
-  async verifyGameParticipantPayment(participantId, { action = 'verify_credit', notes = '' }) {
-    const res = await ownerFetch(`${API_BASE}/owner/game-participants/${participantId}/verify-upi`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action, notes })
-    });
-    const body = await res.json();
-    if (!res.ok) throw new Error(body.error || 'Failed to verify UPI payment');
     return body;
   },
 

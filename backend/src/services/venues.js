@@ -57,7 +57,7 @@ export async function getPublicVenue(sql, slugOrId) {
   const [venue] = await sql`
     select id, name, slug, description, address, lat, lng, phone, email,
            photos, amenities, sport_ids, open_time, close_time, advance_payment_percent,
-           upi_id, upi_name, upi_qr_image, rules, cancellation_policy, allow_guest_open_games
+           upi_id, upi_name, upi_qr_image, rules, cancellation_policy, allow_guest_open_games, whatsapp_number
     from venues
     where (slug = ${slugOrId} or id::text = ${slugOrId}) and status = 'active'
   `;
