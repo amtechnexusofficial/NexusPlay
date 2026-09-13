@@ -416,6 +416,36 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
     window.open(`https://wa.me/${wa}?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
   }
 
+  function buildUpiPayLinks({ upiId, payeeName, amount, bookingId }) {
+    const pa = String(upiId || '').trim();
+    if (!pa) return null;
+    const params = new URLSearchParams({
+      pa,
+      pn: String(payeeName || venue?.name || 'Venue').slice(0, 50),
+      am: String(amount ?? ''),
+      cu: 'INR'
+    });
+    if (bookingId) {
+      params.set('tr', String(bookingId).replace(/-/g, '').slice(0, 35));
+      params.set('tn', `NexusPlay ${String(bookingId).slice(0, 8)}`);
+    }
+    const qs = params.toString();
+    // App-specific schemes so Android doesn't default to WhatsApp Pay for upi://
+    return {
+      gpay: `tez://upi/pay?${qs}`,
+      phonepe: `phonepe://pay?${qs}`,
+      paytm: `paytmmp://pay?${qs}`,
+      generic: `upi://pay?${qs}`
+    };
+  }
+
+  function openUpiPayLink(uri) {
+    if (!uri) return;
+    // Prefer navigating the top window — more reliable for custom schemes
+    // than target=_blank, which some mobile browsers block or mis-route.
+    window.location.href = uri;
+  }
+
   function handlePaymentProofPick(e) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -1295,26 +1325,75 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
                               </div>
                             </div>
                           ) : (
-                            <a
-                              href={activeHold.paymentOrder?.upiUri || `upi://pay?pa=${encodeURIComponent(venue.upi_id || '')}&pn=${encodeURIComponent(venue.upi_name || venue.name || '')}&am=${amountDue}&cu=INR`}
-                              style={{
+                            (() => {
+                              const links = buildUpiPayLinks({
+                                upiId: activeHold.paymentOrder?.upiId || venue.upi_id,
+                                payeeName: activeHold.paymentOrder?.payeeName || venue.upi_name || venue.name,
+                                amount: amountDue,
+                                bookingId: activeHold.bookingId
+                              });
+                              if (!links) {
+                                return (
+                                  <div style={{ fontSize: 12.5, color: '#dc2626', marginBottom: 14 }}>
+                                    This turf has not set a UPI ID yet. Payment cannot start.
+                                  </div>
+                                );
+                              }
+                              const btnStyle = {
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
                                 gap: 8,
-                                background: 'linear-gradient(135deg, #059669, #10b981)',
+                                width: '100%',
+                                border: 'none',
                                 color: '#ffffff',
-                                textDecoration: 'none',
-                                padding: '14px 16px',
+                                padding: '12px 14px',
                                 borderRadius: 10,
-                                fontSize: 14,
+                                fontSize: 13.5,
                                 fontWeight: 700,
-                                marginBottom: 14,
-                                boxShadow: '0 4px 12px rgba(5,150,105,0.25)'
-                              }}
-                            >
-                              <ExternalLink size={16} /> Pay ₹{amountDue} in UPI App
-                            </a>
+                                cursor: 'pointer'
+                              };
+                              return (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
+                                  <button
+                                    type="button"
+                                    onClick={() => openUpiPayLink(links.gpay)}
+                                    style={{ ...btnStyle, background: '#1a73e8' }}
+                                  >
+                                    Pay with GPay
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => openUpiPayLink(links.phonepe)}
+                                    style={{ ...btnStyle, background: '#5f259f' }}
+                                  >
+                                    Pay with PhonePe
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => openUpiPayLink(links.paytm)}
+                                    style={{ ...btnStyle, background: '#00baf2' }}
+                                  >
+                                    Pay with Paytm
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => openUpiPayLink(links.generic)}
+                                    style={{
+                                      ...btnStyle,
+                                      background: '#ffffff',
+                                      color: '#0f172a',
+                                      border: '1px solid #cbd5e1'
+                                    }}
+                                  >
+                                    Other UPI app
+                                  </button>
+                                  <div style={{ fontSize: 11, color: '#64748b', textAlign: 'center' }}>
+                                    Opens your UPI app with amount filled. Then upload the payment screenshot below.
+                                  </div>
+                                </div>
+                              );
+                            })()
                           )}
 
                           {/* Payee Info & Copy UPI ID */}
@@ -1367,8 +1446,7 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
                                 </label>
                                 <input
                                   type="file"
-                                  accept="image/png,image/jpeg,image/webp"
-                                  capture="environment"
+                                  accept="image/png,image/jpeg,image/webp,image/*"
                                   onChange={handlePaymentProofPick}
                                   style={{ width: '100%', fontSize: 13, marginBottom: 8 }}
                                 />
