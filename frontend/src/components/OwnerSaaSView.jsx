@@ -2318,36 +2318,27 @@ export default function OwnerSaaSView() {
       )}
 
       {/* ========================================================================= */}
-      {/* TAB: BUSINESS SETUP (BUSINESS DETAILS, GSTIN, LOCATION, RULES, HOURS) */}
+      {/* TAB: BUSINESS SETUP */}
       {/* ========================================================================= */}
       {activeTab === 'business_setup' && (
-        <div className="animate-fade-in">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 14, marginBottom: 20 }}>
+        <div className="animate-fade-in biz-setup">
+          <div className="biz-setup-header">
             <div>
-              <h2 className="font-display" style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                Venue & Business Configuration
-              </h2>
-              <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: '4px 0 0 0' }}>
-                Set up all your business registration, contact details, ground coordinates, and operational policies.
-              </p>
+              <h2 className="font-display biz-setup-title">Business Setup</h2>
+              <p className="biz-setup-subtitle">Branding, contact, location, payments, and policies for this venue.</p>
             </div>
-            
             {bizSuccessMsg && (
-              <div style={{ background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(16, 185, 129, 0.3)', color: '#059669', padding: '8px 14px', borderRadius: 8, fontSize: 12.5, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div className="biz-setup-success">
                 <CheckCircle2 size={15} /> {bizSuccessMsg}
               </div>
             )}
           </div>
 
           {selectedVenue && selectedVenue.status !== 'active' && (
-            <div className="nexus-card" style={{ padding: '16px 20px', marginBottom: 20, display: 'flex', flexWrap: 'wrap', gap: 14, alignItems: 'center', justifyContent: 'space-between', background: '#fffbeb', border: '1px solid #fde68a' }}>
+            <div className="biz-setup-publish">
               <div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: '#92400e', marginBottom: 2 }}>
-                  This venue is {selectedVenue.status} — not visible to players yet
-                </div>
-                <div style={{ fontSize: 12.5, color: '#b45309' }}>
-                  Players can't find it on the marketplace or its direct link until you publish it.
-                </div>
+                <div className="biz-setup-publish-title">Venue is {selectedVenue.status} — not visible to players</div>
+                <div className="biz-setup-publish-sub">Publish to show on the marketplace and direct booking link.</div>
               </div>
               <button
                 type="button"
@@ -2361,616 +2352,277 @@ export default function OwnerSaaSView() {
             </div>
           )}
 
-          {selectedVenue?.slug && (
-            <div className="nexus-card" style={{ padding: 22, marginBottom: 20, display: 'flex', flexWrap: 'wrap', gap: 20, alignItems: 'center' }}>
-              <img
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=140x140&margin=8&data=${encodeURIComponent(`${window.location.origin}/?venue=${selectedVenue.slug}`)}`}
-                alt="Direct booking QR code"
-                width={110}
-                height={110}
-                style={{ borderRadius: 8, border: '1px solid #e2e8f0', flexShrink: 0, background: '#fff' }}
-              />
-              <div style={{ flex: 1, minWidth: 220 }}>
-                <h3 style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <QrCode size={16} style={{ color: '#059669' }} /> Your Direct Booking QR
-                </h3>
-                <p style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginBottom: 10, lineHeight: 1.5 }}>
-                  Print a poster for your turf entrance — includes your venue mark, NexusPlay branding, and a scan-to-book QR.
-                </p>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                  <code style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 6, padding: '6px 10px', fontSize: 11.5, color: '#334155', wordBreak: 'break-all' }}>
-                    {window.location.origin}/?venue={selectedVenue.slug}
-                  </code>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      navigator.clipboard.writeText(`${window.location.origin}/?venue=${selectedVenue.slug}`);
-                      setDirectLinkCopied(true);
-                      setTimeout(() => setDirectLinkCopied(false), 2000);
-                    }}
-                    className="btn-secondary"
-                    style={{ padding: '6px 12px', fontSize: 12 }}
-                  >
-                    {directLinkCopied ? <CheckCircle2 size={13} /> : <Copy size={13} />}
-                    {directLinkCopied ? 'Copied' : 'Copy Link'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowQrModal(true)}
-                    className="btn-primary"
-                    style={{ padding: '6px 12px', fontSize: 12 }}
-                  >
-                    <Printer size={13} /> Open print poster
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Venue logo — used on printable booking QR posters */}
           {selectedVenue && (
-            <div className="nexus-card" style={{ padding: 22, marginBottom: 20 }}>
-              <h3 style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', marginBottom: 4 }}>
-                Venue logo
-              </h3>
-              <p style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginBottom: 14 }}>
-                Used on your printable booking QR poster. Square logos work best (PNG or JPG).
-              </p>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'center' }}>
-                {bizLogoUrl ? (
-                  <img
-                    src={bizLogoUrl}
-                    alt={`${selectedVenue.name} logo`}
-                    style={{ width: 72, height: 72, borderRadius: 14, objectFit: 'cover', border: '1px solid #e2e8f0', background: '#fff' }}
-                  />
-                ) : (
-                  <div
-                    style={{
-                      width: 72,
-                      height: 72,
-                      borderRadius: 14,
-                      background: '#12201b',
-                      color: '#ecfdf5',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontWeight: 800,
-                      fontSize: 28
-                    }}
-                  >
-                    {(selectedVenue.name || 'V').trim().charAt(0).toUpperCase()}
-                  </div>
-                )}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <label className="btn-secondary" style={{ padding: '8px 14px', fontSize: 12.5, cursor: uploadingLogo ? 'wait' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6, width: 'fit-content' }}>
-                    <input type="file" accept="image/png,image/jpeg,image/webp,image/*" onChange={handleLogoUpload} disabled={uploadingLogo} style={{ display: 'none' }} />
-                    {uploadingLogo ? 'Uploading…' : bizLogoUrl ? 'Replace logo' : 'Upload logo'}
-                  </label>
-                  {bizLogoUrl && (
-                    <button type="button" onClick={handleRemoveLogo} style={{ background: 'none', border: 'none', color: '#b91c1c', fontSize: 12, cursor: 'pointer', textAlign: 'left', padding: 0 }}>
-                      Remove logo
-                    </button>
-                  )}
-                  {logoUploadError && (
-                    <div style={{ fontSize: 12, color: '#b91c1c' }}>{logoUploadError}</div>
-                  )}
-                </div>
+            <section className="biz-setup-section">
+              <div className="biz-setup-section-head">
+                <h3>Branding & booking</h3>
+                <p>Logo for your QR poster, photos for the marketplace, and your direct booking link.</p>
               </div>
-            </div>
-          )}
-
-          {/* Photos + a live preview of exactly how this venue's card
-              renders on the marketplace — players never see any of this
-              form directly, so it's easy to publish with no photo and
-              never notice the card looks bare until a player mentions it. */}
-          {selectedVenue && (
-            <div className="nexus-card" style={{ padding: 22, marginBottom: 20 }}>
-              <h3 style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', marginBottom: 4 }}>
-                Photos &amp; Marketplace Preview
-              </h3>
-              <p style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginBottom: 16 }}>
-                The first photo here is what players see on your venue's card across the marketplace, search, and your direct link.
-              </p>
-
-              <div className="mobile-grid-1" style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 24, alignItems: 'start' }}>
-                <div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 12 }}>
-                    {bizPhotos.map((url, i) => (
-                      <div key={url} style={{ position: 'relative', width: 100, height: 75 }}>
-                        <img
-                          src={url}
-                          alt={`Venue photo ${i + 1}`}
-                          style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 8, border: i === 0 ? '2px solid #4f46e5' : '1px solid #e2e8f0' }}
-                        />
-                        {i === 0 && (
-                          <span style={{ position: 'absolute', top: 3, left: 3, background: '#4f46e5', color: '#fff', fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 4 }}>
-                            COVER
-                          </span>
+              <div className="biz-setup-brand-grid">
+                <div className="biz-setup-brand-main">
+                  <div className="biz-setup-logo-row">
+                    {bizLogoUrl ? (
+                      <img src={bizLogoUrl} alt={`${selectedVenue.name} logo`} className="biz-setup-logo" />
+                    ) : (
+                      <div className="biz-setup-logo biz-setup-logo--fallback" aria-hidden>
+                        {(selectedVenue.name || 'V').trim().charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                    <div>
+                      <div className="biz-setup-label">Venue logo</div>
+                      <div className="biz-setup-hint" style={{ marginBottom: 8 }}>Square PNG/JPG · used on the print poster</div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+                        <label className="btn-secondary biz-setup-file-btn">
+                          <input type="file" accept="image/png,image/jpeg,image/webp,image/*" onChange={handleLogoUpload} disabled={uploadingLogo} style={{ display: 'none' }} />
+                          {uploadingLogo ? 'Uploading…' : bizLogoUrl ? 'Replace' : 'Upload'}
+                        </label>
+                        {bizLogoUrl && (
+                          <button type="button" onClick={handleRemoveLogo} className="biz-setup-link-danger">Remove</button>
                         )}
-                        <button
-                          type="button"
-                          onClick={() => handleRemovePhoto(url)}
-                          title="Remove photo"
-                          aria-label="Remove photo"
-                          style={{ position: 'absolute', top: -8, right: -8, width: 36, height: 36, minWidth: 36, minHeight: 36, borderRadius: '50%', background: '#dc2626', color: '#fff', border: '2px solid #fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 4px rgba(0,0,0,0.2)' }}
-                        >
+                      </div>
+                      {logoUploadError && <div className="biz-setup-error">{logoUploadError}</div>}
+                    </div>
+                  </div>
+
+                  <div className="biz-setup-divider" />
+
+                  <div className="biz-setup-label">Photos</div>
+                  <div className="biz-setup-hint" style={{ marginBottom: 10 }}>First photo is the marketplace cover</div>
+                  <div className="biz-setup-photos">
+                    {bizPhotos.map((url, i) => (
+                      <div key={url} className="biz-setup-photo">
+                        <img src={url} alt={`Venue photo ${i + 1}`} />
+                        {i === 0 && <span className="biz-setup-cover-badge">Cover</span>}
+                        <button type="button" onClick={() => handleRemovePhoto(url)} title="Remove photo" aria-label="Remove photo" className="biz-setup-photo-remove">
                           <X size={14} />
                         </button>
                       </div>
                     ))}
-                    <label
-                      style={{
-                        width: 100, height: 75, borderRadius: 8, border: '1.5px dashed #cbd5e1',
-                        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                        cursor: uploadingPhoto ? 'wait' : 'pointer', color: '#64748b', fontSize: 10.5, gap: 3, background: '#f8fafc'
-                      }}
-                    >
+                    <label className={`biz-setup-photo-add${uploadingPhoto ? ' is-busy' : ''}`}>
                       <Plus size={16} />
-                      {uploadingPhoto ? 'Uploading...' : 'Add Photo'}
-                      <input
-                        type="file"
-                        accept="image/png,image/jpeg,image/webp"
-                        multiple
-                        onChange={handlePhotoUpload}
-                        disabled={uploadingPhoto}
-                        style={{ display: 'none' }}
-                      />
+                      {uploadingPhoto ? 'Uploading…' : 'Add'}
+                      <input type="file" accept="image/png,image/jpeg,image/webp" multiple onChange={handlePhotoUpload} disabled={uploadingPhoto} style={{ display: 'none' }} />
                     </label>
                   </div>
-                  {photoUploadError && (
-                    <div style={{ fontSize: 11.5, color: '#dc2626' }}>{photoUploadError}</div>
-                  )}
-                  <div style={{ fontSize: 11, color: '#94a3b8' }}>
-                    JPEG, PNG or WEBP. First photo is the cover shown everywhere.
-                  </div>
+                  {photoUploadError && <div className="biz-setup-error">{photoUploadError}</div>}
                 </div>
 
-                {/* Mini replica of the actual PlayerMarketplace card */}
-                <div>
-                  <div style={{ fontSize: 10.5, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', marginBottom: 8 }}>
-                    Live Preview
-                  </div>
-                  <div className="nexus-card" style={{ overflow: 'hidden', border: '1px solid #e2e8f0' }}>
-                    <div style={{ position: 'relative', height: 110, background: '#e2e8f0' }}>
+                <div className="biz-setup-brand-side">
+                  <div className="biz-setup-label">Marketplace preview</div>
+                  <div className="biz-setup-preview-card">
+                    <div className="biz-setup-preview-img">
                       <img
                         src={bizPhotos[0] || 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=600&q=80'}
                         alt="Preview"
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                       />
                     </div>
-                    <div style={{ padding: 12 }}>
-                      <div style={{ fontSize: 13.5, fontWeight: 800, color: '#0f172a' }}>{bizName || 'Your Venue Name'}</div>
-                      <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>{bizAddress || 'Address'}</div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, paddingTop: 8, borderTop: '1px solid #e2e8f0' }}>
-                        <span style={{ fontSize: 13, fontWeight: 800, color: '#0f172a' }}>
-                          ₹{selectedVenue?.min_price || 800}<span style={{ fontSize: 10, color: '#64748b', fontWeight: 400 }}>/hr</span>
-                        </span>
-                        <span style={{ fontSize: 10.5, color: '#fff', background: '#4f46e5', borderRadius: 6, padding: '4px 8px' }}>
-                          Select Slot
-                        </span>
+                    <div className="biz-setup-preview-body">
+                      <div className="biz-setup-preview-name">{bizName || 'Your Venue Name'}</div>
+                      <div className="biz-setup-preview-addr">{bizAddress || 'Address'}</div>
+                      <div className="biz-setup-preview-footer">
+                        <span>₹{selectedVenue?.min_price || 800}<small>/hr</small></span>
+                        <span className="biz-setup-preview-cta">Select Slot</span>
                       </div>
                     </div>
                   </div>
-                </div>
-              </div>
-            </div>
-          )}
 
-          <form onSubmit={handleSaveBusinessDetails}>
-            <div className="responsive-cards" style={{ gap: 20 }}>
-              
-              {/* Card 1: Business Identity & Legal Details */}
-              <div className="nexus-card" style={{ padding: 22 }}>
-                <h3 style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <Building size={16} style={{ color: '#10b981' }} />
-                  Business & Legal Registration
-                </h3>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
-                      VENUE / ARENA DISPLAY NAME *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      className="nexus-input"
-                      style={{ width: '100%' }}
-                      value={bizName}
-                      onChange={e => setBizName(e.target.value)}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
-                      ORGANIZATION / LEGAL ENTITY NAME *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      className="nexus-input"
-                      style={{ width: '100%' }}
-                      value={bizOrgName}
-                      onChange={e => setBizOrgName(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="mobile-grid-1" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                    <div>
-                      <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
-                        GSTIN / TAX NUMBER
-                      </label>
-                      <input
-                        type="text"
-                        className="nexus-input"
-                        style={{ width: '100%' }}
-                        value={bizGstin}
-                        onChange={e => setBizGstin(e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
-                        BUSINESS STRUCTURE
-                      </label>
-                      <select
-                        className="nexus-input"
-                        style={{ width: '100%' }}
-                        value={bizType}
-                        onChange={e => setBizType(e.target.value)}
-                      >
-                        <option value="Private Limited Company">Private Limited</option>
-                        <option value="Limited Liability Partnership (LLP)">LLP</option>
-                        <option value="Sole Proprietorship">Proprietorship</option>
-                        <option value="Partnership Firm">Partnership</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="mobile-grid-1" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                    <div>
-                      <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
-                        BUSINESS PHONE *
-                      </label>
-                      <input
-                        type="tel"
-                        required
-                        className="nexus-input"
-                        style={{ width: '100%' }}
-                        value={bizPhone}
-                        onChange={e => setBizPhone(e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
-                        OWNER WHATSAPP *
-                      </label>
-                      <input
-                        type="tel"
-                        required
-                        placeholder="+91 98765 43210"
-                        className="nexus-input"
-                        style={{ width: '100%' }}
-                        value={bizWhatsapp}
-                        onChange={e => setBizWhatsapp(e.target.value)}
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
-                      OFFICIAL EMAIL
-                    </label>
-                    <input
-                      type="email"
-                      className="nexus-input"
-                      style={{ width: '100%' }}
-                      value={bizEmail}
-                      onChange={e => setBizEmail(e.target.value)}
-                    />
-                    <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6, marginBottom: 0 }}>
-                      WhatsApp is used to share walk-in booking confirmations with players from your number.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Card 2: Physical Address & Geolocation Coordinates */}
-              <div className="nexus-card" style={{ padding: 22 }}>
-                <h3 style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <MapPin size={16} style={{ color: '#10b981' }} />
-                  Address & GPS Geolocation
-                </h3>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
-                      FULL STREET ADDRESS *
-                    </label>
-                    <textarea
-                      required
-                      rows={2}
-                      className="nexus-input"
-                      style={{ width: '100%', resize: 'none' }}
-                      value={bizAddress}
-                      onChange={e => setBizAddress(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="mobile-grid-1" style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 10 }}>
-                    <div>
-                      <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
-                        CITY
-                      </label>
-                      <input
-                        type="text"
-                        className="nexus-input"
-                        style={{ width: '100%' }}
-                        value={bizCity}
-                        onChange={e => setBizCity(e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
-                        PINCODE
-                      </label>
-                      <input
-                        type="text"
-                        className="nexus-input"
-                        style={{ width: '100%' }}
-                        value={bizPincode}
-                        onChange={e => setBizPincode(e.target.value)}
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
-                      GOOGLE MAPS LINK
-                    </label>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <input
-                        type="text"
-                        className="nexus-input"
-                        style={{ flex: 1 }}
-                        value={bizMapsLink}
-                        onChange={e => setBizMapsLink(e.target.value)}
-                        placeholder="Paste your venue's Google Maps link"
-                      />
-                      <button type="button" onClick={handleDetectBizLocation} className="btn-secondary" style={{ padding: '0 14px', fontSize: 12.5, whiteSpace: 'nowrap' }}>
-                        <MapPin size={13} /> Detect
-                      </button>
-                    </div>
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6 }}>
-                      In Google Maps: search your venue, tap Share → Copy link, paste here — fills in the coordinates below.
-                    </div>
-                  </div>
-
-                  <div className="mobile-grid-1" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                    <div>
-                      <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
-                        LATITUDE (FOR NEARBY SEARCH)
-                      </label>
-                      <input
-                        type="number"
-                        step="0.0001"
-                        className="nexus-input"
-                        style={{ width: '100%' }}
-                        value={bizLat}
-                        onChange={e => setBizLat(e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
-                        LONGITUDE
-                      </label>
-                      <input
-                        type="number"
-                        step="0.0001"
-                        className="nexus-input"
-                        style={{ width: '100%' }}
-                        value={bizLng}
-                        onChange={e => setBizLng(e.target.value)}
-                      />
-                    </div>
-                  </div>
-
-                  <div style={{ fontSize: 11.5, color: 'var(--text-muted)', background: '#f8fafc', padding: 8, borderRadius: 6 }}>
-                    Coordinates enable customer proximity calculation when nearby players search for turfs.
-                  </div>
-                </div>
-              </div>
-
-              {/* Card 3: Operating Hours & Direct UPI Details */}
-              <div className="nexus-card" style={{ padding: 22 }}>
-                <h3 style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <Clock size={16} style={{ color: '#10b981' }} />
-                  Operating Hours & Direct UPI Settlement
-                </h3>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  <div className="mobile-grid-1" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                    <div>
-                      <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
-                        OPENING TIME
-                      </label>
-                      <input
-                        type="time"
-                        className="nexus-input"
-                        style={{ width: '100%' }}
-                        value={bizOpenTime}
-                        onChange={e => setBizOpenTime(e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
-                        CLOSING TIME
-                      </label>
-                      <input
-                        type="time"
-                        className="nexus-input"
-                        style={{ width: '100%' }}
-                        value={bizCloseTime}
-                        onChange={e => setBizCloseTime(e.target.value)}
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
-                      REGISTERED OWNER UPI ID (0% COMMISSION) *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. yourturf@okaxis"
-                      className="nexus-input"
-                      style={{ width: '100%' }}
-                      value={bizUpiId}
-                      onChange={e => setBizUpiId(e.target.value)}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
-                      PAYEE DISPLAY NAME ON QR
-                    </label>
-                    <input
-                      type="text"
-                      className="nexus-input"
-                      style={{ width: '100%' }}
-                      value={bizUpiName}
-                      onChange={e => setBizUpiName(e.target.value)}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
-                      ADVANCE PAYMENT REQUIRED TO LOCK A SLOT
-                    </label>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <input
-                        type="range"
-                        min={10}
-                        max={100}
-                        step={10}
-                        value={bizAdvancePercent}
-                        onChange={e => setBizAdvancePercent(Number(e.target.value))}
-                        style={{ flex: 1 }}
-                      />
-                      <span style={{ fontSize: 14, fontWeight: 800, color: '#059669', minWidth: 48, textAlign: 'right' }}>
-                        {bizAdvancePercent}%
-                      </span>
-                    </div>
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6, background: '#f8fafc', padding: 8, borderRadius: 6 }}>
-                      {bizAdvancePercent >= 100
-                        ? 'Players pay the full slot price via UPI to lock it — no balance left at the venue.'
-                        : `Players only pay ${bizAdvancePercent}% of the slot price up front to lock it. The remaining ${100 - bizAdvancePercent}% is collected at the venue when they arrive.`}
-                    </div>
-                  </div>
-
-                  <div style={{ marginTop: 4, paddingTop: 16, borderTop: '1px solid #e2e8f0' }}>
-                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 14 }}>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <label htmlFor="biz-allow-guest-open-games" style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
-                          ALLOW PLAYERS TO HOST OPEN GAMES
-                        </label>
-                        <div style={{ fontSize: 12.5, color: '#475569', lineHeight: 1.45 }}>
-                          When on, guests can turn an open slot into a pickup match (name + phone). You can still host from the Owner Hub either way.
+                  {selectedVenue.slug && (
+                    <>
+                      <div className="biz-setup-label" style={{ marginTop: 16 }}>Direct booking QR</div>
+                      <div className="biz-setup-qr-row">
+                        <img
+                          src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&margin=8&data=${encodeURIComponent(`${window.location.origin}/?venue=${selectedVenue.slug}`)}`}
+                          alt="Direct booking QR"
+                          width={88}
+                          height={88}
+                          className="biz-setup-qr-img"
+                        />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <code className="biz-setup-link-code">{window.location.origin}/?venue={selectedVenue.slug}</code>
+                          <div className="biz-setup-qr-actions">
+                            <button
+                              type="button"
+                              className="btn-secondary"
+                              style={{ padding: '6px 10px', fontSize: 12 }}
+                              onClick={() => {
+                                navigator.clipboard.writeText(`${window.location.origin}/?venue=${selectedVenue.slug}`);
+                                setDirectLinkCopied(true);
+                                setTimeout(() => setDirectLinkCopied(false), 2000);
+                              }}
+                            >
+                              {directLinkCopied ? <CheckCircle2 size={13} /> : <Copy size={13} />}
+                              {directLinkCopied ? 'Copied' : 'Copy'}
+                            </button>
+                            <button type="button" className="btn-primary" style={{ padding: '6px 10px', fontSize: 12 }} onClick={() => setShowQrModal(true)}>
+                              <Printer size={13} /> Print poster
+                            </button>
+                          </div>
                         </div>
                       </div>
-                      <button
-                        type="button"
-                        id="biz-allow-guest-open-games"
-                        role="switch"
-                        aria-checked={bizAllowGuestOpenGames}
-                        onClick={() => setBizAllowGuestOpenGames((v) => !v)}
-                        style={{
-                          flexShrink: 0,
-                          width: 48,
-                          height: 28,
-                          borderRadius: 999,
-                          border: 'none',
-                          cursor: 'pointer',
-                          padding: 3,
-                          background: bizAllowGuestOpenGames ? '#059669' : '#cbd5e1',
-                          transition: 'background 0.15s ease'
-                        }}
-                      >
-                        <span
-                          style={{
-                            display: 'block',
-                            width: 22,
-                            height: 22,
-                            borderRadius: '50%',
-                            background: '#ffffff',
-                            boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
-                            transform: bizAllowGuestOpenGames ? 'translateX(20px)' : 'translateX(0)',
-                            transition: 'transform 0.15s ease'
-                          }}
-                        />
-                      </button>
-                    </div>
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8, background: '#f8fafc', padding: 8, borderRadius: 6 }}>
-                      {bizAllowGuestOpenGames
-                        ? 'Players can host open games on available slots from your public booking page.'
-                        : 'Guest hosting is off. Only your team can post open games from the Owner Hub.'}
-                    </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            </section>
+          )}
+
+          <form onSubmit={handleSaveBusinessDetails} className="biz-setup-form">
+            <section className="biz-setup-section">
+              <div className="biz-setup-section-head">
+                <h3>Venue profile</h3>
+                <p>How players and partners see and contact this venue.</p>
+              </div>
+              <div className="biz-setup-fields">
+                <div className="biz-setup-field">
+                  <label className="biz-setup-label">Venue name *</label>
+                  <input type="text" required className="nexus-input" value={bizName} onChange={e => setBizName(e.target.value)} />
+                </div>
+                <div className="biz-setup-field">
+                  <label className="biz-setup-label">Organization / legal name *</label>
+                  <input type="text" required className="nexus-input" value={bizOrgName} onChange={e => setBizOrgName(e.target.value)} />
+                </div>
+                <div className="biz-setup-grid-2">
+                  <div className="biz-setup-field">
+                    <label className="biz-setup-label">Phone *</label>
+                    <input type="tel" required className="nexus-input" value={bizPhone} onChange={e => setBizPhone(e.target.value)} />
+                  </div>
+                  <div className="biz-setup-field">
+                    <label className="biz-setup-label">WhatsApp *</label>
+                    <input type="tel" required placeholder="+91 98765 43210" className="nexus-input" value={bizWhatsapp} onChange={e => setBizWhatsapp(e.target.value)} />
+                  </div>
+                </div>
+                <div className="biz-setup-field">
+                  <label className="biz-setup-label">Email</label>
+                  <input type="email" className="nexus-input" value={bizEmail} onChange={e => setBizEmail(e.target.value)} />
+                </div>
+                <div className="biz-setup-grid-2">
+                  <div className="biz-setup-field">
+                    <label className="biz-setup-label">GSTIN</label>
+                    <input type="text" className="nexus-input" value={bizGstin} onChange={e => setBizGstin(e.target.value)} />
+                  </div>
+                  <div className="biz-setup-field">
+                    <label className="biz-setup-label">Business type</label>
+                    <select className="nexus-input" value={bizType} onChange={e => setBizType(e.target.value)}>
+                      <option value="Private Limited Company">Private Limited</option>
+                      <option value="Limited Liability Partnership (LLP)">LLP</option>
+                      <option value="Sole Proprietorship">Proprietorship</option>
+                      <option value="Partnership Firm">Partnership</option>
+                    </select>
                   </div>
                 </div>
               </div>
+            </section>
 
-              {/* Card 4: Ground Rules & Cancellation Policy */}
-              <div className="nexus-card" style={{ padding: 22 }}>
-                <h3 style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <FileText size={16} style={{ color: '#10b981' }} />
-                  House Rules & Cancellation Policy
-                </h3>
-
-                <div style={{ marginBottom: 16 }}>
-                  <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
-                    HOUSE RULES / GROUND POLICIES
-                  </label>
-                  <textarea
-                    rows={4}
-                    className="nexus-input"
-                    style={{ width: '100%', resize: 'vertical' }}
-                    value={bizRules}
-                    onChange={e => setBizRules(e.target.value)}
-                    placeholder="Footwear, arrival time, food on turf, etc."
-                  />
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
-                    Shown on your public booking page under House Rules.
+            <section className="biz-setup-section">
+              <div className="biz-setup-section-head">
+                <h3>Location & hours</h3>
+                <p>Address for players and opening hours for slot generation.</p>
+              </div>
+              <div className="biz-setup-fields">
+                <div className="biz-setup-field">
+                  <label className="biz-setup-label">Street address *</label>
+                  <textarea required rows={2} className="nexus-input" style={{ resize: 'vertical' }} value={bizAddress} onChange={e => setBizAddress(e.target.value)} />
+                </div>
+                <div className="biz-setup-grid-2">
+                  <div className="biz-setup-field">
+                    <label className="biz-setup-label">City</label>
+                    <input type="text" className="nexus-input" value={bizCity} onChange={e => setBizCity(e.target.value)} />
+                  </div>
+                  <div className="biz-setup-field">
+                    <label className="biz-setup-label">Pincode</label>
+                    <input type="text" className="nexus-input" value={bizPincode} onChange={e => setBizPincode(e.target.value)} />
                   </div>
                 </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
-                    CANCELLATION & RESCHEDULE POLICY *
-                  </label>
-                  <textarea
-                    rows={4}
-                    className="nexus-input"
-                    style={{ width: '100%', resize: 'vertical' }}
-                    value={bizCancellationPolicy}
-                    onChange={e => setBizCancellationPolicy(e.target.value)}
-                    placeholder="e.g. Free cancellation up to 4 hours before slot start…"
-                  />
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
-                    Players see this clearly before they pay — keep it specific about refund windows and reschedules.
+                <div className="biz-setup-field">
+                  <label className="biz-setup-label">Google Maps link</label>
+                  <div className="biz-setup-inline">
+                    <input type="text" className="nexus-input" value={bizMapsLink} onChange={e => setBizMapsLink(e.target.value)} placeholder="Paste Share link from Google Maps" />
+                    <button type="button" onClick={handleDetectBizLocation} className="btn-secondary" style={{ padding: '0 14px', fontSize: 12.5, whiteSpace: 'nowrap' }}>
+                      <MapPin size={13} /> Detect
+                    </button>
+                  </div>
+                  <div className="biz-setup-hint">Fills latitude / longitude for nearby search.</div>
+                </div>
+                <div className="biz-setup-grid-2">
+                  <div className="biz-setup-field">
+                    <label className="biz-setup-label">Latitude</label>
+                    <input type="number" step="0.0001" className="nexus-input" value={bizLat} onChange={e => setBizLat(e.target.value)} />
+                  </div>
+                  <div className="biz-setup-field">
+                    <label className="biz-setup-label">Longitude</label>
+                    <input type="number" step="0.0001" className="nexus-input" value={bizLng} onChange={e => setBizLng(e.target.value)} />
+                  </div>
+                </div>
+                <div className="biz-setup-grid-2">
+                  <div className="biz-setup-field">
+                    <label className="biz-setup-label">Opens</label>
+                    <input type="time" className="nexus-input" value={bizOpenTime} onChange={e => setBizOpenTime(e.target.value)} />
+                  </div>
+                  <div className="biz-setup-field">
+                    <label className="biz-setup-label">Closes</label>
+                    <input type="time" className="nexus-input" value={bizCloseTime} onChange={e => setBizCloseTime(e.target.value)} />
                   </div>
                 </div>
               </div>
-            </div>
+            </section>
 
-            {/* Bottom Save Action Bar */}
-            <div style={{ marginTop: 22, display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
-              <button
-                type="submit"
-                disabled={savingBiz}
-                className="btn-primary"
-                style={{ padding: '10px 24px', fontSize: 13.5 }}
-              >
+            <section className="biz-setup-section">
+              <div className="biz-setup-section-head">
+                <h3>Payments & policies</h3>
+                <p>UPI settlement, advance amount, open games, and player-facing rules.</p>
+              </div>
+              <div className="biz-setup-fields">
+                <div className="biz-setup-field">
+                  <label className="biz-setup-label">UPI ID *</label>
+                  <input type="text" required placeholder="yourturf@okaxis" className="nexus-input" value={bizUpiId} onChange={e => setBizUpiId(e.target.value)} />
+                </div>
+                <div className="biz-setup-field">
+                  <label className="biz-setup-label">Payee name on UPI</label>
+                  <input type="text" className="nexus-input" value={bizUpiName} onChange={e => setBizUpiName(e.target.value)} />
+                </div>
+                <div className="biz-setup-field">
+                  <label className="biz-setup-label">Advance to lock slot</label>
+                  <div className="biz-setup-slider-row">
+                    <input type="range" min={10} max={100} step={10} value={bizAdvancePercent} onChange={e => setBizAdvancePercent(Number(e.target.value))} />
+                    <span className="biz-setup-slider-value">{bizAdvancePercent}%</span>
+                  </div>
+                  <div className="biz-setup-hint">
+                    {bizAdvancePercent >= 100
+                      ? 'Players pay the full amount online.'
+                      : `${bizAdvancePercent}% online now · ${100 - bizAdvancePercent}% at the venue.`}
+                  </div>
+                </div>
+                <div className="biz-setup-toggle">
+                  <div>
+                    <div className="biz-setup-label">Allow players to host open games</div>
+                    <div className="biz-setup-hint">Guests can turn an open slot into a pickup match. You can still host from Owner Hub.</div>
+                  </div>
+                  <button
+                    type="button"
+                    id="biz-allow-guest-open-games"
+                    role="switch"
+                    aria-checked={bizAllowGuestOpenGames}
+                    onClick={() => setBizAllowGuestOpenGames((v) => !v)}
+                    className={`biz-setup-switch${bizAllowGuestOpenGames ? ' is-on' : ''}`}
+                  >
+                    <span />
+                  </button>
+                </div>
+                <div className="biz-setup-field">
+                  <label className="biz-setup-label">House rules</label>
+                  <textarea rows={3} className="nexus-input" style={{ resize: 'vertical' }} value={bizRules} onChange={e => setBizRules(e.target.value)} placeholder="Footwear, arrival time, food on turf…" />
+                </div>
+                <div className="biz-setup-field">
+                  <label className="biz-setup-label">Cancellation policy *</label>
+                  <textarea rows={3} className="nexus-input" style={{ resize: 'vertical' }} value={bizCancellationPolicy} onChange={e => setBizCancellationPolicy(e.target.value)} placeholder="Refund window and reschedule rules…" />
+                </div>
+              </div>
+            </section>
+
+            <div className="biz-setup-save-bar">
+              <button type="submit" disabled={savingBiz} className="btn-primary" style={{ padding: '10px 22px', fontSize: 13.5 }}>
                 <Save size={15} />
-                {savingBiz ? 'Saving Details...' : 'Save All Business Details'}
+                {savingBiz ? 'Saving…' : 'Save changes'}
               </button>
             </div>
           </form>
