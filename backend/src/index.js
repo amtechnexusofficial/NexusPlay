@@ -313,7 +313,11 @@ app.get("/api/owner/context", ...ownerAuth, async (c) => {
 
 app.get("/api/owner/analytics", ...ownerAuth, async (c) => {
   const sql = getDb(c.env);
-  return c.json(await getAnalytics(sql, c.get("organizationId"), c.req.query("venueId") || undefined));
+  return c.json(await getAnalytics(sql, c.get("organizationId"), {
+    venueId: c.req.query("venueId") || undefined,
+    sportId: c.req.query("sportId") || undefined,
+    courtId: c.req.query("courtId") || undefined
+  }));
 });
 
 app.get("/api/owner/bookings", ...ownerAuth, async (c) => {

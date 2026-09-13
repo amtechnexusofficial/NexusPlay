@@ -224,8 +224,12 @@ export const api = {
     return res.json();
   },
 
-  async getOwnerAnalytics(venueId) {
-    const q = venueId ? `?venueId=${venueId}` : '';
+  async getOwnerAnalytics(venueId, { sportId, courtId } = {}) {
+    const params = new URLSearchParams();
+    if (venueId) params.set('venueId', venueId);
+    if (sportId) params.set('sportId', sportId);
+    if (courtId) params.set('courtId', courtId);
+    const q = params.toString() ? `?${params.toString()}` : '';
     const res = await ownerFetch(`${API_BASE}/owner/analytics${q}`);
     if (!res.ok) throw new Error('Failed to fetch analytics');
     return res.json();

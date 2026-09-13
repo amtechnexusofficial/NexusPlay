@@ -38,50 +38,69 @@ export async function getContext(sql, organizationId, user) {
 }
 
 // ===========================================================================
-// Analytics
+// Analytics — optional sportId / courtId scopes the same KPI set.
+// Call as getAnalytics(sql, orgId, { venueId, sportId, courtId }).
+// Legacy call getAnalytics(sql, orgId, venueIdString) is still accepted.
 // ===========================================================================
 
-export async function getAnalytics(sql, organizationId, venueId) {
-  // Scalar param + inline null-check, not a composed empty sql`` fragment
-  // (see venues.js listPublicVenues for why) — "all venues" analytics
-  // (no venueId) hits the empty-fragment case on every query below.
-  const venueIdParam = venueId || null;
+export async function getAnalytics(sql, organizationId, venueIdOrOpts) {
+  const opts = typeof venueIdOrOpts === 'string' || venueIdOrOpts == null
+    ? { venueId: venueIdOrOpts || undefined }
+    : (venueIdOrOpts || {});
+  const venueIdParam = opts.venueId || null;
+  const sportIdParam = opts.sportId || null;
+  const courtIdParam = opts.courtId || null;
 
   const [today] = await sql`
-    select coalesce(sum(amount_paid), 0)::int as revenue, count(*)::int as bookings
+    select coalesce(sum(b.amount_paid), 0)::int as revenue, count(*)::int as bookings
     from bookings b
-    where organization_id = ${organizationId} and status in ('confirmed', 'completed')
-      and created_at::date = current_date
+    join courts crt on b.court_id = crt.id
+    where b.organization_id = ${organizationId} and b.status in ('confirmed', 'completed')
+      and b.created_at::date = current_date
       and (${venueIdParam}::uuid is null or b.venue_id = ${venueIdParam}::uuid)
+      and (${courtIdParam}::uuid is null or b.court_id = ${courtIdParam}::uuid)
+      and (${sportIdParam}::uuid is null or crt.sport_id = ${sportIdParam}::uuid)
   `;
   const [week] = await sql`
-    select coalesce(sum(amount_paid), 0)::int as revenue, count(*)::int as bookings
+    select coalesce(sum(b.amount_paid), 0)::int as revenue, count(*)::int as bookings
     from bookings b
-    where organization_id = ${organizationId} and status in ('confirmed', 'completed')
-      and created_at >= now() - interval '7 days'
+    join courts crt on b.court_id = crt.id
+    where b.organization_id = ${organizationId} and b.status in ('confirmed', 'completed')
+      and b.created_at >= now() - interval '7 days'
       and (${venueIdParam}::uuid is null or b.venue_id = ${venueIdParam}::uuid)
+      and (${courtIdParam}::uuid is null or b.court_id = ${courtIdParam}::uuid)
+      and (${sportIdParam}::uuid is null or crt.sport_id = ${sportIdParam}::uuid)
   `;
   const [month] = await sql`
-    select coalesce(sum(amount_paid), 0)::int as revenue, count(*)::int as bookings
+    select coalesce(sum(b.amount_paid), 0)::int as revenue, count(*)::int as bookings
     from bookings b
-    where organization_id = ${organizationId} and status in ('confirmed', 'completed')
-      and created_at >= now() - interval '30 days'
+    join courts crt on b.court_id = crt.id
+    where b.organization_id = ${organizationId} and b.status in ('confirmed', 'completed')
+      and b.created_at >= now() - interval '30 days'
       and (${venueIdParam}::uuid is null or b.venue_id = ${venueIdParam}::uuid)
+      and (${courtIdParam}::uuid is null or b.court_id = ${courtIdParam}::uuid)
+      and (${sportIdParam}::uuid is null or crt.sport_id = ${sportIdParam}::uuid)
   `;
   const [total] = await sql`
-    select coalesce(sum(amount_paid), 0)::int as revenue, count(*)::int as bookings
+    select coalesce(sum(b.amount_paid), 0)::int as revenue, count(*)::int as bookings
     from bookings b
-    where organization_id = ${organizationId} and status in ('confirmed', 'completed')
+    join courts crt on b.court_id = crt.id
+    where b.organization_id = ${organizationId} and b.status in ('confirmed', 'completed')
       and (${venueIdParam}::uuid is null or b.venue_id = ${venueIdParam}::uuid)
+      and (${courtIdParam}::uuid is null or b.court_id = ${courtIdParam}::uuid)
+      and (${sportIdParam}::uuid is null or crt.sport_id = ${sportIdParam}::uuid)
   `;
 
   const [occupancy] = await sql`
     select
-      count(*) filter (where status = 'booked')::int as booked,
-      count(*) filter (where status in ('open', 'held', 'booked'))::int as bookable
-    from court_slots
-    where organization_id = ${organizationId} and date = current_date
-      and (${venueIdParam}::uuid is null or venue_id = ${venueIdParam}::uuid)
+      count(*) filter (where cs.status = 'booked')::int as booked,
+      count(*) filter (where cs.status in ('open', 'held', 'booked'))::int as bookable
+    from court_slots cs
+    join courts c on cs.court_id = c.id
+    where cs.organization_id = ${organizationId} and cs.date = current_date
+      and (${venueIdParam}::uuid is null or cs.venue_id = ${venueIdParam}::uuid)
+      and (${courtIdParam}::uuid is null or cs.court_id = ${courtIdParam}::uuid)
+      and (${sportIdParam}::uuid is null or c.sport_id = ${sportIdParam}::uuid)
   `;
   const occupancyRate = occupancy.bookable > 0
     ? Math.round((occupancy.booked / occupancy.bookable) * 100)
@@ -91,6 +110,7 @@ export async function getAnalytics(sql, organizationId, venueId) {
     select
       c.id as court_id,
       c.name as court_name,
+      c.sport_id,
       count(*) filter (where cs.status = 'booked')::int as booked,
       count(*) filter (where cs.status in ('open', 'held', 'booked'))::int as bookable
     from court_slots cs
@@ -98,26 +118,29 @@ export async function getAnalytics(sql, organizationId, venueId) {
     where cs.organization_id = ${organizationId}
       and cs.date = current_date
       and (${venueIdParam}::uuid is null or cs.venue_id = ${venueIdParam}::uuid)
-    group by c.id, c.name
+      and (${courtIdParam}::uuid is null or cs.court_id = ${courtIdParam}::uuid)
+      and (${sportIdParam}::uuid is null or c.sport_id = ${sportIdParam}::uuid)
+    group by c.id, c.name, c.sport_id
     order by c.name
   `;
 
-  // Last 30 days of slots — occupancy by weekday (0=Sun … 6=Sat)
   const occupancyByDayOfWeek = await sql`
     select
       extract(dow from cs.date)::int as dow,
       count(*) filter (where cs.status = 'booked')::int as booked,
       count(*) filter (where cs.status in ('open', 'held', 'booked'))::int as bookable
     from court_slots cs
+    join courts c on cs.court_id = c.id
     where cs.organization_id = ${organizationId}
       and cs.date >= current_date - interval '30 days'
       and cs.date <= current_date
       and (${venueIdParam}::uuid is null or cs.venue_id = ${venueIdParam}::uuid)
+      and (${courtIdParam}::uuid is null or cs.court_id = ${courtIdParam}::uuid)
+      and (${sportIdParam}::uuid is null or c.sport_id = ${sportIdParam}::uuid)
     group by 1
     order by 1
   `;
 
-  // Past + today open slots = unfilled capacity (lost revenue estimate)
   const [idle] = await sql`
     select
       count(*)::int as idle_slots,
@@ -129,50 +152,79 @@ export async function getAnalytics(sql, organizationId, venueId) {
       ), 0)::float as idle_hours,
       coalesce(sum(cs.price), 0)::int as lost_revenue
     from court_slots cs
+    join courts c on cs.court_id = c.id
     where cs.organization_id = ${organizationId}
       and cs.status = 'open'
       and cs.date >= current_date - interval '30 days'
       and cs.date <= current_date
       and (${venueIdParam}::uuid is null or cs.venue_id = ${venueIdParam}::uuid)
+      and (${courtIdParam}::uuid is null or cs.court_id = ${courtIdParam}::uuid)
+      and (${sportIdParam}::uuid is null or c.sport_id = ${sportIdParam}::uuid)
   `;
 
   const revenueByCourt = await sql`
-    select c.id as court_id, c.name as court_name, coalesce(sum(b.amount_paid), 0)::int as revenue, count(b.id)::int as bookings
-    from bookings b join courts c on b.court_id = c.id
+    select
+      c.id as court_id,
+      c.name as court_name,
+      c.sport_id,
+      s.name as sport_name,
+      coalesce(sum(b.amount_paid), 0)::int as revenue,
+      count(b.id)::int as bookings
+    from bookings b
+    join courts c on b.court_id = c.id
+    left join sports s on c.sport_id = s.id
     where b.organization_id = ${organizationId} and b.status in ('confirmed', 'completed')
       and (${venueIdParam}::uuid is null or b.venue_id = ${venueIdParam}::uuid)
-    group by c.id, c.name order by revenue desc
+      and (${courtIdParam}::uuid is null or b.court_id = ${courtIdParam}::uuid)
+      and (${sportIdParam}::uuid is null or c.sport_id = ${sportIdParam}::uuid)
+    group by c.id, c.name, c.sport_id, s.name
+    order by revenue desc
   `;
 
   const revenueBySport = await sql`
-    select s.name as sport, coalesce(sum(b.amount_paid), 0)::int as revenue, count(b.id)::int as bookings
-    from bookings b join courts c on b.court_id = c.id join sports s on c.sport_id = s.id
+    select
+      s.id as sport_id,
+      s.name as sport,
+      coalesce(sum(b.amount_paid), 0)::int as revenue,
+      count(b.id)::int as bookings
+    from bookings b
+    join courts c on b.court_id = c.id
+    join sports s on c.sport_id = s.id
     where b.organization_id = ${organizationId} and b.status in ('confirmed', 'completed')
       and (${venueIdParam}::uuid is null or b.venue_id = ${venueIdParam}::uuid)
-    group by s.name order by revenue desc
+      and (${courtIdParam}::uuid is null or b.court_id = ${courtIdParam}::uuid)
+      and (${sportIdParam}::uuid is null or c.sport_id = ${sportIdParam}::uuid)
+    group by s.id, s.name
+    order by revenue desc
   `;
 
   const peakHours = await sql`
     select left(cs.start_time, 5) as start_time, count(*)::int as bookings
-    from bookings b join court_slots cs on b.court_slot_id = cs.id
+    from bookings b
+    join courts crt on b.court_id = crt.id
+    join court_slots cs on b.court_slot_id = cs.id
     where b.organization_id = ${organizationId} and b.status in ('confirmed', 'completed')
       and (${venueIdParam}::uuid is null or b.venue_id = ${venueIdParam}::uuid)
+      and (${courtIdParam}::uuid is null or b.court_id = ${courtIdParam}::uuid)
+      and (${sportIdParam}::uuid is null or crt.sport_id = ${sportIdParam}::uuid)
     group by left(cs.start_time, 5)
     order by bookings desc
   `;
 
-  // Heatmap cells: weekday × hour-of-day for confirmed bookings (last 90 days)
   const bookingsHeatmap = await sql`
     select
       extract(dow from cs.date)::int as dow,
       extract(hour from cs.start_time::time)::int as hour,
       count(*)::int as bookings
     from bookings b
+    join courts crt on b.court_id = crt.id
     join court_slots cs on b.court_slot_id = cs.id
     where b.organization_id = ${organizationId}
       and b.status in ('confirmed', 'completed')
       and cs.date >= current_date - interval '90 days'
       and (${venueIdParam}::uuid is null or b.venue_id = ${venueIdParam}::uuid)
+      and (${courtIdParam}::uuid is null or b.court_id = ${courtIdParam}::uuid)
+      and (${sportIdParam}::uuid is null or crt.sport_id = ${sportIdParam}::uuid)
     group by 1, 2
     order by 1, 2
   `;
@@ -184,13 +236,47 @@ export async function getAnalytics(sql, organizationId, venueId) {
       coalesce(sum(b.amount_paid) filter (where extract(dow from cs.date) in (0, 6)), 0)::int as weekend_revenue,
       count(*) filter (where extract(dow from cs.date) in (0, 6))::int as weekend_bookings
     from bookings b
+    join courts crt on b.court_id = crt.id
     join court_slots cs on b.court_slot_id = cs.id
     where b.organization_id = ${organizationId}
       and b.status in ('confirmed', 'completed')
       and (${venueIdParam}::uuid is null or b.venue_id = ${venueIdParam}::uuid)
+      and (${courtIdParam}::uuid is null or b.court_id = ${courtIdParam}::uuid)
+      and (${sportIdParam}::uuid is null or crt.sport_id = ${sportIdParam}::uuid)
+  `;
+
+  const filterSports = await sql`
+    select distinct s.id, s.name
+    from sports s
+    join courts c on c.sport_id = s.id
+    where c.organization_id = ${organizationId}
+      and (${venueIdParam}::uuid is null or c.venue_id = ${venueIdParam}::uuid)
+    order by s.name
+  `;
+  const filterCourts = await sql`
+    select c.id, c.name, c.sport_id, s.name as sport_name
+    from courts c
+    left join sports s on c.sport_id = s.id
+    where c.organization_id = ${organizationId}
+      and (${venueIdParam}::uuid is null or c.venue_id = ${venueIdParam}::uuid)
+    order by s.name nulls last, c.name
   `;
 
   return {
+    scope: {
+      venueId: venueIdParam,
+      sportId: sportIdParam,
+      courtId: courtIdParam
+    },
+    filters: {
+      sports: filterSports.map((s) => ({ id: s.id, name: s.name })),
+      courts: filterCourts.map((c) => ({
+        id: c.id,
+        name: c.name,
+        sportId: c.sport_id,
+        sportName: c.sport_name
+      }))
+    },
     todayRevenue: today.revenue,
     todayBookings: today.bookings,
     weeklyRevenue: week.revenue,
@@ -203,6 +289,7 @@ export async function getAnalytics(sql, organizationId, venueId) {
     occupancyByCourt: occupancyByCourt.map((r) => ({
       courtId: r.court_id,
       courtName: r.court_name,
+      sportId: r.sport_id,
       booked: r.booked,
       bookable: r.bookable,
       occupancyRate: r.bookable > 0 ? Math.round((r.booked / r.bookable) * 100) : 0

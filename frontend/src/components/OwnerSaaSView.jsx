@@ -34,6 +34,10 @@ export default function OwnerSaaSView() {
   const [venues, setVenues] = useState([]);
   const [selectedVenue, setSelectedVenue] = useState(null);
   const [analytics, setAnalytics] = useState(null);
+  const [analyticsScope, setAnalyticsScope] = useState('overall'); // overall | sport | court
+  const [analyticsSportId, setAnalyticsSportId] = useState('');
+  const [analyticsCourtId, setAnalyticsCourtId] = useState('');
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [bookings, setBookings] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -218,6 +222,9 @@ export default function OwnerSaaSView() {
           api.getCustomers().catch(() => [])
         ]).then(([anData, bData, cData]) => {
           setAnalytics(anData);
+          setAnalyticsScope('overall');
+          setAnalyticsSportId('');
+          setAnalyticsCourtId('');
           setBookings(bData || []);
           setCustomers(cData || []);
         });
@@ -330,6 +337,9 @@ export default function OwnerSaaSView() {
       populateBizForm(v);
       setLoadingSlots(true);
       loadLiveSlots(v.id, calendarDate);
+      setAnalyticsScope('overall');
+      setAnalyticsSportId('');
+      setAnalyticsCourtId('');
       // Refresh secondary tabs in the background for the new venue
       Promise.all([
         api.getOwnerAnalytics(v.id).catch(() => null),
@@ -341,6 +351,49 @@ export default function OwnerSaaSView() {
         setCustomers(cData || []);
       });
     }
+  }
+
+  async function loadAnalyticsForScope({ scope = analyticsScope, sportId = analyticsSportId, courtId = analyticsCourtId, venueId } = {}) {
+    const vId = venueId || selectedVenue?.id;
+    if (!vId) return;
+    setAnalyticsLoading(true);
+    try {
+      const opts = {};
+      if (scope === 'sport' && sportId) opts.sportId = sportId;
+      if (scope === 'court' && courtId) opts.courtId = courtId;
+      // When drilling to a court, also pass sport if known for consistency
+      if (scope === 'court' && sportId) opts.sportId = sportId;
+      const anData = await api.getOwnerAnalytics(vId, opts);
+      setAnalytics(anData);
+    } catch (err) {
+      console.error('Error fetching analytics:', err);
+    } finally {
+      setAnalyticsLoading(false);
+    }
+  }
+
+  function selectAnalyticsOverall() {
+    setAnalyticsScope('overall');
+    setAnalyticsSportId('');
+    setAnalyticsCourtId('');
+    loadAnalyticsForScope({ scope: 'overall', sportId: '', courtId: '' });
+  }
+
+  function selectAnalyticsSport(sportId) {
+    if (!sportId) return;
+    setAnalyticsScope('sport');
+    setAnalyticsSportId(sportId);
+    setAnalyticsCourtId('');
+    loadAnalyticsForScope({ scope: 'sport', sportId, courtId: '' });
+  }
+
+  function selectAnalyticsCourt(courtId, sportId) {
+    if (!courtId) return;
+    const sid = sportId || analyticsSportId || '';
+    setAnalyticsScope('court');
+    setAnalyticsCourtId(courtId);
+    if (sid) setAnalyticsSportId(sid);
+    loadAnalyticsForScope({ scope: 'court', sportId: sid, courtId });
   }
 
   function handleDateChange(newDate) {
@@ -2837,6 +2890,11 @@ export default function OwnerSaaSView() {
             const a = analytics || {};
             const fmt = (n) => `₹${Number(n || 0).toLocaleString('en-IN')}`;
             const dowNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            const filterSports = Array.isArray(a.filters?.sports) ? a.filters.sports : [];
+            const filterCourts = Array.isArray(a.filters?.courts) ? a.filters.courts : [];
+            const courtsForSport = analyticsSportId
+              ? filterCourts.filter((c) => c.sportId === analyticsSportId)
+              : filterCourts;
             const courts = Array.isArray(a.revenueByCourt) ? a.revenueByCourt : [];
             const sports = Array.isArray(a.revenueBySport) ? a.revenueBySport : [];
             const peak = (Array.isArray(a.peakHours) ? a.peakHours : []).map((p) => (
@@ -2856,21 +2914,166 @@ export default function OwnerSaaSView() {
             const hours = heatHours.length ? heatHours : [6, 8, 10, 12, 14, 16, 18, 20, 22];
             const heatLookup = new Map(heat.map((h) => [`${h.dow}-${h.hour}`, h.bookings]));
             const occDowMap = new Map(occDow.map((d) => [d.dow, d]));
+            const selectedSportName = filterSports.find((s) => s.id === analyticsSportId)?.name
+              || sports.find((s) => s.sport_id === analyticsSportId)?.sport
+              || '';
+            const selectedCourtName = filterCourts.find((c) => c.id === analyticsCourtId)?.name
+              || courts.find((c) => c.court_id === analyticsCourtId)?.court_name
+              || '';
 
-            const BarRow = ({ label, valueLabel, pct, color = '#059669' }) => (
-              <div style={{ marginBottom: 10 }}>
+            const BarRow = ({ label, valueLabel, pct, color = '#059669', onClick }) => (
+              <button
+                type="button"
+                onClick={onClick}
+                disabled={!onClick}
+                style={{
+                  display: 'block',
+                  width: '100%',
+                  textAlign: 'left',
+                  marginBottom: 10,
+                  background: 'none',
+                  border: 'none',
+                  padding: 0,
+                  cursor: onClick ? 'pointer' : 'default'
+                }}
+              >
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 12.5, marginBottom: 4 }}>
-                  <span style={{ color: '#334155', fontWeight: 600 }}>{label}</span>
+                  <span style={{ color: onClick ? '#059669' : '#334155', fontWeight: 600 }}>{label}{onClick ? ' →' : ''}</span>
                   <span style={{ color: '#0f172a', fontWeight: 700, whiteSpace: 'nowrap' }}>{valueLabel}</span>
                 </div>
                 <div style={{ height: 8, background: '#e2e8f0', borderRadius: 999, overflow: 'hidden' }}>
                   <div style={{ width: `${Math.min(100, Math.max(0, pct))}%`, height: '100%', background: color, borderRadius: 999 }} />
                 </div>
-              </div>
+              </button>
             );
+
+            const scopeBtn = (key, label) => {
+              const active = analyticsScope === key;
+              return (
+                <button
+                  type="button"
+                  key={key}
+                  onClick={() => {
+                    if (key === 'overall') selectAnalyticsOverall();
+                    else if (key === 'sport') {
+                      const first = analyticsSportId || filterSports[0]?.id || sports[0]?.sport_id;
+                      if (first) selectAnalyticsSport(first);
+                    } else if (key === 'court') {
+                      const first = analyticsCourtId
+                        || courtsForSport[0]?.id
+                        || filterCourts[0]?.id
+                        || courts[0]?.court_id;
+                      const sid = analyticsSportId
+                        || filterCourts.find((c) => c.id === first)?.sportId
+                        || courts.find((c) => c.court_id === first)?.sport_id;
+                      if (first) selectAnalyticsCourt(first, sid);
+                    }
+                  }}
+                  style={{
+                    padding: '8px 14px',
+                    borderRadius: 999,
+                    border: active ? '1px solid #059669' : '1px solid #e2e8f0',
+                    background: active ? '#ecfdf5' : '#ffffff',
+                    color: active ? '#065f46' : '#475569',
+                    fontWeight: 700,
+                    fontSize: 12.5,
+                    cursor: 'pointer'
+                  }}
+                >
+                  {label}
+                </button>
+              );
+            };
 
             return (
               <>
+          {/* Scope: Overall → Sport → Court */}
+          <div className="nexus-card" style={{ padding: 14, marginBottom: 16 }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', marginBottom: 10 }}>
+              {scopeBtn('overall', 'Overall')}
+              {scopeBtn('sport', 'By sport')}
+              {scopeBtn('court', 'By court')}
+              {analyticsLoading && (
+                <span style={{ fontSize: 12, color: '#94a3b8' }}>Updating…</span>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center', fontSize: 12.5, color: '#64748b', marginBottom: analyticsScope === 'overall' ? 0 : 10 }}>
+              <button type="button" onClick={selectAnalyticsOverall} style={{ background: 'none', border: 'none', color: analyticsScope === 'overall' ? '#0f172a' : '#059669', fontWeight: 700, cursor: 'pointer', padding: 0 }}>
+                Overall
+              </button>
+              {analyticsScope !== 'overall' && selectedSportName && (
+                <>
+                  <ChevronRight size={14} />
+                  <button type="button" onClick={() => selectAnalyticsSport(analyticsSportId)} style={{ background: 'none', border: 'none', color: analyticsScope === 'sport' ? '#0f172a' : '#059669', fontWeight: 700, cursor: 'pointer', padding: 0 }}>
+                    {selectedSportName}
+                  </button>
+                </>
+              )}
+              {analyticsScope === 'court' && selectedCourtName && (
+                <>
+                  <ChevronRight size={14} />
+                  <span style={{ color: '#0f172a', fontWeight: 700 }}>{selectedCourtName}</span>
+                </>
+              )}
+            </div>
+
+            {analyticsScope === 'sport' && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                <select
+                  className="nexus-input"
+                  style={{ maxWidth: 280, minHeight: 40, padding: '8px 12px' }}
+                  value={analyticsSportId}
+                  onChange={(e) => selectAnalyticsSport(e.target.value)}
+                >
+                  {(filterSports.length ? filterSports : sports.map((s) => ({ id: s.sport_id, name: s.sport }))).map((s) => (
+                    <option key={s.id || s.name} value={s.id}>{s.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {analyticsScope === 'court' && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {filterSports.length > 0 && (
+                  <select
+                    className="nexus-input"
+                    style={{ maxWidth: 200, minHeight: 40, padding: '8px 12px' }}
+                    value={analyticsSportId}
+                    onChange={(e) => {
+                      const sid = e.target.value;
+                      setAnalyticsSportId(sid);
+                      const nextCourts = filterCourts.filter((c) => c.sportId === sid);
+                      const next = nextCourts[0]?.id || '';
+                      if (next) selectAnalyticsCourt(next, sid);
+                    }}
+                  >
+                    <option value="">All sports</option>
+                    {filterSports.map((s) => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
+                )}
+                <select
+                  className="nexus-input"
+                  style={{ maxWidth: 280, minHeight: 40, padding: '8px 12px' }}
+                  value={analyticsCourtId}
+                  onChange={(e) => {
+                    const cid = e.target.value;
+                    const sportId = filterCourts.find((c) => c.id === cid)?.sportId || analyticsSportId;
+                    selectAnalyticsCourt(cid, sportId);
+                  }}
+                >
+                  {(courtsForSport.length ? courtsForSport : filterCourts).map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}{c.sportName ? ` · ${c.sportName}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+
           {/* Period revenue */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 16 }}>
             {[
@@ -2921,65 +3124,75 @@ export default function OwnerSaaSView() {
             </div>
           </div>
 
+          {/* Drill lists — overall: sports + courts; sport: courts; court: hide */}
+          {analyticsScope !== 'court' && (
+            <div className="mobile-grid-1" style={{ display: 'grid', gridTemplateColumns: analyticsScope === 'overall' ? '1fr 1fr' : '1fr', gap: 14, marginBottom: 20 }}>
+              {analyticsScope === 'overall' && (
+                <div className="nexus-card" style={{ padding: 16 }}>
+                  <h3 style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', margin: '0 0 4px' }}>By sport</h3>
+                  <div style={{ fontSize: 11.5, color: '#64748b', marginBottom: 12 }}>Tap a sport to open its metrics</div>
+                  {sports.length === 0 ? (
+                    <div style={{ fontSize: 13, color: '#94a3b8' }}>No sport breakdown yet.</div>
+                  ) : (
+                    sports.map((s) => (
+                      <BarRow
+                        key={s.sport_id || s.sport}
+                        label={s.sport}
+                        valueLabel={`${fmt(s.revenue)} · ${s.bookings}`}
+                        pct={maxSportRev ? (Number(s.revenue) / maxSportRev) * 100 : 0}
+                        color="#2563eb"
+                        onClick={s.sport_id ? () => selectAnalyticsSport(s.sport_id) : undefined}
+                      />
+                    ))
+                  )}
+                </div>
+              )}
+
+              <div className="nexus-card" style={{ padding: 16 }}>
+                <h3 style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', margin: '0 0 4px' }}>
+                  {analyticsScope === 'sport' ? 'Courts in this sport' : 'By court'}
+                </h3>
+                <div style={{ fontSize: 11.5, color: '#64748b', marginBottom: 12 }}>Tap a court to open its metrics</div>
+                {courts.length === 0 ? (
+                  <div style={{ fontSize: 13, color: '#94a3b8' }}>No confirmed bookings yet.</div>
+                ) : (
+                  courts.map((c) => (
+                    <BarRow
+                      key={c.court_id || c.court_name}
+                      label={c.court_name || 'Court'}
+                      valueLabel={`${fmt(c.revenue)} · ${c.bookings}`}
+                      pct={maxCourtRev ? (Number(c.revenue) / maxCourtRev) * 100 : 0}
+                      onClick={c.court_id ? () => selectAnalyticsCourt(c.court_id, c.sport_id || analyticsSportId) : undefined}
+                    />
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="mobile-grid-1" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 20 }}>
-            {/* By court */}
-            <div className="nexus-card" style={{ padding: 16 }}>
-              <h3 style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', margin: '0 0 12px' }}>Revenue by court</h3>
-              {courts.length === 0 ? (
-                <div style={{ fontSize: 13, color: '#94a3b8' }}>No confirmed bookings yet.</div>
-              ) : (
-                courts.map((c) => (
-                  <BarRow
-                    key={c.court_id || c.court_name}
-                    label={c.court_name || 'Court'}
-                    valueLabel={`${fmt(c.revenue)} · ${c.bookings}`}
-                    pct={maxCourtRev ? (Number(c.revenue) / maxCourtRev) * 100 : 0}
-                  />
-                ))
-              )}
-            </div>
+            {analyticsScope !== 'court' && (
+              <div className="nexus-card" style={{ padding: 16 }}>
+                <h3 style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', margin: '0 0 4px' }}>Occupancy by court</h3>
+                <div style={{ fontSize: 11.5, color: '#64748b', marginBottom: 12 }}>Today</div>
+                {occCourts.length === 0 ? (
+                  <div style={{ fontSize: 13, color: '#94a3b8' }}>No slots generated for today.</div>
+                ) : (
+                  occCourts.map((c) => (
+                    <BarRow
+                      key={c.courtId}
+                      label={c.courtName}
+                      valueLabel={`${c.occupancyRate}% · ${c.booked}/${c.bookable}`}
+                      pct={c.occupancyRate}
+                      color="#0d9488"
+                      onClick={c.courtId ? () => selectAnalyticsCourt(c.courtId, c.sportId || analyticsSportId) : undefined}
+                    />
+                  ))
+                )}
+              </div>
+            )}
 
-            {/* By sport */}
-            <div className="nexus-card" style={{ padding: 16 }}>
-              <h3 style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', margin: '0 0 12px' }}>Revenue by sport</h3>
-              {sports.length === 0 ? (
-                <div style={{ fontSize: 13, color: '#94a3b8' }}>No sport breakdown yet.</div>
-              ) : (
-                sports.map((s) => (
-                  <BarRow
-                    key={s.sport}
-                    label={s.sport}
-                    valueLabel={`${fmt(s.revenue)} · ${s.bookings}`}
-                    pct={maxSportRev ? (Number(s.revenue) / maxSportRev) * 100 : 0}
-                    color="#2563eb"
-                  />
-                ))
-              )}
-            </div>
-          </div>
-
-          <div className="mobile-grid-1" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 20 }}>
-            {/* Occupancy by court today */}
-            <div className="nexus-card" style={{ padding: 16 }}>
-              <h3 style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', margin: '0 0 4px' }}>Occupancy by court</h3>
-              <div style={{ fontSize: 11.5, color: '#64748b', marginBottom: 12 }}>Today</div>
-              {occCourts.length === 0 ? (
-                <div style={{ fontSize: 13, color: '#94a3b8' }}>No slots generated for today.</div>
-              ) : (
-                occCourts.map((c) => (
-                  <BarRow
-                    key={c.courtId}
-                    label={c.courtName}
-                    valueLabel={`${c.occupancyRate}% · ${c.booked}/${c.bookable}`}
-                    pct={c.occupancyRate}
-                    color="#0d9488"
-                  />
-                ))
-              )}
-            </div>
-
-            {/* Occupancy by day of week */}
-            <div className="nexus-card" style={{ padding: 16 }}>
+            <div className="nexus-card" style={{ padding: 16, gridColumn: analyticsScope === 'court' ? '1 / -1' : undefined }}>
               <h3 style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', margin: '0 0 4px' }}>Occupancy by weekday</h3>
               <div style={{ fontSize: 11.5, color: '#64748b', marginBottom: 12 }}>Last 30 days</div>
               {dowNames.map((name, dow) => {
@@ -2998,7 +3211,6 @@ export default function OwnerSaaSView() {
           </div>
 
           <div className="mobile-grid-1" style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: 14, marginBottom: 20 }}>
-            {/* Peak hours */}
             <div className="nexus-card" style={{ padding: 16 }}>
               <h3 style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', margin: '0 0 12px' }}>Peak hours</h3>
               {peak.length === 0 ? (
@@ -3016,7 +3228,6 @@ export default function OwnerSaaSView() {
               )}
             </div>
 
-            {/* Weekday vs weekend */}
             <div className="nexus-card" style={{ padding: 16 }}>
               <h3 style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', margin: '0 0 12px' }}>Weekday vs weekend</h3>
               <BarRow
@@ -3039,13 +3250,9 @@ export default function OwnerSaaSView() {
                 }
                 color="#059669"
               />
-              <div style={{ fontSize: 11.5, color: '#64748b', marginTop: 8 }}>
-                Share of all-time confirmed revenue
-              </div>
             </div>
           </div>
 
-          {/* Heatmap */}
           <div className="nexus-card" style={{ padding: 16, marginBottom: 20, overflowX: 'auto' }}>
             <h3 style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', margin: '0 0 4px' }}>Booking heatmap</h3>
             <div style={{ fontSize: 11.5, color: '#64748b', marginBottom: 12 }}>Last 90 days · darker = more bookings</div>
