@@ -838,6 +838,10 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   border-radius: 8px !important;
 }
 
+.turf-proof-pick:active {
+  transform: scale(0.99);
+}
+
 .turf-booking-sheet-overlay .turf-summary-close {
   display: inline-flex !important;
 }

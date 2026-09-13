@@ -5,7 +5,7 @@ import {
   Calendar, Clock, MapPin, Phone, ShieldCheck, ChevronRight,
   Share2, Users, ArrowLeft, CheckCircle, AlertCircle,
   Split, Sparkles, Trophy, Lock, QrCode, Copy, CheckCircle2,
-  ExternalLink, RefreshCw, X
+  ExternalLink, RefreshCw, X, ImagePlus
 } from 'lucide-react';
 
 export default function PublicBookingView({ slug = 'nexus-central-koramangala', onBack, currentUser }) {
@@ -477,6 +477,22 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
     setErrorMsg('');
   }
 
+  /** Release hold but stay on the Lock & Pay form (mobile pay step back). */
+  async function handleBackFromPayment() {
+    if (activeHold?.bookingId) {
+      try {
+        await api.releaseHold({ bookingId: activeHold.bookingId, slotId: selectedSlot?.id });
+      } catch (e) {}
+    }
+    setActiveHold(null);
+    setLockCountdown(0);
+    setCheckoutStep('slots');
+    setUpiUtr('');
+    setPaymentProofFile(null);
+    setPaymentProofPreview('');
+    setErrorMsg('');
+  }
+
   if (loading) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh', color: 'var(--text-secondary)' }}>
@@ -880,7 +896,30 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
               onClick={(e) => e.stopPropagation()}
             >
               <div className="turf-summary-header">
-                <h3 className="font-display" style={{ fontSize: 20, fontWeight: 700, color: '#0f172a', margin: 0 }}>
+                {isMobileBooking && activeHold ? (
+                  <button
+                    type="button"
+                    onClick={handleBackFromPayment}
+                    aria-label="Back to booking details"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      border: '1px solid #e2e8f0',
+                      background: '#ffffff',
+                      color: '#334155',
+                      borderRadius: 10,
+                      padding: '8px 10px',
+                      fontSize: 13,
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      flexShrink: 0
+                    }}
+                  >
+                    <ArrowLeft size={16} /> Back
+                  </button>
+                ) : null}
+                <h3 className="font-display" style={{ fontSize: 20, fontWeight: 700, color: '#0f172a', margin: 0, flex: 1 }}>
                   {isMobileBooking && activeHold ? 'Pay now' : 'Booking Summary'}
                 </h3>
                 <button
@@ -1042,12 +1081,31 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
               ) : selectedSlot ? (
                 <div>
                   {!(isMobileBooking && activeHold) && (
-                  <div style={{ background: '#f8fafc', borderRadius: 10, padding: 14, marginBottom: 16, border: '1px solid #e2e8f0' }}>
-                    <div style={{ fontSize: 13, color: '#64748b' }}>{venue.name}</div>
-                    <div style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', marginTop: 2 }}>{selectedCourt?.name}</div>
-                    <div style={{ fontSize: 13, color: '#059669', marginTop: 4, fontWeight: 600 }}>
-                      {selectedDate} · {selectedSlot.start_time} to {selectedSlot.end_time}
-                    </div>
+                  <div style={{
+                    background: '#f8fafc',
+                    borderRadius: 10,
+                    padding: isMobileBooking ? '8px 10px' : 14,
+                    marginBottom: isMobileBooking ? 10 : 16,
+                    border: '1px solid #e2e8f0'
+                  }}>
+                    {isMobileBooking ? (
+                      <>
+                        <div style={{ fontSize: 13.5, fontWeight: 700, color: '#0f172a' }}>
+                          {selectedCourt?.name}
+                        </div>
+                        <div style={{ fontSize: 12, color: '#059669', fontWeight: 600, marginTop: 2 }}>
+                          {selectedDate} · {selectedSlot.start_time}–{selectedSlot.end_time}
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div style={{ fontSize: 13, color: '#64748b' }}>{venue.name}</div>
+                        <div style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', marginTop: 2 }}>{selectedCourt?.name}</div>
+                        <div style={{ fontSize: 13, color: '#059669', marginTop: 4, fontWeight: 600 }}>
+                          {selectedDate} · {selectedSlot.start_time} to {selectedSlot.end_time}
+                        </div>
+                      </>
+                    )}
                   </div>
                   )}
 
@@ -1059,7 +1117,7 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
                         gridTemplateColumns: '1fr 1fr',
                         gap: 6,
                         padding: 4,
-                        marginBottom: 16,
+                        marginBottom: isMobileBooking ? 10 : 16,
                         background: '#f1f5f9',
                         borderRadius: 10,
                         border: '1px solid #e2e8f0'
@@ -1193,73 +1251,102 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
                   {/* Pre-lock: contact + fee. Post-lock on mobile: jump straight to pay. */}
                   {!(isMobileBooking && activeHold) && (
                     <>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
-                        <div>
+                      <div
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: isMobileBooking ? '1fr 1fr' : '1fr',
+                          gap: isMobileBooking ? 8 : 10,
+                          marginBottom: isMobileBooking ? 10 : 16
+                        }}
+                      >
+                        <div style={isMobileBooking ? undefined : { gridColumn: '1 / -1' }}>
                           <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
-                            PHONE NUMBER *
+                            {isMobileBooking ? 'PHONE *' : 'PHONE NUMBER *'}
                           </label>
                           <input
                             type="tel"
-                            placeholder="+91 98765 43210"
+                            placeholder={isMobileBooking ? '98765 43210' : '+91 98765 43210'}
                             className="nexus-input"
-                            style={{ width: '100%' }}
+                            style={{ width: '100%', ...(isMobileBooking ? { padding: '8px 10px', fontSize: 13 } : {}) }}
                             value={customerPhone}
                             onChange={e => setCustomerPhone(e.target.value)}
                           />
                         </div>
-                        <div>
+                        <div style={isMobileBooking ? undefined : { gridColumn: '1 / -1' }}>
                           <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>
-                            YOUR NAME
+                            {isMobileBooking ? 'NAME' : 'YOUR NAME'}
                           </label>
                           <input
                             type="text"
                             placeholder="Player Name"
                             className="nexus-input"
-                            style={{ width: '100%' }}
+                            style={{ width: '100%', ...(isMobileBooking ? { padding: '8px 10px', fontSize: 13 } : {}) }}
                             value={customerName}
                             onChange={e => setCustomerName(e.target.value)}
                           />
                         </div>
                       </div>
 
-                      <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8, background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: 8, padding: '10px 12px' }}>
-                        <QrCode size={16} style={{ color: '#059669', flexShrink: 0 }} />
-                        <span style={{ fontSize: 12.5, color: '#065f46', fontWeight: 600 }}>
-                          Pay via the venue owner's UPI QR to lock this slot
-                        </span>
-                      </div>
+                      {!isMobileBooking && (
+                        <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8, background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: 8, padding: '10px 12px' }}>
+                          <QrCode size={16} style={{ color: '#059669', flexShrink: 0 }} />
+                          <span style={{ fontSize: 12.5, color: '#065f46', fontWeight: 600 }}>
+                            Pay via the venue owner's UPI QR to lock this slot
+                          </span>
+                        </div>
+                      )}
 
-                      <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: 14, marginBottom: 18 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#64748b', marginBottom: 6 }}>
-                          <span>Slot Fee</span>
-                          <span style={{ fontWeight: 600, color: '#0f172a' }}>₹{selectedSlot.price}</span>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#64748b', marginBottom: 8 }}>
-                          <span>Platform Fee</span>
-                          <span style={{ color: '#059669', fontWeight: 600 }}>₹0 (Direct UPI to Venue)</span>
-                        </div>
-                        {advancePercent < 100 && (
-                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#92400e', marginBottom: 8 }}>
-                            <span>Balance Due at Venue</span>
-                            <span style={{ fontWeight: 600 }}>₹{balanceAtVenue}</span>
+                      {isMobileBooking ? (
+                        <div style={{ marginBottom: 10, padding: '8px 0 2px', borderTop: '1px solid #e2e8f0' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                            <span style={{ fontSize: 12, color: '#64748b' }}>
+                              {advancePercent < 100 ? 'Pay now' : 'Total'}
+                            </span>
+                            <span style={{ fontSize: 20, fontWeight: 800, color: '#0f172a' }}>₹{advanceAmount}</span>
                           </div>
-                        )}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 18, fontWeight: 800, color: '#0f172a' }}>
-                          <span>{advancePercent < 100 ? 'Pay Now (Advance)' : 'Total Due'}</span>
-                          <span>₹{advanceAmount}</span>
+                          {advancePercent < 100 && (
+                            <div style={{ fontSize: 11, color: '#92400e', marginTop: 2, textAlign: 'right' }}>
+                              Slot ₹{selectedSlot.price} · ₹{balanceAtVenue} at venue
+                            </div>
+                          )}
                         </div>
-                      </div>
+                      ) : (
+                        <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: 14, marginBottom: 18 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#64748b', marginBottom: 6 }}>
+                            <span>Slot Fee</span>
+                            <span style={{ fontWeight: 600, color: '#0f172a' }}>₹{selectedSlot.price}</span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#64748b', marginBottom: 8 }}>
+                            <span>Platform Fee</span>
+                            <span style={{ color: '#059669', fontWeight: 600 }}>₹0 (Direct UPI to Venue)</span>
+                          </div>
+                          {advancePercent < 100 && (
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#92400e', marginBottom: 8 }}>
+                              <span>Balance Due at Venue</span>
+                              <span style={{ fontWeight: 600 }}>₹{balanceAtVenue}</span>
+                            </div>
+                          )}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 18, fontWeight: 800, color: '#0f172a' }}>
+                            <span>{advancePercent < 100 ? 'Pay Now (Advance)' : 'Total Due'}</span>
+                            <span>₹{advanceAmount}</span>
+                          </div>
+                        </div>
+                      )}
                     </>
                   )}
 
                   {!activeHold ? (
                     <button
                       className="btn-primary"
-                      style={{ width: '100%', padding: '12px' }}
+                      style={{ width: '100%', padding: isMobileBooking ? '11px' : '12px' }}
                       disabled={isHolding}
                       onClick={handleLockSlot}
                     >
-                      {isHolding ? 'Locking Slot...' : (isMobileBooking ? 'Lock Slot & Pay (10m Hold)' : 'Lock Slot & Show UPI QR (10m Hold)')}
+                      {isHolding
+                        ? 'Locking Slot...'
+                        : isMobileBooking
+                        ? `Lock & Pay · ₹${advanceAmount}`
+                        : 'Lock Slot & Show UPI QR (10m Hold)'}
                     </button>
                   ) : isMobileBooking ? (
                     (() => {
@@ -1351,22 +1438,53 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
                           </div>
 
                           <div>
-                            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#059669', marginBottom: 4, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-                              Payment screenshot *
-                            </label>
-                            <input
-                              type="file"
-                              accept="image/png,image/jpeg,image/webp,image/*"
-                              onChange={handlePaymentProofPick}
-                              style={{ width: '100%', fontSize: 12 }}
-                            />
-                            {paymentProofPreview && (
-                              <img
-                                src={paymentProofPreview}
-                                alt="Payment screenshot preview"
-                                style={{ width: '100%', maxHeight: 96, objectFit: 'contain', borderRadius: 6, border: '1px solid #e2e8f0', background: '#fff', marginTop: 6 }}
+                            <label
+                              className="turf-proof-pick"
+                              style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: 6,
+                                width: '100%',
+                                boxSizing: 'border-box',
+                                padding: paymentProofPreview ? '10px' : '16px 12px',
+                                borderRadius: 10,
+                                border: paymentProofFile ? '2px solid #059669' : '2px dashed #059669',
+                                background: paymentProofFile ? '#ecfdf5' : '#f0fdf4',
+                                cursor: 'pointer',
+                                textAlign: 'center'
+                              }}
+                            >
+                              <input
+                                type="file"
+                                accept="image/png,image/jpeg,image/webp,image/*"
+                                onChange={handlePaymentProofPick}
+                                style={{ display: 'none' }}
                               />
-                            )}
+                              {paymentProofPreview ? (
+                                <>
+                                  <img
+                                    src={paymentProofPreview}
+                                    alt="Payment screenshot preview"
+                                    style={{ width: '100%', maxHeight: 88, objectFit: 'contain', borderRadius: 6, background: '#fff' }}
+                                  />
+                                  <span style={{ fontSize: 12, fontWeight: 700, color: '#065f46' }}>
+                                    Tap to change · {paymentProofFile?.name || 'Screenshot selected'}
+                                  </span>
+                                </>
+                              ) : (
+                                <>
+                                  <ImagePlus size={22} style={{ color: '#059669' }} />
+                                  <span style={{ fontSize: 13.5, fontWeight: 800, color: '#065f46' }}>
+                                    Upload payment screenshot
+                                  </span>
+                                  <span style={{ fontSize: 11, color: '#64748b' }}>
+                                    Tap to choose from gallery
+                                  </span>
+                                </>
+                              )}
+                            </label>
                           </div>
 
                           <button
@@ -1380,7 +1498,7 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
 
                           <button
                             type="button"
-                            onClick={handleCancelHold}
+                            onClick={handleBackFromPayment}
                             style={{
                               background: 'none',
                               border: 'none',
@@ -1391,7 +1509,7 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
                               padding: 0
                             }}
                           >
-                            Cancel hold
+                            Back to details
                           </button>
                         </div>
                       );
