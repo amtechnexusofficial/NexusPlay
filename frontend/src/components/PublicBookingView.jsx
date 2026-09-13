@@ -432,9 +432,7 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
     // App-specific schemes so Android doesn't default to WhatsApp Pay for upi://
     return {
       gpay: `tez://upi/pay?${qs}`,
-      phonepe: `phonepe://pay?${qs}`,
-      paytm: `paytmmp://pay?${qs}`,
-      generic: `upi://pay?${qs}`
+      phonepe: `phonepe://pay?${qs}`
     };
   }
 
@@ -643,7 +641,6 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
         </div>
       </div>
 
-      {/* MAIN BOOKING INTERFACE */}
       {checkoutStep === 'confirmed' && confirmedBooking ? (
         <div className="nexus-card animate-fade-in" style={{ padding: 36, textAlign: 'center', background: '#ffffff', border: '1px solid #e2e8f0' }}>
           <div style={{ display: 'inline-flex', padding: 16, borderRadius: '50%', background: '#d1fae5', color: '#059669', marginBottom: 16 }}>
@@ -745,6 +742,75 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
         </div>
       ) : (
         <>
+        <div className="turf-about-section">
+          <button
+            type="button"
+            className="turf-about-toggle"
+            onClick={() => setShowVenueDetails((v) => !v)}
+            aria-expanded={showVenueDetails}
+          >
+            {showVenueDetails ? 'Hide venue details' : 'Photos & policies'}
+            <ChevronRight size={16} style={{ transform: showVenueDetails ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }} />
+          </button>
+          {showVenueDetails && (
+            <div className="nexus-card turf-about-body" style={{ overflow: 'hidden', marginTop: 10 }}>
+              <div className="venue-gallery-grid">
+                <img
+                  src={venue.photos?.[0] || 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=1200&q=80'}
+                  alt={venue.name}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                />
+                <div className="venue-gallery-side" style={{ display: 'grid', gridTemplateRows: '1fr 1fr', gap: 4 }}>
+                  <img
+                    src={venue.photos?.[1] || 'https://images.unsplash.com/photo-1529900241452-94f4c281df69?auto=format&fit=crop&w=600&q=80'}
+                    alt="Turf side"
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
+                  <img
+                    src={venue.photos?.[2] || 'https://images.unsplash.com/photo-1626224583764-f87db24ac4ea?auto=format&fit=crop&w=600&q=80'}
+                    alt="Night floodlights"
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
+                </div>
+              </div>
+              <div style={{ padding: 18 }}>
+                {venue.description && (
+                  <p style={{ color: '#475569', margin: '0 0 14px', fontSize: 14, lineHeight: 1.55 }}>
+                    {venue.description}
+                  </p>
+                )}
+                {(venue.cancellation_policy || venue.rules) && (
+                  <div
+                    className="mobile-grid-1"
+                    style={{ display: 'grid', gridTemplateColumns: venue.cancellation_policy && venue.rules ? '1fr 1fr' : '1fr', gap: 12 }}
+                  >
+                    {venue.cancellation_policy && (
+                      <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 12, padding: '14px 16px' }}>
+                        <div style={{ fontSize: 11, fontWeight: 800, color: '#92400e', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
+                          Cancellation Policy
+                        </div>
+                        <div style={{ fontSize: 13.5, color: '#78350f', lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>
+                          {venue.cancellation_policy}
+                        </div>
+                      </div>
+                    )}
+                    {venue.rules && (
+                      <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: '14px 16px' }}>
+                        <div style={{ fontSize: 11, fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
+                          House Rules
+                        </div>
+                        <div style={{ fontSize: 13.5, color: '#334155', lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>
+                          {venue.rules}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
         <div className="turf-booking-chrome">
           <div className="turf-date-strip scroll-pills" role="tablist" aria-label="Choose date">
             {Array.from({ length: 7 }).map((_, i) => {
@@ -1382,60 +1448,84 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
                             )}
                           </div>
 
-                          {!links ? (
+                          {!upiId ? (
                             <div style={{ fontSize: 12.5, color: '#dc2626' }}>
                               This turf has not set a UPI ID yet. Payment cannot start.
                             </div>
                           ) : (
-                            <div className="turf-pay-grid">
-                              <button type="button" onClick={() => openUpiPayLink(links.gpay)} style={{ border: 'none', color: '#fff', background: '#1a73e8', fontWeight: 700, cursor: 'pointer' }}>
-                                GPay
-                              </button>
-                              <button type="button" onClick={() => openUpiPayLink(links.phonepe)} style={{ border: 'none', color: '#fff', background: '#5f259f', fontWeight: 700, cursor: 'pointer' }}>
-                                PhonePe
-                              </button>
-                              <button type="button" onClick={() => openUpiPayLink(links.paytm)} style={{ border: 'none', color: '#fff', background: '#00baf2', fontWeight: 700, cursor: 'pointer' }}>
-                                Paytm
-                              </button>
-                              <button type="button" onClick={() => openUpiPayLink(links.generic)} style={{ border: '1px solid #cbd5e1', color: '#0f172a', background: '#fff', fontWeight: 700, cursor: 'pointer' }}>
-                                Other UPI
-                              </button>
-                            </div>
-                          )}
+                            <>
+                              {links && (
+                                <div className="turf-pay-grid">
+                                  <button type="button" onClick={() => openUpiPayLink(links.gpay)} style={{ border: 'none', color: '#fff', background: '#1a73e8', fontWeight: 700, cursor: 'pointer' }}>
+                                    GPay
+                                  </button>
+                                  <button type="button" onClick={() => openUpiPayLink(links.phonepe)} style={{ border: 'none', color: '#fff', background: '#5f259f', fontWeight: 700, cursor: 'pointer' }}>
+                                    PhonePe
+                                  </button>
+                                </div>
+                              )}
 
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '8px 10px' }}>
-                            <div style={{ minWidth: 0 }}>
-                              <div style={{ fontSize: 10, color: '#64748b' }}>UPI ID</div>
-                              <div style={{ fontSize: 12.5, fontWeight: 700, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                {upiId || 'Not set'}
+                              <div
+                                style={{
+                                  background: '#fffbeb',
+                                  border: '1.5px solid #f59e0b',
+                                  borderRadius: 10,
+                                  padding: '12px 12px 10px'
+                                }}
+                              >
+                                <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase', color: '#b45309', marginBottom: 6 }}>
+                                  Or pay with UPI ID
+                                </div>
+                                <div style={{ fontSize: 12, color: '#78350f', marginBottom: 8, lineHeight: 1.35 }}>
+                                  Open any UPI app, send <strong>₹{amountDue}</strong> to this ID, then upload the screenshot below.
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                  <div
+                                    style={{
+                                      flex: 1,
+                                      minWidth: 0,
+                                      background: '#ffffff',
+                                      border: '1px solid #fcd34d',
+                                      borderRadius: 8,
+                                      padding: '10px 12px',
+                                      fontSize: 15,
+                                      fontWeight: 800,
+                                      color: '#0f172a',
+                                      wordBreak: 'break-all',
+                                      fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace'
+                                    }}
+                                  >
+                                    {upiId}
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(upiId);
+                                      setCopiedUpi(true);
+                                      setTimeout(() => setCopiedUpi(false), 2000);
+                                    }}
+                                    style={{
+                                      flexShrink: 0,
+                                      background: copiedUpi ? '#059669' : '#0f172a',
+                                      border: 'none',
+                                      borderRadius: 8,
+                                      color: '#ffffff',
+                                      padding: '12px 14px',
+                                      fontSize: 13,
+                                      fontWeight: 800,
+                                      cursor: 'pointer',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: 6
+                                    }}
+                                  >
+                                    {copiedUpi ? <CheckCircle2 size={16} /> : <Copy size={16} />}
+                                    {copiedUpi ? 'Copied' : 'Copy'}
+                                  </button>
+                                </div>
                               </div>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (!upiId) return;
-                                navigator.clipboard.writeText(upiId);
-                                setCopiedUpi(true);
-                                setTimeout(() => setCopiedUpi(false), 2000);
-                              }}
-                              style={{
-                                flexShrink: 0,
-                                background: copiedUpi ? '#ecfdf5' : '#fff',
-                                border: '1px solid #cbd5e1',
-                                borderRadius: 6,
-                                color: copiedUpi ? '#059669' : '#334155',
-                                padding: '5px 8px',
-                                fontSize: 11,
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 4
-                              }}
-                            >
-                              {copiedUpi ? <CheckCircle2 size={12} /> : <Copy size={12} />}
-                              {copiedUpi ? 'Copied' : 'Copy'}
-                            </button>
-                          </div>
+                            </>
+                          )}
 
                           <div>
                             <label
@@ -1673,75 +1763,6 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
               </div>
             );
           })()}
-        </div>
-
-        <div className="turf-about-section">
-          <button
-            type="button"
-            className="turf-about-toggle"
-            onClick={() => setShowVenueDetails((v) => !v)}
-            aria-expanded={showVenueDetails}
-          >
-            {showVenueDetails ? 'Hide venue details' : 'Photos & policies'}
-            <ChevronRight size={16} style={{ transform: showVenueDetails ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }} />
-          </button>
-          {showVenueDetails && (
-            <div className="nexus-card turf-about-body" style={{ overflow: 'hidden', marginTop: 10 }}>
-              <div className="venue-gallery-grid">
-                <img
-                  src={venue.photos?.[0] || 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=1200&q=80'}
-                  alt={venue.name}
-                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                />
-                <div className="venue-gallery-side" style={{ display: 'grid', gridTemplateRows: '1fr 1fr', gap: 4 }}>
-                  <img
-                    src={venue.photos?.[1] || 'https://images.unsplash.com/photo-1529900241452-94f4c281df69?auto=format&fit=crop&w=600&q=80'}
-                    alt="Turf side"
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                  />
-                  <img
-                    src={venue.photos?.[2] || 'https://images.unsplash.com/photo-1626224583764-f87db24ac4ea?auto=format&fit=crop&w=600&q=80'}
-                    alt="Night floodlights"
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                  />
-                </div>
-              </div>
-              <div style={{ padding: 18 }}>
-                {venue.description && (
-                  <p style={{ color: '#475569', margin: '0 0 14px', fontSize: 14, lineHeight: 1.55 }}>
-                    {venue.description}
-                  </p>
-                )}
-                {(venue.cancellation_policy || venue.rules) && (
-                  <div
-                    className="mobile-grid-1"
-                    style={{ display: 'grid', gridTemplateColumns: venue.cancellation_policy && venue.rules ? '1fr 1fr' : '1fr', gap: 12 }}
-                  >
-                    {venue.cancellation_policy && (
-                      <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 12, padding: '14px 16px' }}>
-                        <div style={{ fontSize: 11, fontWeight: 800, color: '#92400e', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
-                          Cancellation Policy
-                        </div>
-                        <div style={{ fontSize: 13.5, color: '#78350f', lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>
-                          {venue.cancellation_policy}
-                        </div>
-                      </div>
-                    )}
-                    {venue.rules && (
-                      <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: '14px 16px' }}>
-                        <div style={{ fontSize: 11, fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
-                          House Rules
-                        </div>
-                        <div style={{ fontSize: 13.5, color: '#334155', lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>
-                          {venue.rules}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
         </div>
         </>
       )}
