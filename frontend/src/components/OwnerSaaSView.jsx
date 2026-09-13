@@ -2833,48 +2833,264 @@ export default function OwnerSaaSView() {
       {/* ========================================================================= */}
       {activeTab === 'dashboard' && (
         <div className="animate-fade-in">
-          {/* Key Metrics */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginBottom: 24 }}>
-            <div className="nexus-card" style={{ padding: 20 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Total Revenue</div>
-              <div className="font-display" style={{ fontSize: 26, fontWeight: 800, color: '#0f172a', marginTop: 6 }}>
-                ₹{analytics?.totalRevenue?.toLocaleString() || '48,500'}
+          {(() => {
+            const a = analytics || {};
+            const fmt = (n) => `₹${Number(n || 0).toLocaleString('en-IN')}`;
+            const dowNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            const courts = Array.isArray(a.revenueByCourt) ? a.revenueByCourt : [];
+            const sports = Array.isArray(a.revenueBySport) ? a.revenueBySport : [];
+            const peak = (Array.isArray(a.peakHours) ? a.peakHours : []).map((p) => (
+              typeof p === 'string'
+                ? { startTime: String(p).slice(0, 5), bookings: 0 }
+                : { startTime: String(p?.startTime || p?.start_time || '').slice(0, 5), bookings: Number(p?.bookings) || 0 }
+            ));
+            const occCourts = Array.isArray(a.occupancyByCourt) ? a.occupancyByCourt : [];
+            const occDow = Array.isArray(a.occupancyByDayOfWeek) ? a.occupancyByDayOfWeek : [];
+            const heat = Array.isArray(a.bookingsHeatmap) ? a.bookingsHeatmap : [];
+            const ww = a.weekdayWeekend || {};
+            const maxCourtRev = courts.reduce((m, c) => Math.max(m, Number(c.revenue) || 0), 0);
+            const maxSportRev = sports.reduce((m, s) => Math.max(m, Number(s.revenue) || 0), 0);
+            const maxPeak = peak.reduce((m, p) => Math.max(m, Number(p.bookings) || 0), 0);
+            const heatMax = Math.max(1, heat.reduce((m, h) => Math.max(m, Number(h.bookings) || 0), 0));
+            const heatHours = [...new Set(heat.map((h) => h.hour))].sort((x, y) => x - y);
+            const hours = heatHours.length ? heatHours : [6, 8, 10, 12, 14, 16, 18, 20, 22];
+            const heatLookup = new Map(heat.map((h) => [`${h.dow}-${h.hour}`, h.bookings]));
+            const occDowMap = new Map(occDow.map((d) => [d.dow, d]));
+
+            const BarRow = ({ label, valueLabel, pct, color = '#059669' }) => (
+              <div style={{ marginBottom: 10 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 12.5, marginBottom: 4 }}>
+                  <span style={{ color: '#334155', fontWeight: 600 }}>{label}</span>
+                  <span style={{ color: '#0f172a', fontWeight: 700, whiteSpace: 'nowrap' }}>{valueLabel}</span>
+                </div>
+                <div style={{ height: 8, background: '#e2e8f0', borderRadius: 999, overflow: 'hidden' }}>
+                  <div style={{ width: `${Math.min(100, Math.max(0, pct))}%`, height: '100%', background: color, borderRadius: 999 }} />
+                </div>
               </div>
-              <div style={{ fontSize: 11.5, color: '#059669', marginTop: 4 }}>
-                100% Direct-to-bank settlement
+            );
+
+            return (
+              <>
+          {/* Period revenue */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 16 }}>
+            {[
+              { label: 'Today', revenue: a.todayRevenue, bookings: a.todayBookings },
+              { label: '7 days', revenue: a.weeklyRevenue, bookings: a.weeklyBookings },
+              { label: '30 days', revenue: a.monthlyRevenue, bookings: a.monthlyBookings },
+              { label: 'All time', revenue: a.totalRevenue, bookings: a.totalBookings }
+            ].map((p) => (
+              <div key={p.label} className="nexus-card" style={{ padding: 16 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>{p.label}</div>
+                <div className="font-display" style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', marginTop: 4 }}>{fmt(p.revenue)}</div>
+                <div style={{ fontSize: 11.5, color: '#64748b', marginTop: 2 }}>{p.bookings || 0} bookings</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Snapshot KPIs */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 20 }}>
+            <div className="nexus-card" style={{ padding: 16 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Today's Occupancy</div>
+              <div className="font-display" style={{ fontSize: 24, fontWeight: 800, color: '#059669', marginTop: 4 }}>
+                {a.occupancyRate != null ? `${a.occupancyRate}%` : '—'}
+              </div>
+              <div style={{ fontSize: 11.5, color: '#64748b', marginTop: 2 }}>Booked vs bookable slots today</div>
+            </div>
+            <div className="nexus-card" style={{ padding: 16 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Idle slots (30d)</div>
+              <div className="font-display" style={{ fontSize: 24, fontWeight: 800, color: '#0f172a', marginTop: 4 }}>
+                {a.idleSlots ?? 0}
+              </div>
+              <div style={{ fontSize: 11.5, color: '#64748b', marginTop: 2 }}>
+                {a.idleHours ?? 0} hrs unfilled
               </div>
             </div>
+            <div className="nexus-card" style={{ padding: 16 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Lost revenue est.</div>
+              <div className="font-display" style={{ fontSize: 24, fontWeight: 800, color: '#b45309', marginTop: 4 }}>
+                {fmt(a.lostRevenue)}
+              </div>
+              <div style={{ fontSize: 11.5, color: '#64748b', marginTop: 2 }}>Open slots × price (30d)</div>
+            </div>
+            <div className="nexus-card" style={{ padding: 16 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Gateway fee saved</div>
+              <div className="font-display" style={{ fontSize: 24, fontWeight: 800, color: '#f59e0b', marginTop: 4 }}>
+                {fmt(Math.round((a.totalRevenue || 0) * 0.025))}
+              </div>
+              <div style={{ fontSize: 11.5, color: '#64748b', marginTop: 2 }}>~2.5% vs card gateways</div>
+            </div>
+          </div>
 
-            <div className="nexus-card" style={{ padding: 20 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Slots Booked</div>
-              <div className="font-display" style={{ fontSize: 26, fontWeight: 800, color: '#0f172a', marginTop: 6 }}>
-                {analytics?.totalBookings || bookings.length || '38'}
-              </div>
-              <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 4 }}>
-                Across all courts this month
-              </div>
+          <div className="mobile-grid-1" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 20 }}>
+            {/* By court */}
+            <div className="nexus-card" style={{ padding: 16 }}>
+              <h3 style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', margin: '0 0 12px' }}>Revenue by court</h3>
+              {courts.length === 0 ? (
+                <div style={{ fontSize: 13, color: '#94a3b8' }}>No confirmed bookings yet.</div>
+              ) : (
+                courts.map((c) => (
+                  <BarRow
+                    key={c.court_id || c.court_name}
+                    label={c.court_name || 'Court'}
+                    valueLabel={`${fmt(c.revenue)} · ${c.bookings}`}
+                    pct={maxCourtRev ? (Number(c.revenue) / maxCourtRev) * 100 : 0}
+                  />
+                ))
+              )}
             </div>
 
-            <div className="nexus-card" style={{ padding: 20 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Repeat Customer Rate</div>
-              <div className="font-display" style={{ fontSize: 26, fontWeight: 800, color: '#059669', marginTop: 6 }}>
-                64%
-              </div>
-              <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 4 }}>
-                High weekly player retention
-              </div>
+            {/* By sport */}
+            <div className="nexus-card" style={{ padding: 16 }}>
+              <h3 style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', margin: '0 0 12px' }}>Revenue by sport</h3>
+              {sports.length === 0 ? (
+                <div style={{ fontSize: 13, color: '#94a3b8' }}>No sport breakdown yet.</div>
+              ) : (
+                sports.map((s) => (
+                  <BarRow
+                    key={s.sport}
+                    label={s.sport}
+                    valueLabel={`${fmt(s.revenue)} · ${s.bookings}`}
+                    pct={maxSportRev ? (Number(s.revenue) / maxSportRev) * 100 : 0}
+                    color="#2563eb"
+                  />
+                ))
+              )}
+            </div>
+          </div>
+
+          <div className="mobile-grid-1" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 20 }}>
+            {/* Occupancy by court today */}
+            <div className="nexus-card" style={{ padding: 16 }}>
+              <h3 style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', margin: '0 0 4px' }}>Occupancy by court</h3>
+              <div style={{ fontSize: 11.5, color: '#64748b', marginBottom: 12 }}>Today</div>
+              {occCourts.length === 0 ? (
+                <div style={{ fontSize: 13, color: '#94a3b8' }}>No slots generated for today.</div>
+              ) : (
+                occCourts.map((c) => (
+                  <BarRow
+                    key={c.courtId}
+                    label={c.courtName}
+                    valueLabel={`${c.occupancyRate}% · ${c.booked}/${c.bookable}`}
+                    pct={c.occupancyRate}
+                    color="#0d9488"
+                  />
+                ))
+              )}
             </div>
 
-            <div className="nexus-card" style={{ padding: 20 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Gateway Fee Saved</div>
-              <div className="font-display" style={{ fontSize: 26, fontWeight: 800, color: '#f59e0b', marginTop: 6 }}>
-                ₹{Math.round((analytics?.totalRevenue || 48500) * 0.025).toLocaleString()}
-              </div>
-              <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 4 }}>
-                0% fees via Direct UPI
+            {/* Occupancy by day of week */}
+            <div className="nexus-card" style={{ padding: 16 }}>
+              <h3 style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', margin: '0 0 4px' }}>Occupancy by weekday</h3>
+              <div style={{ fontSize: 11.5, color: '#64748b', marginBottom: 12 }}>Last 30 days</div>
+              {dowNames.map((name, dow) => {
+                const d = occDowMap.get(dow) || { occupancyRate: 0, booked: 0, bookable: 0 };
+                return (
+                  <BarRow
+                    key={name}
+                    label={name}
+                    valueLabel={`${d.occupancyRate || 0}% · ${d.booked || 0}/${d.bookable || 0}`}
+                    pct={d.occupancyRate || 0}
+                    color="#6366f1"
+                  />
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="mobile-grid-1" style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: 14, marginBottom: 20 }}>
+            {/* Peak hours */}
+            <div className="nexus-card" style={{ padding: 16 }}>
+              <h3 style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', margin: '0 0 12px' }}>Peak hours</h3>
+              {peak.length === 0 ? (
+                <div style={{ fontSize: 13, color: '#94a3b8' }}>No booking times yet.</div>
+              ) : (
+                peak.slice(0, 10).map((p) => (
+                  <BarRow
+                    key={p.startTime}
+                    label={p.startTime}
+                    valueLabel={`${p.bookings} bookings`}
+                    pct={maxPeak ? (Number(p.bookings) / maxPeak) * 100 : 0}
+                    color="#ea580c"
+                  />
+                ))
+              )}
+            </div>
+
+            {/* Weekday vs weekend */}
+            <div className="nexus-card" style={{ padding: 16 }}>
+              <h3 style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', margin: '0 0 12px' }}>Weekday vs weekend</h3>
+              <BarRow
+                label="Weekday (Mon–Fri)"
+                valueLabel={`${fmt(ww.weekdayRevenue)} · ${ww.weekdayBookings || 0}`}
+                pct={
+                  (Number(ww.weekdayRevenue || 0) + Number(ww.weekendRevenue || 0)) > 0
+                    ? (Number(ww.weekdayRevenue || 0) / (Number(ww.weekdayRevenue || 0) + Number(ww.weekendRevenue || 0))) * 100
+                    : 0
+                }
+                color="#334155"
+              />
+              <BarRow
+                label="Weekend (Sat–Sun)"
+                valueLabel={`${fmt(ww.weekendRevenue)} · ${ww.weekendBookings || 0}`}
+                pct={
+                  (Number(ww.weekdayRevenue || 0) + Number(ww.weekendRevenue || 0)) > 0
+                    ? (Number(ww.weekendRevenue || 0) / (Number(ww.weekdayRevenue || 0) + Number(ww.weekendRevenue || 0))) * 100
+                    : 0
+                }
+                color="#059669"
+              />
+              <div style={{ fontSize: 11.5, color: '#64748b', marginTop: 8 }}>
+                Share of all-time confirmed revenue
               </div>
             </div>
           </div>
+
+          {/* Heatmap */}
+          <div className="nexus-card" style={{ padding: 16, marginBottom: 20, overflowX: 'auto' }}>
+            <h3 style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', margin: '0 0 4px' }}>Booking heatmap</h3>
+            <div style={{ fontSize: 11.5, color: '#64748b', marginBottom: 12 }}>Last 90 days · darker = more bookings</div>
+            {heat.length === 0 ? (
+              <div style={{ fontSize: 13, color: '#94a3b8' }}>Not enough booking history for a heatmap yet.</div>
+            ) : (
+              <div style={{ minWidth: Math.max(320, 52 + hours.length * 36) }}>
+                <div style={{ display: 'grid', gridTemplateColumns: `44px repeat(${hours.length}, 1fr)`, gap: 3, marginBottom: 3 }}>
+                  <div />
+                  {hours.map((h) => (
+                    <div key={h} style={{ fontSize: 10, color: '#94a3b8', textAlign: 'center' }}>
+                      {String(h).padStart(2, '0')}
+                    </div>
+                  ))}
+                </div>
+                {dowNames.map((name, dow) => (
+                  <div key={name} style={{ display: 'grid', gridTemplateColumns: `44px repeat(${hours.length}, 1fr)`, gap: 3, marginBottom: 3 }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: '#475569', display: 'flex', alignItems: 'center' }}>{name}</div>
+                    {hours.map((hour) => {
+                      const count = heatLookup.get(`${dow}-${hour}`) || 0;
+                      const intensity = count / heatMax;
+                      const bg = count === 0
+                        ? '#f1f5f9'
+                        : `rgba(5, 150, 105, ${0.18 + intensity * 0.82})`;
+                      return (
+                        <div
+                          key={`${dow}-${hour}`}
+                          title={`${name} ${String(hour).padStart(2, '0')}:00 — ${count} bookings`}
+                          style={{
+                            height: 28,
+                            borderRadius: 4,
+                            background: bg,
+                            border: '1px solid #e2e8f0'
+                          }}
+                        />
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+              </>
+            );
+          })()}
 
           {/* Recent Bookings — table on desktop, cards on phone */}
           <div className="nexus-card" style={{ overflow: 'hidden' }}>

@@ -78,12 +78,63 @@ export async function getAnalytics(sql, organizationId, venueId) {
   const [occupancy] = await sql`
     select
       count(*) filter (where status = 'booked')::int as booked,
-      count(*)::int as total
+      count(*) filter (where status in ('open', 'held', 'booked'))::int as bookable
     from court_slots
     where organization_id = ${organizationId} and date = current_date
       and (${venueIdParam}::uuid is null or venue_id = ${venueIdParam}::uuid)
   `;
-  const occupancyRate = occupancy.total > 0 ? Math.round((occupancy.booked / occupancy.total) * 100) : 0;
+  const occupancyRate = occupancy.bookable > 0
+    ? Math.round((occupancy.booked / occupancy.bookable) * 100)
+    : 0;
+
+  const occupancyByCourt = await sql`
+    select
+      c.id as court_id,
+      c.name as court_name,
+      count(*) filter (where cs.status = 'booked')::int as booked,
+      count(*) filter (where cs.status in ('open', 'held', 'booked'))::int as bookable
+    from court_slots cs
+    join courts c on cs.court_id = c.id
+    where cs.organization_id = ${organizationId}
+      and cs.date = current_date
+      and (${venueIdParam}::uuid is null or cs.venue_id = ${venueIdParam}::uuid)
+    group by c.id, c.name
+    order by c.name
+  `;
+
+  // Last 30 days of slots — occupancy by weekday (0=Sun … 6=Sat)
+  const occupancyByDayOfWeek = await sql`
+    select
+      extract(dow from cs.date)::int as dow,
+      count(*) filter (where cs.status = 'booked')::int as booked,
+      count(*) filter (where cs.status in ('open', 'held', 'booked'))::int as bookable
+    from court_slots cs
+    where cs.organization_id = ${organizationId}
+      and cs.date >= current_date - interval '30 days'
+      and cs.date <= current_date
+      and (${venueIdParam}::uuid is null or cs.venue_id = ${venueIdParam}::uuid)
+    group by 1
+    order by 1
+  `;
+
+  // Past + today open slots = unfilled capacity (lost revenue estimate)
+  const [idle] = await sql`
+    select
+      count(*)::int as idle_slots,
+      coalesce(sum(
+        greatest(
+          0.25,
+          extract(epoch from (cs.end_time::time - cs.start_time::time)) / 3600.0
+        )
+      ), 0)::float as idle_hours,
+      coalesce(sum(cs.price), 0)::int as lost_revenue
+    from court_slots cs
+    where cs.organization_id = ${organizationId}
+      and cs.status = 'open'
+      and cs.date >= current_date - interval '30 days'
+      and cs.date <= current_date
+      and (${venueIdParam}::uuid is null or cs.venue_id = ${venueIdParam}::uuid)
+  `;
 
   const revenueByCourt = await sql`
     select c.id as court_id, c.name as court_name, coalesce(sum(b.amount_paid), 0)::int as revenue, count(b.id)::int as bookings
@@ -102,11 +153,41 @@ export async function getAnalytics(sql, organizationId, venueId) {
   `;
 
   const peakHours = await sql`
-    select cs.start_time, count(*)::int as bookings
+    select left(cs.start_time, 5) as start_time, count(*)::int as bookings
     from bookings b join court_slots cs on b.court_slot_id = cs.id
     where b.organization_id = ${organizationId} and b.status in ('confirmed', 'completed')
       and (${venueIdParam}::uuid is null or b.venue_id = ${venueIdParam}::uuid)
-    group by cs.start_time order by bookings desc limit 3
+    group by left(cs.start_time, 5)
+    order by bookings desc
+  `;
+
+  // Heatmap cells: weekday × hour-of-day for confirmed bookings (last 90 days)
+  const bookingsHeatmap = await sql`
+    select
+      extract(dow from cs.date)::int as dow,
+      extract(hour from cs.start_time::time)::int as hour,
+      count(*)::int as bookings
+    from bookings b
+    join court_slots cs on b.court_slot_id = cs.id
+    where b.organization_id = ${organizationId}
+      and b.status in ('confirmed', 'completed')
+      and cs.date >= current_date - interval '90 days'
+      and (${venueIdParam}::uuid is null or b.venue_id = ${venueIdParam}::uuid)
+    group by 1, 2
+    order by 1, 2
+  `;
+
+  const [weekdayWeekend] = await sql`
+    select
+      coalesce(sum(b.amount_paid) filter (where extract(dow from cs.date) between 1 and 5), 0)::int as weekday_revenue,
+      count(*) filter (where extract(dow from cs.date) between 1 and 5)::int as weekday_bookings,
+      coalesce(sum(b.amount_paid) filter (where extract(dow from cs.date) in (0, 6)), 0)::int as weekend_revenue,
+      count(*) filter (where extract(dow from cs.date) in (0, 6))::int as weekend_bookings
+    from bookings b
+    join court_slots cs on b.court_slot_id = cs.id
+    where b.organization_id = ${organizationId}
+      and b.status in ('confirmed', 'completed')
+      and (${venueIdParam}::uuid is null or b.venue_id = ${venueIdParam}::uuid)
   `;
 
   return {
@@ -119,9 +200,39 @@ export async function getAnalytics(sql, organizationId, venueId) {
     totalRevenue: total.revenue,
     totalBookings: total.bookings,
     occupancyRate,
+    occupancyByCourt: occupancyByCourt.map((r) => ({
+      courtId: r.court_id,
+      courtName: r.court_name,
+      booked: r.booked,
+      bookable: r.bookable,
+      occupancyRate: r.bookable > 0 ? Math.round((r.booked / r.bookable) * 100) : 0
+    })),
+    occupancyByDayOfWeek: occupancyByDayOfWeek.map((r) => ({
+      dow: r.dow,
+      booked: r.booked,
+      bookable: r.bookable,
+      occupancyRate: r.bookable > 0 ? Math.round((r.booked / r.bookable) * 100) : 0
+    })),
+    idleSlots: idle.idle_slots,
+    idleHours: Math.round(Number(idle.idle_hours) * 10) / 10,
+    lostRevenue: idle.lost_revenue,
     revenueByCourt,
     revenueBySport,
-    peakHours: peakHours.map((p) => p.start_time),
+    peakHours: peakHours.map((p) => ({
+      startTime: String(p.start_time).slice(0, 5),
+      bookings: p.bookings
+    })),
+    bookingsHeatmap: bookingsHeatmap.map((r) => ({
+      dow: r.dow,
+      hour: r.hour,
+      bookings: r.bookings
+    })),
+    weekdayWeekend: {
+      weekdayRevenue: weekdayWeekend.weekday_revenue,
+      weekdayBookings: weekdayWeekend.weekday_bookings,
+      weekendRevenue: weekdayWeekend.weekend_revenue,
+      weekendBookings: weekdayWeekend.weekend_bookings
+    }
   };
 }
 
