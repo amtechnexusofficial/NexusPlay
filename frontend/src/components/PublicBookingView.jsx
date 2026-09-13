@@ -1333,7 +1333,7 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
                             type="tel"
                             placeholder={isMobileBooking ? '98765 43210' : '+91 98765 43210'}
                             className="nexus-input"
-                            style={{ width: '100%', ...(isMobileBooking ? { padding: '8px 10px', fontSize: 13 } : {}) }}
+                            style={{ width: '100%', ...(isMobileBooking ? { padding: '10px 12px', fontSize: 16 } : {}) }}
                             value={customerPhone}
                             onChange={e => setCustomerPhone(e.target.value)}
                           />
@@ -1346,7 +1346,7 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
                             type="text"
                             placeholder="Player Name"
                             className="nexus-input"
-                            style={{ width: '100%', ...(isMobileBooking ? { padding: '8px 10px', fontSize: 13 } : {}) }}
+                            style={{ width: '100%', ...(isMobileBooking ? { padding: '10px 12px', fontSize: 16 } : {}) }}
                             value={customerName}
                             onChange={e => setCustomerName(e.target.value)}
                           />
@@ -1467,17 +1467,17 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
 
                               <div
                                 style={{
-                                  background: '#fffbeb',
-                                  border: '1.5px solid #f59e0b',
+                                  background: '#f8fafc',
+                                  border: '1px solid #cbd5e1',
                                   borderRadius: 10,
                                   padding: '12px 12px 10px'
                                 }}
                               >
-                                <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase', color: '#b45309', marginBottom: 6 }}>
+                                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: '#64748b', marginBottom: 6 }}>
                                   Or pay with UPI ID
                                 </div>
-                                <div style={{ fontSize: 12, color: '#78350f', marginBottom: 8, lineHeight: 1.35 }}>
-                                  Open any UPI app, send <strong>₹{amountDue}</strong> to this ID, then upload the screenshot below.
+                                <div style={{ fontSize: 12, color: '#64748b', marginBottom: 8, lineHeight: 1.35 }}>
+                                  Open any UPI app, send <strong style={{ color: '#0f172a' }}>₹{amountDue}</strong> to this ID, then upload the screenshot below.
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                   <div
@@ -1485,11 +1485,11 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
                                       flex: 1,
                                       minWidth: 0,
                                       background: '#ffffff',
-                                      border: '1px solid #fcd34d',
+                                      border: '1px solid #e2e8f0',
                                       borderRadius: 8,
                                       padding: '10px 12px',
-                                      fontSize: 15,
-                                      fontWeight: 800,
+                                      fontSize: 14,
+                                      fontWeight: 700,
                                       color: '#0f172a',
                                       wordBreak: 'break-all',
                                       fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace'
@@ -1506,13 +1506,13 @@ export default function PublicBookingView({ slug = 'nexus-central-koramangala', 
                                     }}
                                     style={{
                                       flexShrink: 0,
-                                      background: copiedUpi ? '#059669' : '#0f172a',
+                                      background: copiedUpi ? '#059669' : '#334155',
                                       border: 'none',
                                       borderRadius: 8,
                                       color: '#ffffff',
                                       padding: '12px 14px',
                                       fontSize: 13,
-                                      fontWeight: 800,
+                                      fontWeight: 700,
                                       cursor: 'pointer',
                                       display: 'flex',
                                       alignItems: 'center',

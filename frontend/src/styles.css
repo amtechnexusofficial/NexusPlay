@@ -839,6 +839,14 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   border-radius: 8px !important;
 }
 
+/* iOS Safari zooms focused inputs under 16px and often stays zoomed after Done */
+.turf-booking-sheet-overlay .nexus-input,
+.turf-booking-sheet-overlay input,
+.turf-booking-sheet-overlay select,
+.turf-booking-sheet-overlay textarea {
+  font-size: 16px !important;
+}
+
 .turf-proof-pick:active {
   transform: scale(0.99);
 }
