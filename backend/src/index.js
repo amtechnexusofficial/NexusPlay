@@ -22,7 +22,7 @@ import {
   updateCourt,
   deleteCourt,
 } from "./services/courts.js";
-import { listSlots, blockSlot, unblockSlot, updateSlotPrice, deleteSlot, listLiveSlots, generateSlotsForDate, regenerateSlotsForCourt } from "./services/slots.js";
+import { listSlots, blockSlot, unblockSlot, blockCourtRange, updateSlotPrice, deleteSlot, listLiveSlots, generateSlotsForDate, regenerateSlotsForCourt } from "./services/slots.js";
 import { holdSlot, confirmBooking, releaseHold, sweepExpiredHolds } from "./services/bookings.js";
 import { getSplitShare, paySplitShare } from "./services/splitPayments.js";
 import {
@@ -356,6 +356,12 @@ app.post("/api/owner/slots/block", ...ownerAuth, async (c) => {
   const sql = getDb(c.env);
   const slot = await blockSlot(sql, c.get("organizationId"), await c.req.json());
   return c.json({ success: true, slot });
+});
+
+app.post("/api/owner/slots/block-range", ...ownerAuth, async (c) => {
+  const sql = getDb(c.env);
+  const result = await blockCourtRange(sql, c.get("organizationId"), await c.req.json());
+  return c.json({ success: true, ...result });
 });
 
 app.post("/api/owner/slots/unblock", ...ownerAuth, async (c) => {

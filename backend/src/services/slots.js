@@ -1,14 +1,44 @@
 import { httpError } from "../errors.js";
 
 function timeToMinutes(hhmm) {
-  const [h, m] = (hhmm || "00:00").split(":").map(Number);
-  return h * 60 + (m || 0);
+  const raw = String(hhmm || "00:00").slice(0, 5);
+  // "24:00" is the sentinel for end-of-day (true 24h close). HTML <input type="time">
+  // cannot express it, so the owner UI stores it when "Open 24 hours" is on.
+  if (raw === "24:00") return 24 * 60;
+  const [h, m] = raw.split(":").map(Number);
+  return (Number.isFinite(h) ? h : 0) * 60 + (Number.isFinite(m) ? m : 0);
 }
 
 function minutesToTime(mins) {
+  if (mins >= 24 * 60) return "24:00";
   const h = Math.floor(mins / 60) % 24;
   const m = mins % 60;
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+/** Resolve court/venue open→close window in minutes. Supports close_time = "24:00". */
+export function resolveOpenCloseMinutes(openTime, closeTime) {
+  const openMinutes = timeToMinutes(openTime || "06:00");
+  let closeMinutes = timeToMinutes(closeTime || "23:00");
+  // Same clock time on both ends with an explicit 24h close, or open=close=00:00,
+  // means the full day (00:00 → 24:00).
+  if (closeMinutes <= openMinutes) {
+    if (String(closeTime || "").slice(0, 5) === "24:00" || (openMinutes === 0 && closeMinutes === 0)) {
+      closeMinutes = 24 * 60;
+    }
+  }
+  return { openMinutes, closeMinutes };
+}
+
+function eachDateInclusive(startDate, endDate) {
+  const dates = [];
+  const start = new Date(`${startDate}T00:00:00Z`);
+  const end = new Date(`${endDate}T00:00:00Z`);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) return dates;
+  for (let cur = new Date(start); cur <= end; cur.setUTCDate(cur.getUTCDate() + 1)) {
+    dates.push(dateStr(cur));
+  }
+  return dates;
 }
 
 function isPeakTime(startMinutes, peakHours) {
@@ -81,8 +111,10 @@ async function generateSlotsForDates(sql, venueId, dates) {
     const isWeekend = [0, 6].includes(new Date(`${date}T00:00:00Z`).getUTCDay());
 
     for (const court of courts) {
-      const openMinutes = timeToMinutes(court.open_time || venue.open_time);
-      const closeMinutes = timeToMinutes(court.close_time || venue.close_time);
+      const { openMinutes, closeMinutes } = resolveOpenCloseMinutes(
+        court.open_time || venue.open_time,
+        court.close_time || venue.close_time
+      );
       const duration = court.slot_duration_minutes || 60;
 
       for (let start = openMinutes; start + duration <= closeMinutes; start += duration) {
@@ -193,8 +225,10 @@ export async function regenerateSlotsForCourt(sql, organizationId, courtId, days
     returning id
   `;
 
-  const openMinutes = timeToMinutes(court.open_time || venue.open_time);
-  const closeMinutes = timeToMinutes(court.close_time || venue.close_time);
+  const { openMinutes, closeMinutes } = resolveOpenCloseMinutes(
+    court.open_time || venue.open_time,
+    court.close_time || venue.close_time
+  );
   const duration = court.slot_duration_minutes || 60;
 
   const rows = [];
@@ -344,19 +378,92 @@ export async function blockSlot(sql, organizationId, { slotId, courtId, venueId,
     return updated;
   }
 
-  if (courtId && venueId && date && startTime) {
-    const [court] = await sql`select id from courts where id = ${courtId} and organization_id = ${organizationId}`;
+  if (courtId && date && startTime) {
+    const [court] = await sql`
+      select id, venue_id from courts
+      where id = ${courtId} and organization_id = ${organizationId}
+    `;
     if (!court) throw httpError(404, "Court not found");
+    const resolvedVenueId = venueId || court.venue_id;
     const [row] = await sql`
       insert into court_slots (court_id, venue_id, organization_id, date, start_time, end_time, price, status, block_reason)
-      values (${courtId}, ${venueId}, ${organizationId}, ${date}, ${startTime}, ${endTime || startTime}, 0, 'blocked', ${reason})
+      values (${courtId}, ${resolvedVenueId}, ${organizationId}, ${date}, ${startTime}, ${endTime || startTime}, 0, 'blocked', ${reason})
       on conflict (court_id, date, start_time) do update set status = 'blocked', block_reason = ${reason}
       returning *
     `;
     return row;
   }
 
-  throw httpError(400, "slotId, or courtId+venueId+date+startTime, is required");
+  throw httpError(400, "slotId, or courtId+date+startTime, is required");
+}
+
+// Close a court for one or more days, optionally limited to an hour window.
+// Generates missing open slots first so a freshly created 24h court can still
+// be closed for tonight even before Live Slots was opened.
+export async function blockCourtRange(sql, organizationId, {
+  courtId,
+  venueId,
+  startDate,
+  endDate,
+  startTime,
+  endTime,
+  allDay = false,
+  reason = "Maintenance",
+}) {
+  if (!courtId || !startDate) throw httpError(400, "courtId and startDate are required");
+  const [court] = await sql`
+    select id, venue_id from courts
+    where id = ${courtId} and organization_id = ${organizationId}
+  `;
+  if (!court) throw httpError(404, "Court not found");
+  if (venueId && venueId !== court.venue_id) throw httpError(400, "Court does not belong to that venue");
+
+  const from = startDate;
+  const to = endDate || startDate;
+  const dates = eachDateInclusive(from, to);
+  if (dates.length === 0) throw httpError(400, "Invalid date range");
+  if (dates.length > 62) throw httpError(400, "Date range cannot exceed 62 days");
+
+  await generateSlotsForDates(sql, court.venue_id, dates);
+
+  const closeAllDay = allDay || !startTime || !endTime;
+  let updated;
+  if (closeAllDay) {
+    updated = await sql`
+      update court_slots
+      set status = 'blocked', block_reason = ${reason}
+      where court_id = ${courtId}
+        and organization_id = ${organizationId}
+        and date = any(${dates}::date[])
+        and status = 'open'
+      returning id
+    `;
+  } else {
+    const fromT = String(startTime).slice(0, 5);
+    const toT = String(endTime).slice(0, 5);
+    if (timeToMinutes(toT) <= timeToMinutes(fromT)) {
+      throw httpError(400, "endTime must be after startTime");
+    }
+    updated = await sql`
+      update court_slots
+      set status = 'blocked', block_reason = ${reason}
+      where court_id = ${courtId}
+        and organization_id = ${organizationId}
+        and date = any(${dates}::date[])
+        and status = 'open'
+        and start_time >= ${fromT}
+        and start_time < ${toT}
+      returning id
+    `;
+  }
+
+  return {
+    blocked: updated.length,
+    dates: dates.length,
+    startDate: from,
+    endDate: to,
+    allDay: closeAllDay,
+  };
 }
 
 // The dashboard's "Unblock" button sends courtId+date+startTime (it never

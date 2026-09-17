@@ -291,7 +291,20 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
-    return res.json();
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error || 'Failed to block slot');
+    return body;
+  },
+
+  async blockCourtRange(data) {
+    const res = await ownerFetch(`${API_BASE}/owner/slots/block-range`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error || 'Failed to close court');
+    return body;
   },
 
   async unblockSlot(data) {

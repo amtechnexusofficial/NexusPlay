@@ -150,8 +150,12 @@ export default function OwnerSaaSView() {
   const [showBlockModal, setShowBlockModal] = useState(false);
   const [blockCourtId, setBlockCourtId] = useState('');
   const [blockDate, setBlockDate] = useState(new Date().toISOString().slice(0, 10));
+  const [blockEndDate, setBlockEndDate] = useState(new Date().toISOString().slice(0, 10));
   const [blockStartTime, setBlockStartTime] = useState('14:00');
+  const [blockEndTime, setBlockEndTime] = useState('18:00');
+  const [blockAllDay, setBlockAllDay] = useState(false);
   const [blockReason, setBlockReason] = useState('Turf Maintenance & Brushing');
+  const [blockingRange, setBlockingRange] = useState(false);
 
   // Add/Edit Court modal — editingCourt null means "Add Court"; set to
   // the court object means the form is pre-filled and submits an update
@@ -166,6 +170,7 @@ export default function OwnerSaaSView() {
   const [newCourtWeekendPrice, setNewCourtWeekendPrice] = useState(1800);
   const [newCourtOpenTime, setNewCourtOpenTime] = useState('06:00');
   const [newCourtCloseTime, setNewCourtCloseTime] = useState('23:00');
+  const [newCourtOpen24h, setNewCourtOpen24h] = useState(false);
   const [newCourtSlotDuration, setNewCourtSlotDuration] = useState(60);
   const [savingCourt, setSavingCourt] = useState(false);
   const [courtStatusBusyId, setCourtStatusBusyId] = useState(null);
@@ -571,6 +576,12 @@ export default function OwnerSaaSView() {
     }
   }
 
+  function isCourtOpen24h(openTime, closeTime) {
+    const close = String(closeTime || '').slice(0, 5);
+    const open = String(openTime || '').slice(0, 5);
+    return close === '24:00' || (open === '00:00' && close === '00:00');
+  }
+
   function handleOpenAddCourt() {
     setEditingCourt(null);
     setNewCourtName('');
@@ -579,8 +590,11 @@ export default function OwnerSaaSView() {
     setNewCourtBasePrice(1000);
     setNewCourtPeakPrice(1500);
     setNewCourtWeekendPrice(1800);
-    setNewCourtOpenTime(selectedVenue?.open_time || '06:00');
-    setNewCourtCloseTime(selectedVenue?.close_time || '23:00');
+    const open = selectedVenue?.open_time || '06:00';
+    const close = selectedVenue?.close_time || '23:00';
+    setNewCourtOpenTime(open);
+    setNewCourtCloseTime(close);
+    setNewCourtOpen24h(isCourtOpen24h(open, close));
     setNewCourtSlotDuration(60);
     setShowCourtModal(true);
   }
@@ -593,10 +607,26 @@ export default function OwnerSaaSView() {
     setNewCourtBasePrice(court.base_price ?? 1000);
     setNewCourtPeakPrice(court.peak_price ?? court.base_price ?? 1500);
     setNewCourtWeekendPrice(court.weekend_price ?? court.base_price ?? 1800);
-    setNewCourtOpenTime(court.open_time || selectedVenue?.open_time || '06:00');
-    setNewCourtCloseTime(court.close_time || selectedVenue?.close_time || '23:00');
+    const open = court.open_time || selectedVenue?.open_time || '06:00';
+    const close = court.close_time || selectedVenue?.close_time || '23:00';
+    setNewCourtOpenTime(open === '24:00' ? '00:00' : open);
+    setNewCourtCloseTime(close === '24:00' ? '23:00' : close);
+    setNewCourtOpen24h(isCourtOpen24h(open, close));
     setNewCourtSlotDuration(court.slot_duration_minutes || 60);
     setShowCourtModal(true);
+  }
+
+  function openBlockModal(prefill = {}) {
+    const today = new Date().toISOString().slice(0, 10);
+    const firstCourtId = selectedVenue?.courts?.[0]?.id || '';
+    setBlockCourtId(prefill.courtId || blockCourtId || firstCourtId);
+    setBlockDate(prefill.date || calendarDate || today);
+    setBlockEndDate(prefill.endDate || prefill.date || calendarDate || today);
+    setBlockStartTime(prefill.startTime || '14:00');
+    setBlockEndTime(prefill.endTime || '18:00');
+    setBlockAllDay(!!prefill.allDay);
+    setBlockReason(prefill.reason || 'Turf Maintenance & Brushing');
+    setShowBlockModal(true);
   }
 
   // Toggling this is how an owner takes a court off (or back onto) the
@@ -838,18 +868,31 @@ export default function OwnerSaaSView() {
   // Slot block & walkin handlers
   async function handleBlockSlotSubmit(e) {
     e.preventDefault();
+    if (blockingRange) return;
+    const courtId = blockCourtId || selectedVenue.courts?.[0]?.id;
+    if (!courtId) {
+      alert('Add a court first before closing hours.');
+      return;
+    }
+    setBlockingRange(true);
     try {
-      await api.blockSlot({
-        courtId: blockCourtId || selectedVenue.courts?.[0]?.id,
-        date: blockDate,
-        startTime: blockStartTime,
+      const res = await api.blockCourtRange({
+        courtId,
+        venueId: selectedVenue.id,
+        startDate: blockDate,
+        endDate: blockEndDate || blockDate,
+        allDay: blockAllDay,
+        startTime: blockAllDay ? undefined : blockStartTime,
+        endTime: blockAllDay ? undefined : blockEndTime,
         reason: blockReason
       });
       setShowBlockModal(false);
       if (selectedVenue) loadLiveSlots(selectedVenue.id, calendarDate);
-      alert('Slot blocked for maintenance successfully.');
+      alert(`Closed ${res.blocked} open slot(s) across ${res.dates} day(s). Booked/held slots were left alone.`);
     } catch (err) {
-      alert('Failed to block slot: ' + err.message);
+      alert('Failed to close court: ' + err.message);
+    } finally {
+      setBlockingRange(false);
     }
   }
 
@@ -1555,12 +1598,12 @@ export default function OwnerSaaSView() {
 
               <button
                 type="button"
-                onClick={() => setShowBlockModal(true)}
+                onClick={() => openBlockModal({ date: calendarDate, allDay: false })}
                 className="btn-secondary owner-live-action-btn"
               >
                 <Lock size={14} />
-                <span className="owner-action-full">Block Slot</span>
-                <span className="owner-action-short">Block</span>
+                <span className="owner-action-full">Close Court</span>
+                <span className="owner-action-short">Close</span>
               </button>
             </div>
           </div>
@@ -1939,12 +1982,12 @@ export default function OwnerSaaSView() {
                           </button>
 
                           <button
-                            onClick={() => {
-                              setBlockCourtId(slot.court_id);
-                              setBlockDate(slot.date);
-                              setBlockStartTime(slot.start_time);
-                              setShowBlockModal(true);
-                            }}
+                            onClick={() => openBlockModal({
+                              courtId: slot.court_id,
+                              date: slot.date,
+                              startTime: String(slot.start_time).slice(0, 5),
+                              endTime: String(slot.end_time || slot.start_time).slice(0, 5),
+                            })}
                             style={{ background: '#f1f5f9', border: '1px solid var(--border-card)', color: '#475569', borderRadius: 6, padding: '7px 10px', fontSize: 11.5, cursor: 'pointer' }}
                           >
                             Block
@@ -2212,12 +2255,12 @@ export default function OwnerSaaSView() {
                                     Walk-in
                                   </button>
                                   <button
-                                    onClick={() => {
-                                      setBlockCourtId(slot.court_id);
-                                      setBlockDate(slot.date);
-                                      setBlockStartTime(slot.start_time);
-                                      setShowBlockModal(true);
-                                    }}
+                                    onClick={() => openBlockModal({
+                                      courtId: slot.court_id,
+                                      date: slot.date,
+                                      startTime: String(slot.start_time).slice(0, 5),
+                                      endTime: String(slot.end_time || slot.start_time).slice(0, 5),
+                                    })}
                                     style={{ background: '#f1f5f9', border: '1px solid var(--border-card)', color: '#475569', borderRadius: 6, padding: '4px 8px', fontSize: 11, cursor: 'pointer' }}
                                   >
                                     Block
@@ -3239,7 +3282,9 @@ export default function OwnerSaaSView() {
                           {c.status === 'active' ? '(Published)' : '(Unpublished)'}
                         </span>
                         <div style={{ color: '#64748b', marginTop: 2 }}>
-                          Open {c.open_time || selectedVenue.open_time || '06:00'} - {c.close_time || selectedVenue.close_time || '23:00'} · {c.slot_duration_minutes}-min slots · ₹{c.base_price} · ID {c.id.slice(0, 8)} · Added {c.created_at ? new Date(c.created_at).toLocaleString() : ''}
+                          Open {isCourtOpen24h(c.open_time || selectedVenue.open_time, c.close_time || selectedVenue.close_time)
+                            ? '24 hours'
+                            : `${c.open_time || selectedVenue.open_time || '06:00'} - ${c.close_time || selectedVenue.close_time || '23:00'}`} · {c.slot_duration_minutes}-min slots · ₹{c.base_price} · ID {c.id.slice(0, 8)} · Added {c.created_at ? new Date(c.created_at).toLocaleString() : ''}
                         </div>
                       </div>
                     ))}
@@ -3280,7 +3325,9 @@ export default function OwnerSaaSView() {
                 </div>
 
                 <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginBottom: 4 }}>
-                  Open {c.open_time || selectedVenue.open_time || '06:00'} - {c.close_time || selectedVenue.close_time || '23:00'} · {c.slot_duration_minutes}-minute slots
+                  Open {isCourtOpen24h(c.open_time || selectedVenue.open_time, c.close_time || selectedVenue.close_time)
+                    ? '24 hours'
+                    : `${c.open_time || selectedVenue.open_time || '06:00'} - ${c.close_time || selectedVenue.close_time || '23:00'}`} · {c.slot_duration_minutes}-minute slots
                 </div>
                 <div style={{ fontSize: 10.5, color: 'var(--text-faint)', marginBottom: 14 }}>
                   Added {c.created_at ? new Date(c.created_at).toLocaleString() : ''} · ID {c.id.slice(0, 8)}
@@ -4101,24 +4148,39 @@ export default function OwnerSaaSView() {
         </div>
       )}
 
-      {/* MODAL: BLOCK SLOT */}
+      {/* MODAL: CLOSE COURT / BLOCK RANGE */}
       {showBlockModal && (
         <div className="modal-overlay">
-          <div className="nexus-card animate-fade-in" style={{ maxHeight: '90vh', overflowY: 'auto', maxWidth: 440, width: '100%', padding: 24, background: '#ffffff' }}>
+          <div className="nexus-card animate-fade-in" style={{ maxHeight: '90vh', overflowY: 'auto', maxWidth: 460, width: '100%', padding: 24, background: '#ffffff' }}>
             <h3 style={{ fontSize: 18, fontWeight: 800, color: '#0f172a', marginBottom: 6 }}>
-              Block Slot for Maintenance
+              Close court
             </h3>
             <p style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginBottom: 16 }}>
-              Take slot off the public calendar for grass repair, lighting maintenance, or private events.
+              Block open slots for maintenance, events, or off hours. Booked and held slots stay as-is.
             </p>
 
             <form onSubmit={handleBlockSlotSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>COURT *</label>
+                <select
+                  required
+                  className="nexus-input"
+                  style={{ width: '100%' }}
+                  value={blockCourtId}
+                  onChange={e => setBlockCourtId(e.target.value)}
+                >
+                  {(selectedVenue?.courts || []).map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+
               <div>
                 <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>REASON</label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Grass aeration, Tournament block"
+                  placeholder="e.g. Grass aeration, Private event"
                   className="nexus-input"
                   style={{ width: '100%' }}
                   value={blockReason}
@@ -4128,35 +4190,76 @@ export default function OwnerSaaSView() {
 
               <div className="mobile-grid-1" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>DATE</label>
+                  <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>FROM DATE</label>
                   <input
                     type="date"
                     required
                     className="nexus-input"
                     style={{ width: '100%' }}
                     value={blockDate}
-                    onChange={e => setBlockDate(e.target.value)}
+                    onChange={e => {
+                      setBlockDate(e.target.value);
+                      if (!blockEndDate || blockEndDate < e.target.value) setBlockEndDate(e.target.value);
+                    }}
                   />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>START TIME</label>
+                  <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>TO DATE</label>
                   <input
-                    type="time"
+                    type="date"
                     required
                     className="nexus-input"
                     style={{ width: '100%' }}
-                    value={blockStartTime}
-                    onChange={e => setBlockStartTime(e.target.value)}
+                    value={blockEndDate}
+                    min={blockDate}
+                    onChange={e => setBlockEndDate(e.target.value)}
                   />
                 </div>
               </div>
 
+              <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', userSelect: 'none' }}>
+                <input
+                  type="checkbox"
+                  checked={blockAllDay}
+                  onChange={e => setBlockAllDay(e.target.checked)}
+                  style={{ width: 16, height: 16 }}
+                />
+                <span style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>Close all day(s)</span>
+              </label>
+
+              {!blockAllDay && (
+                <div className="mobile-grid-1" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>FROM TIME</label>
+                    <input
+                      type="time"
+                      required
+                      className="nexus-input"
+                      style={{ width: '100%' }}
+                      value={blockStartTime}
+                      onChange={e => setBlockStartTime(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>TO TIME</label>
+                    <input
+                      type="time"
+                      required
+                      className="nexus-input"
+                      style={{ width: '100%' }}
+                      value={blockEndTime}
+                      onChange={e => setBlockEndTime(e.target.value)}
+                    />
+                  </div>
+                </div>
+              )}
+
               <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
-                <button type="button" className="btn-secondary" style={{ flex: 1 }} onClick={() => setShowBlockModal(false)}>
+                <button type="button" className="btn-secondary" style={{ flex: 1 }} onClick={() => setShowBlockModal(false)} disabled={blockingRange}>
                   Cancel
                 </button>
-                <button type="submit" className="btn-primary" style={{ flex: 1.5, background: '#f59e0b', color: '#000' }}>
-                  Block Slot
+                <button type="submit" className="btn-primary" style={{ flex: 1.5, background: '#f59e0b', color: '#000' }} disabled={blockingRange}>
+                  {blockingRange ? 'Closing…' : 'Close court'}
                 </button>
               </div>
             </form>
@@ -4177,6 +4280,8 @@ export default function OwnerSaaSView() {
                 e.preventDefault();
                 if (savingCourt) return; // guards against a double-click firing this twice and creating a duplicate court
                 setSavingCourt(true);
+                const openTime = newCourtOpen24h ? '00:00' : newCourtOpenTime;
+                const closeTime = newCourtOpen24h ? '24:00' : newCourtCloseTime;
                 try {
                   if (editingCourt) {
                     await api.updateCourt(editingCourt.id, {
@@ -4185,8 +4290,8 @@ export default function OwnerSaaSView() {
                       basePrice: Number(newCourtBasePrice),
                       peakPrice: Number(newCourtPeakPrice),
                       weekendPrice: Number(newCourtWeekendPrice),
-                      openTime: newCourtOpenTime,
-                      closeTime: newCourtCloseTime,
+                      openTime,
+                      closeTime,
                       slotDurationMinutes: Number(newCourtSlotDuration)
                     });
 
@@ -4194,9 +4299,11 @@ export default function OwnerSaaSView() {
                     // because the court's schedule did — only offer to
                     // rebuild the upcoming grid when the schedule that
                     // drives it actually changed.
+                    const prevOpen = editingCourt.open_time || selectedVenue?.open_time || '06:00';
+                    const prevClose = editingCourt.close_time || selectedVenue?.close_time || '23:00';
                     const scheduleChanged =
-                      newCourtOpenTime !== (editingCourt.open_time || selectedVenue?.open_time || '06:00') ||
-                      newCourtCloseTime !== (editingCourt.close_time || selectedVenue?.close_time || '23:00') ||
+                      openTime !== prevOpen ||
+                      closeTime !== prevClose ||
                       Number(newCourtSlotDuration) !== (editingCourt.slot_duration_minutes || 60);
 
                     if (scheduleChanged && window.confirm('Schedule changed. Apply the new open/close time and slot length to the next 7 days now? (Already-booked or blocked slots are left untouched.)')) {
@@ -4214,8 +4321,8 @@ export default function OwnerSaaSView() {
                       basePrice: Number(newCourtBasePrice),
                       peakPrice: Number(newCourtPeakPrice),
                       weekendPrice: Number(newCourtWeekendPrice),
-                      openTime: newCourtOpenTime,
-                      closeTime: newCourtCloseTime,
+                      openTime,
+                      closeTime,
                       slotDurationMinutes: Number(newCourtSlotDuration)
                     });
                     alert('Court created successfully.');
@@ -4275,28 +4382,50 @@ export default function OwnerSaaSView() {
                 </div>
               </div>
 
-              <div className="mobile-grid-1" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <label style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, padding: '10px 12px', borderRadius: 10, border: '1px solid var(--border-card)', background: 'var(--bg-subtle)', cursor: 'pointer' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>OPENING TIME</label>
-                  <input
-                    type="time"
-                    className="nexus-input"
-                    style={{ width: '100%' }}
-                    value={newCourtOpenTime}
-                    onChange={e => setNewCourtOpenTime(e.target.value)}
-                  />
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>Open 24 hours</div>
+                  <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 2 }}>Generate slots across the full day (00:00–24:00).</div>
                 </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>CLOSING TIME</label>
-                  <input
-                    type="time"
-                    className="nexus-input"
-                    style={{ width: '100%' }}
-                    value={newCourtCloseTime}
-                    onChange={e => setNewCourtCloseTime(e.target.value)}
-                  />
+                <input
+                  type="checkbox"
+                  checked={newCourtOpen24h}
+                  onChange={e => {
+                    const on = e.target.checked;
+                    setNewCourtOpen24h(on);
+                    if (on) {
+                      setNewCourtOpenTime('00:00');
+                      setNewCourtCloseTime('23:00');
+                    }
+                  }}
+                  style={{ width: 18, height: 18, marginTop: 2 }}
+                />
+              </label>
+
+              {!newCourtOpen24h && (
+                <div className="mobile-grid-1" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>OPENING TIME</label>
+                    <input
+                      type="time"
+                      className="nexus-input"
+                      style={{ width: '100%' }}
+                      value={newCourtOpenTime}
+                      onChange={e => setNewCourtOpenTime(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>CLOSING TIME</label>
+                    <input
+                      type="time"
+                      className="nexus-input"
+                      style={{ width: '100%' }}
+                      value={newCourtCloseTime}
+                      onChange={e => setNewCourtCloseTime(e.target.value)}
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
 
               <div>
                 <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>SLOT LENGTH / INTERVAL</label>
@@ -4313,7 +4442,9 @@ export default function OwnerSaaSView() {
                   <option value={120}>120 minutes (2 hours)</option>
                 </select>
                 <div style={{ fontSize: 10.5, color: 'var(--text-muted)', marginTop: 4 }}>
-                  E.g. 06:00-23:00 at 30 minutes gives slots like 06:00-06:30, 06:30-07:00, and so on.
+                  {newCourtOpen24h
+                    ? `E.g. 24 hours at ${newCourtSlotDuration} minutes fills the full day.`
+                    : 'E.g. 06:00-23:00 at 30 minutes gives slots like 06:00-06:30, 06:30-07:00, and so on.'}
                 </div>
               </div>
 
